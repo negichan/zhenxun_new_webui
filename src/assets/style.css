@@ -1,0 +1,44 @@
+@import "tailwindcss";
+@import "./custom.css";
+
+@font-face {
+    font-family: "Harmony";
+    src: url("./fonts/HarmonyOS_Sans_Regular.ttf");
+    font-weight: normal;
+    font-display: swap; /* 避免布局偏移 */
+}
+
+/*@font-face {*/
+/*    font-family: "Yezi";*/
+/*    src: url("./fonts/yezi.ttf");*/
+/*    font-weight: normal;*/
+/*    font-display: swap; !* 避免布局偏移 *!*/
+/*}*/
+/*@font-face {*/
+/*    font-family: "RuanTang";*/
+/*    src: url("./fonts/RuanTang.ttf");*/
+/*    font-weight: normal;*/
+/*    font-display: swap; !* 避免布局偏移 *!*/
+/*}*/
+
+body{
+    font-family: "Harmony", sans-serif;
+    color: #212121;
+}
+.custom-center-notification {
+    left: 50% !important;
+    top: 20px !important;
+    transform: translateX(-50%) !important;
+    animation: slide-down 0.3s ease-out;
+}
+
+@keyframes slide-down {
+    from {
+        transform: translate(-50%, -30px);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+}
