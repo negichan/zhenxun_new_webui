@@ -87,7 +87,7 @@
 <script setup>
 import {ref, computed} from 'vue'
 import gsap from 'gsap'
-import {ZXConfetti} from "components";
+import {ZXConfetti} from "components/zxcomponent/Confetti/index.js";
 
 const MAX_PER_POSITION = 99
 const notifications = ref([])

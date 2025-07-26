@@ -119,8 +119,10 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { getBaseUrl, setUrl } from '@/utils/api/index.js'
-import { ZXNotification } from 'components'
+import { getBaseUrl} from '@/utils/api/index.js'
+import { updateRequestUrl } from '@/utils/api/request.js'
+
+import ZXNotification  from 'components/zxcomponent/Notification/index.js'
 import { throttle } from '@/utils/util.js'
 import { useComponentStore } from '@/store/componet.js'
 import { systemApi } from '@/utils/api/system.js'
@@ -239,7 +241,7 @@ const onConfirm = async () => {
 
     let state = await handleTestAddress()
     if (state) {
-        setUrl(url.value,port.value)
+        updateRequestUrl(url.value,port.value)
         notificationModify(true)
         await leaveAnimation()
         visible.value = false
