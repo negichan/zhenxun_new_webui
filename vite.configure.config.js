@@ -1,15 +1,12 @@
-import {defineConfig} from 'vite'
+import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import {fileURLToPath, URL} from 'node:url'
+import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
-import {ElementPlusResolver} from 'unplugin-vue-components/resolvers'
-import {resolve} from "path";
-import {viteSingleFile} from 'vite-plugin-singlefile'
-import {visualizer} from 'rollup-plugin-visualizer'
-import * as path from "node:path";
-import * as fs from "node:fs";
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import { viteSingleFile } from 'vite-plugin-singlefile'
+import * as path from 'node:path'
 
 // https://vite.dev/config/
 export default defineConfig({
