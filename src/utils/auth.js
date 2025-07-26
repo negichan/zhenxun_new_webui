@@ -20,6 +20,10 @@ export const auth ={
     },
     deleteAuthToken(){
         sessionStorage.removeItem('token');
+    },
+    logout(){
+        this.deleteAuthToken()
+        this.setAuthState(false)
     }
 
 }
