@@ -4,12 +4,13 @@ import { ZXNotification } from 'components'
 import { auth } from '../auth.js'
 import { navigateTo } from '@/utils/navigation.js'
 
-let baseUrl =getBaseUrl()
 export const apiUrl = '/zhenxun/api'
-// console.log(baseUrl)
+
+
+
 
 const request = axios.create({
-    baseURL: baseUrl+apiUrl,
+    baseURL: getBaseUrl()+apiUrl,
     timeout: 10000,
 })
 
@@ -69,9 +70,6 @@ request.interceptors.response.use(
     }
 )
 
-export function setRequestBaseUrl() {
-    request.defaults.baseURL = getBaseUrl()+apiUrl
-}
 
 
 export default request
