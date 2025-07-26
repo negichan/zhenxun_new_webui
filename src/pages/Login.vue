@@ -16,6 +16,8 @@ import ZXInput from 'components/zxcomponent/ZXInput.vue'
 import bg_img from '@/assets/img/title.png'
 import poster_img from '@/assets/img/img.png'
 import logo_img from '@/assets/img/title.png'
+import RainEffect from '@/pages/RainEffect.vue'
+
 
 
 /*
@@ -357,10 +359,12 @@ function handleHoverShowLocation() {
 </script>
 
 <template>
-    <div class="flex h-screen items-center justify-center bg-[#fefefe] select-none">
+    <div class="flex h-screen items-center justify-center   bg-[#fefefe]  select-none ">
+
+        <RainEffect />
         <div
             ref="card"
-            class="login-card relative z-1 flex h-160 w-260 rounded-4xl bg-transparent outline-8 shadow-[0_0_16px_rgba(30,30,30,0.5)] outline-white max-sm:h-screen max-sm:bg-pink-100 sm:m-10"
+            class="login-card relative z-1 flex h-160 w-260 rounded-4xl bg-transparent outline-8 shadow-[0_0_16px_rgba(30,30,30,0.5)] outline-white max-sm:h-screen max-sm:bg-pink-100 sm:m-10   after:content-['']"
         >
             <div
                 class="backdrop h-full overflow-hidden rounded-l-2xl bg-white max-md:hidden max-sm:hidden   pointer-events-none"
@@ -400,9 +404,8 @@ function handleHoverShowLocation() {
                     />
                 </div>
             </div>
-
             <div
-                class="right-area z-2 flex flex-1 flex-col rounded-r-4xl py-6 max-sm:pb-0 backdrop-blur-3xl"
+                class="right-area z-2 flex flex-1 flex-col rounded-r-4xl backdrop-blur-xl py-6 max-sm:pb-0"
             >
                 <div class="location mx-6 ml-auto max-sm:mb-20">
                     <button
@@ -482,10 +485,58 @@ function handleHoverShowLocation() {
                 </div>
             </div>
         </div>
-        <div
-            class="bg absolute -z-0 flex h-full w-full flex-col items-center justify-center blur-3xl overflow-hidden"
+        <svg
+            width="300"
+            height="150"
+            viewBox="0 0 300 150"
+            xmlns='http://www.w3.org/2000/svg'
+            class='absolute'
         >
-            <img ref="bgRef" :src="bg_img" alt="" class="w-full transition-transform duration-1000 ease-linear" />
+            <defs>
+                <filter id='noiseFilter' color-interpolation-filters="sRGB">
+                    <!-- 基础噪点生成 -->
+                    <feTurbulence
+                        type='fractalNoise'
+                        baseFrequency='0.65'
+                        numOctaves='3'
+                        stitchTiles='stitch'
+                        result='turbulence'
+                    />
+
+                    <!-- 颜色调整 -->
+                    <feColorMatrix
+                        type='matrix'
+                        values='0 0 0 0 0.5
+                0 0 0 0 0.5
+                0 0 0 0 0.5
+                0 0 0 0.2 0'
+                        result='coloredNoise'
+                    />
+
+                    <!-- 对比度增强 -->
+                    <feComponentTransfer result='contrastNoise'>
+                        <feFuncR type="linear" slope="2" intercept="-0.5"/>
+                        <feFuncG type="linear" slope="2" intercept="-0.5"/>
+                        <feFuncB type="linear" slope="2" intercept="-0.5"/>
+                    </feComponentTransfer>
+
+                    <!-- 与原图混合 -->
+                    <feBlend
+                        mode='multiply'
+                        in='SourceGraphic'
+                        in2='contrastNoise'
+                    />
+                </filter>
+            </defs>
+
+        </svg>
+        <div
+            class="bg absolute -z-0 flex h-full w-full flex-col items-center justify-center  [filter:url(#noiseFilter)] overflow-hidden bg-gradient-to-br from-white/20 via-white/8 to-white/3"
+        >
+<!--            <div-->
+<!--                class="bg absolute -z-0 flex h-full w-full flex-col items-center justify-center overflow-hidden"-->
+<!--            >-->
+            <img ref="bgRef" :src="bg_img" alt="" class="w-full transition-transform duration-1000 ease-linear blur-3xl " />
         </div>
     </div>
 </template>
