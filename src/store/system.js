@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, reactive, computed, watch } from 'vue';
-import { botApi } from "@/utils/api/bot.js";
+import { botApi } from "@/utils/api/bot.ts";
 import { useWebSocketStore } from "@/store/websocket.js";
 
 /**

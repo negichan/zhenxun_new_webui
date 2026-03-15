@@ -19,7 +19,7 @@ import {gsap} from 'gsap'
  */
 
 import logo from '@/assets/img/title.png'
-import { auth } from '@/utils/auth.js'
+import { auth } from '@/utils/auth.ts'
 import { router } from '@/router/index.js'
 
 

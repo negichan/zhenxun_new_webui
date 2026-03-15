@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "components/*": ["src/components/*"]
+    },
+    "types": ["vite/client",], // 如果你使用 Vite
+//    "allowJs": true,        // 允许编译 JS 文件，便于逐步迁移
+    "noEmit": true,         // 不输出文件，由 vite/vue-cli 处理
+    "lib": ["ESNext", "DOM"],
+    "noImplicitReturns": true
+//    "resolveJsonModule": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.vue", "auto-imports.d.ts" ],
+  "exclude": ["node_modules"]
+}

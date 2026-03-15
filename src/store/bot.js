@@ -1,4 +1,4 @@
-import { botApi } from "@/utils/api/bot.js";
+import { botApi } from "@/utils/api/bot.ts";
 
 /**
  * Pinia Store 用于管理机器人相关状态，包括机器人列表、统计数据和系统状态等。

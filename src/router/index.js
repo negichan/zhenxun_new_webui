@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { ZXNotification } from 'components'
-import { auth } from '@/utils/auth.js'
+import { ZXNotification } from 'components/index.js'
+import { auth } from '@/utils/auth.ts'
 // import Login from "@/views/Login.vue";
 
 const routes = [

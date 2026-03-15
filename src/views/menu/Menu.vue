@@ -21,9 +21,9 @@ import {useGlobalStore} from "@/store/global.js";
 
 // 在 setup 中添加
 const route = useRoute();
-import { auth } from "@/utils/auth.js";
+import { auth } from "@/utils/auth.ts";
 import { router } from "@/router/index.js";
-import { ZXMessageBox } from "components";
+import { ZXMessageBox } from "components/index.js";
 
 /*
 图片导入区
