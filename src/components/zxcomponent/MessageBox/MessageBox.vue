@@ -73,8 +73,8 @@ const props = defineProps({
 
 const visible = ref(false)
 const hovering = ref(false)
-const overlay = ref(null)
-const box = ref(null)
+const overlay = useTemplateRef("overlay")
+const box = useTemplateRef("box")
 
 onMounted(() => {
     visible.value = true

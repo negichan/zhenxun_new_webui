@@ -14,22 +14,13 @@ const system_status = {
             localStorage.setItem("system_status", JSON.stringify(data));
         })
         statusSocket.on('disconnect', () => {
-            console.log("断开连接")
-            // store.addMessage(this.name,data)
         })
         statusSocket.on('error', (data) => {
-            // console.log("发生错误",data)
-            // store.addMessage(this.name,data)
         })
         statusSocket.on('reconnecting', (data) => {
-
-            console.log(data)
-            // store.addMessage(this.name,data)
         })
         statusSocket.on('reconnect_failed', (data) => {
-
             console.log("重连失败，停止连接")
-            // store.addMessage(this.name,data)
         })
 
     },

@@ -1,4 +1,6 @@
-import { createVNode, render } from 'vue'
+import { createVNode, render, ComponentInternalInstance } from 'vue'
+import { ZXConfettiExposed, ZXConfettiOptions, ZXConfettiFn } from "@/types/zxcomponets/confetti.types";
+
 
 
 // 记录最近鼠标坐标
@@ -10,13 +12,12 @@ window.addEventListener('mousemove', (e) => {
     mouseY = e.clientY
 })
 
-let vm = null
+let vm: ComponentInternalInstance | null = null
+let loadingPromise: Promise<ComponentInternalInstance | null> | null = null
 
-let loadingPromise = null
-
-function ensureMounted() {
+async function ensureMounted(): Promise<ComponentInternalInstance | null> {
     if (vm) return vm
-    if (loadingPromise) return vm  // 正在加载，先返回null或旧实例
+    if (loadingPromise) return vm
 
     loadingPromise = import('./Confetti.vue').then(({ default: ConfettiVue }) => {
         const container = document.createElement('div')
@@ -29,24 +30,30 @@ function ensureMounted() {
         return vm
     })
 
-    return vm  // 第一次调用时返回 null，后续调用有实例
+    return vm
 }
 
-function baseConfetti(options = {}) {
+function baseConfetti(options: ZXConfettiOptions = {}) {
     const { x = window.innerWidth / 2, y = window.innerHeight / 2 } = options
-    ensureMounted()?.exposed.launch(x, y, options)
+    ensureMounted().then((instance) => {
+        const exposed = instance?.exposed as ZXConfettiExposed | undefined
+        exposed?.launch(x, y, options)
+    })
 }
 
-// 主函数
-const ZXConfetti = baseConfetti
 
-// 在鼠标位置爆炸（不需要传参）
-ZXConfetti.atMouse = function (options = {}) {
+
+
+
+const ZXConfetti = ((options?: ZXConfettiOptions) => {
+    baseConfetti(options ?? {})
+}) as ZXConfettiFn
+
+ZXConfetti.atMouse = function (options: ZXConfettiOptions = {}) {
     ZXConfetti({ x: mouseX, y: mouseY, ...options })
 }
 
-// 在元素中心爆炸
-ZXConfetti.atElement = function (el, options = {}) {
+ZXConfetti.atElement = function (el: HTMLElement, options: ZXConfettiOptions = {}) {
     const rect = el.getBoundingClientRect()
     const x = rect.left + rect.width / 2
     const y = rect.top + rect.height / 2

@@ -1,16 +1,15 @@
-// @flow
 <script setup>
-import { systemApi } from '@/utils/api/system.js'
-import { ZXNotification } from 'components'
+import { systemApi } from '@/utils/api/system.ts'
+import { ZXNotification } from 'components/index.js'
 import { reactive, computed, toRaw } from 'vue'
-import { navigateTo } from '@/utils/navigation.js'
+import { navigateTo } from '@/utils/navigation.ts'
 
 /*
 图片导入区
  */
 
 import poster from '@/assets/img/7(1).png'
-import ZXInput from 'components/zxcomponent/ZXInput.vue'
+import ZXInput from '@/components/zxcomponent/ZXInput.vue'
 
 /*
 图片导入区结束
@@ -152,7 +151,7 @@ async function submit() {
                 confetti: true
             })
             await navigateTo({
-                path: '/login'
+                path: "/login"
             })
         } else {
             ZXNotification({

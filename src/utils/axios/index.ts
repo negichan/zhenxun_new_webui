@@ -1,8 +1,8 @@
 import axios from 'axios'
-import { getBaseUrl } from '@/utils/api/index.js'
-import { ZXNotification } from 'components'
+import { getBaseUrl } from '@/utils/api'
+import { ZXNotification } from '@/components'
 import { auth } from '../auth.js'
-import { navigateTo } from '@/utils/navigation.js'
+import { navigateTo } from '@/utils/navigation'
 
 export const apiUrl = '/zhenxun/api'
 

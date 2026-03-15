@@ -2,18 +2,28 @@
     <div ref="container" class="fixed inset-0 pointer-events-none z-[9999]"></div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { gsap } from 'gsap'
+import type { ZXConfettiOptions, ZXConfettiExposed } from '@/types/zxcomponets/confetti.types' // 直接复用你定义的 types
 
-const container = ref()
+const container = ref<HTMLDivElement | null>(null)
 
-function launch(x, y, {
-    total = 40,
-    useEmoji = false,
-    emojiList = ['🎉', '✨', '💥', '🎊'],
-    colors = ['#f87171', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#f472b6'],
-} = {}) {
+/**
+ * 🎉 发射 Confetti
+ */
+function launch(
+    x: number,
+    y: number,
+    {
+        total = 40,
+        useEmoji = false,
+        emojiList = ['🎉', '✨', '💥', '🎊'],
+        colors = ['#f87171', '#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#f472b6'],
+    }: ZXConfettiOptions = {}
+): void {
+    if (!container.value) return
+
     for (let i = 0; i < total; i++) {
         const div = document.createElement('div')
         const size = gsap.utils.random(8, 14)
@@ -68,5 +78,8 @@ function launch(x, y, {
     }
 }
 
-defineExpose({ launch })
+// ✅ 向外暴露时，强制类型为 ZXConfettiExposed
+defineExpose<ZXConfettiExposed>({
+    launch,
+})
 </script>

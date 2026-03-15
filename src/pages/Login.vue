@@ -1,194 +1,204 @@
-<script setup>
-import { ZXMessageBox, ZXNotification } from 'components'
-import { showLocationAddress } from 'components/zxcomponent/LocationAddress/index.js'
-import { throttle } from '@/utils/util.js'
-import { auth } from '@/utils/auth.js'
-import { useRouter } from 'vue-router'
-import { useComponentStore } from '@/store/componet.js'
-import { systemApi } from '@/utils/api/system.js'
-import { gsap } from 'gsap'
-import ZXInput from 'components/zxcomponent/ZXInput.vue'
+<script setup lang="ts">
+import { ZXMessageBox, ZXNotification } from "components/index.js";
+import { showLocationAddress } from "components/zxcomponent/LocationAddress";
+import { throttle } from "@/utils/util";
+import { auth } from "@/utils/auth.js";
+import { useRouter } from "vue-router";
+import { useComponentStore } from "@/store/componet.js";
+import { systemApi } from "@/utils/api/system.js";
+import { gsap } from "gsap";
+import ZXInput from "@/components/zxcomponent/ZXInput.vue";
 
 /*
 图片导入区
  */
 
-import bg_img from '@/assets/img/title.png'
-import poster_img from '@/assets/img/img.png'
-import logo_img from '@/assets/img/title.png'
-import RainEffect from '@/utils/effects/RainEffect.vue'
-
+import bg_img from "@/assets/img/title.png";
+import poster_img from "@/assets/img/img.png";
+import logo_img from "@/assets/img/title.png";
+import RainEffect from "@/utils/effects/RainEffect.vue";
+import type { BaseResponse } from "@/types";
 
 /*
 图片导入区结束
  */
 
-const router = useRouter()
+const router = useRouter();
 
-const componentStore = useComponentStore()
+const componentStore = useComponentStore();
 
-const username = ref('')
-const password = ref('')
+// 表单数据
+const username = ref<string>("");
+const password = ref<string>("");
 
-const bgRef = ref('')
-const imgRef = ref('')
-
-const card = ref('')
-const login_card = ref('')
-const logo = ref('')
-
-const showLocationButton = ref('')
+// Refs for template refs (确保类型正确)
+const bgRef = useTemplateRef("bgRef")
+const imgRef = useTemplateRef("imgRef")
+const card = useTemplateRef("card")
+const login_card = useTemplateRef("login_card")
+const logo = useTemplateRef("logo")
+const showLocationButton = useTemplateRef("showLocationButton")
 
 const validate = reactive({
     username: false,
-    password: false
-})
+    password: false,
+});
 
 const message = reactive({
-    username: '',
-    password: ''
-})
+    username: "",
+    password: "",
+});
 
-const changeUsername = (_username) => {
+const changeUsername = (_username: string) => {
     if (_username) {
-        validate.username = true
-        message.username = ''
+        validate.username = true;
+        message.username = "";
     } else {
-        validate.username = false
-        message.username = '请输入用户名'
+        validate.username = false;
+        message.username = "请输入用户名";
     }
-}
+};
 
-const changePassword = (_password) => {
+const changePassword = (_password: string) => {
     if (_password) {
-        validate.password = true
-        message.password = ''
+        validate.password = true;
+        message.password = "";
     } else {
-        validate.password = false
-        message.password = '请输入密码'
+        validate.password = false;
+        message.password = "请输入密码";
     }
-}
+};
 
 const handleSubmitLogin = throttle(() => {
-    const formData = new URLSearchParams()
-    formData.append('username', username.value)
-    formData.append('password', password.value)
+    const formData = new URLSearchParams();
+    formData.append("username", username.value);
+    formData.append("password", password.value);
 
     systemApi
         .login(formData)
-        .then((response) => {
+        .then((axiosRes: object) => {
+            const response = axiosRes as BaseResponse;
             if (response?.suc) {
                 if (response?.warning) {
                     ZXNotification({
-                        title: '警告＞︿＜',
-                        type: 'warning',
-                        message: response?.info
-                    })
-                    return
+                        title: "警告＞︿＜",
+                        type: "warning",
+                        message: response?.info,
+                    });
+                    return;
                 }
 
-                auth.setAuthState(true)
+                auth.setAuthState(true);
 
                 auth.setAuthToken(
                     response?.data?.token_type,
-                    response?.data?.access_token
-                )
+                    response?.data?.access_token,
+                );
 
                 ZXNotification({
-                    title: '🥳',
-                    type: 'success',
+                    title: "🥳",
+                    type: "success",
                     message: response?.info,
-                    confetti: true
-                })
+                    confetti: true,
+                });
 
-                router.push({ name: 'Home' })
+                router.push({ name: "Home" });
             } else {
                 ZXNotification({
-                    title: '哎呀（；´д｀）ゞ',
-                    type: 'error',
-                    message: response?.info
-                })
+                    title: "哎呀（；´д｀）ゞ",
+                    type: "error",
+                    message: response?.info,
+                });
             }
         })
-        .catch((error) => {
-            console.error(error)
-        })
-}, 1000)
+        .catch((error: Error) => {
+            console.error(error);
+        });
+}, 1000);
 
 const submitLogin = () => {
-    changeUsername(username.value)
-    changePassword(password.value)
-    if (!validate.username || !validate.password) return
-    handleSubmitLogin()
-}
+    changeUsername(username.value);
+    changePassword(password.value);
+    if (!validate.username || !validate.password) return;
+    handleSubmitLogin();
+};
 
 const showLocation = () => {
-    document.activeElement.blur()
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement) {
+        activeElement.blur();
+    }
     showLocationAddress({
-        bg_visible: false
-    })
-}
+        bg_visible: false,
+    });
+};
 
 const showForgetPassword = () => {
     ZXMessageBox({
-        title: '活该！！',
-        message: '哥哥竟然忘记密码了呢~人家好伤心哦🤣',
-        confirmButtonText: '😡',
-        confirmButtonHoverText: '🤡'
-    })
-}
+        title: "活该！！",
+        message: "哥哥竟然忘记密码了呢~人家好伤心哦🤣",
+        confirmButtonText: "😡",
+        confirmButtonHoverText: "🤡",
+    });
+};
 
-const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-        if (!componentStore.LocationAddress) submitLogin()
+const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+        if (!componentStore.LocationAddress) submitLogin();
     }
-}
+};
 
 onMounted(() => {
-    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener("keydown", handleKeyDown);
 
-
-    const el = card.value?.$el ?? card.value
-    const el2 = login_card.value?.$el ?? login_card.value
-    const el3 = logo.value?.$el ?? logo.value
+    const el = card.value;
+    const el2 = login_card.value;
+    const el3 = logo.value;
 
     useSodaBlast(el, el2, el3).then(() => {
         createParallaxEffect(bgRef.value, {
             depth: 0.8,
-            duration: 0.1
-        })
+            duration: 0.1,
+        });
         createParallaxEffect(imgRef.value, {
             xOffset: 10,
             yOffset: 10,
             depth: 0.15,
-            duration: 1
-        })
-    })
-    createSVGConfetti()
-})
+            duration: 1,
+        });
+    });
+    createSVGConfetti();
+});
 
 onUnmounted(() => {
-    window.removeEventListener('keydown', handleKeyDown)
-})
+    window.removeEventListener("keydown", handleKeyDown);
+});
 
-function useSodaBlast(el, el2, el3) {
-    const timeline = gsap.timeline()
+function useSodaBlast(
+    el: HTMLElement | null,
+    el2: HTMLElement | null,
+    el3: HTMLElement | null,
+) {
+    const timeline = gsap.timeline();
 
-    const start_scale = 0.3
+    const start_scale = 0.3;
 
     // Step 1: 变小
     timeline.to(el, {
         scale: start_scale,
         duration: 0.1,
-        ease: 'power1.inOut'
-    })
+        ease: "power1.inOut",
+    });
 
-    timeline.to(el2, {
-        scale: 0.5,
-        duration: 0.1,
-        ease: 'power1.inOut'
-    }, '<') // "<" 表示与前一个动画同时开始
-
+    timeline.to(
+        el2,
+        {
+            scale: 0.5,
+            duration: 0.1,
+            ease: "power1.inOut",
+        },
+        "<",
+    ); // "<" 表示与前一个动画同时开始
 
     // Step 2: 喷发（el 和 el2 同时进行）
     timeline.to(el, {
@@ -196,85 +206,106 @@ function useSodaBlast(el, el2, el3) {
         scale: 1.09,
         rotation: 0,
         duration: 0.5,
-        ease: 'power4.out'
-    }) // "<" 表示与上一个动画同时开始
+        ease: "power4.out",
+    }); // "<" 表示与上一个动画同时开始
 
-    timeline.to(el2, {
-        y: -20,
-        scale: 1.1,
-        rotation: 0,
-        duration: 0.6,
-        ease: 'power4.out'
-    }, '<') // "<" 表示与前一个动画同时开始
+    timeline.to(
+        el2,
+        {
+            y: -20,
+            scale: 1.1,
+            rotation: 0,
+            duration: 0.6,
+            ease: "power4.out",
+        },
+        "<",
+    ); // "<" 表示与前一个动画同时开始
 
-    timeline.to(el3, {
-        y: -20,
-        scale: 1.03,
-        rotation: 0,
-        duration: 0.6,
-        ease: 'power4.out'
-    }, '<') // "<" 表示与前一个动画同时开始
-
+    timeline.to(
+        el3,
+        {
+            y: -20,
+            scale: 1.03,
+            rotation: 0,
+            duration: 0.6,
+            ease: "power4.out",
+        },
+        "<",
+    ); // "<" 表示与前一个动画同时开始
 
     // Step 3: 回落（el 单独回落）
     timeline.to(el, {
         y: 0,
         scale: 1,
         duration: 0.6,
-        ease: 'bounce.out'
-    })
-    timeline.to(el2, {
-        y: 0,
-        scale: 1,
-        duration: 0.6,
-        ease: 'bounce.out'
-    }, '<') // "<" 表示与前一个动画同时开始
+        ease: "bounce.out",
+    });
+    timeline.to(
+        el2,
+        {
+            y: 0,
+            scale: 1,
+            duration: 0.6,
+            ease: "bounce.out",
+        },
+        "<",
+    ); // "<" 表示与前一个动画同时开始
 
+    timeline.to(
+        el3,
+        {
+            y: 0,
+            scale: 1,
+            duration: 0.6,
+            ease: "bounce.out",
+            delay: 0.1,
+        },
+        "<",
+    ); // "<" 表示与前一个动画同时开始
 
-    timeline.to(el3, {
-        y: 0,
-        scale: 1,
-        duration: 0.6,
-        ease: 'bounce.out',
-        delay: 0.1
-    }, '<') // "<" 表示与前一个动画同时开始
-
-
-    return timeline
+    return timeline;
 }
 
 function createSVGConfetti() {
-    const container = document.createElement('div')
-    container.style.position = 'fixed'
-    container.style.top = '0'
-    container.style.left = '0'
-    container.style.width = '100%'
-    container.style.height = '100%'
-    container.style.pointerEvents = 'none'
-    container.style.zIndex = '0'
-    document.body.appendChild(container)
+    const container = document.createElement("div");
+    container.style.position = "fixed";
+    container.style.top = "0";
+    container.style.left = "0";
+    container.style.width = "100%";
+    container.style.height = "100%";
+    container.style.pointerEvents = "none";
+    container.style.zIndex = "0";
+    document.body.appendChild(container);
 
     // 创建彩条元素
-    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
-    const count = 100 // 彩条数量
+    const colors = [
+        "#ff0000",
+        "#00ff00",
+        "#0000ff",
+        "#ffff00",
+        "#ff00ff",
+        "#00ffff",
+    ];
+    const count = 100; // 彩条数量
 
     for (let i = 0; i < count; i++) {
-        const confetti = document.createElement('div')
-        confetti.style.position = 'absolute'
-        confetti.style.width = '10px'
-        confetti.style.height = '30px'
-        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)]
-        confetti.style.left = '50%'
-        confetti.style.top = '50%'
-        confetti.style.transformOrigin = 'center center'
-        confetti.style.transform = 'translate(-50%, -50%)'
-        confetti.style.borderRadius = '2px'
-        container.appendChild(confetti)
+        const confetti = document.createElement("div");
+        confetti.style.position = "absolute";
+        confetti.style.width = "10px";
+        confetti.style.height = "30px";
+        confetti.style.backgroundColor =
+            colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.left = "50%";
+        confetti.style.top = "50%";
+        confetti.style.transformOrigin = "center center";
+        confetti.style.transform = "translate(-50%, -50%)";
+        confetti.style.borderRadius = "2px";
+        container.appendChild(confetti);
 
         // 动画设置
-        const angle = Math.random() * Math.PI * 2
-        const distance = 100 + Math.random() * 1000
-        const duration = 1 + Math.random() * 2
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 100 + Math.random() * 1000;
+        const duration = 1 + Math.random() * 2;
 
         gsap.to(confetti, {
             x: Math.cos(angle) * distance,
@@ -282,133 +313,111 @@ function createSVGConfetti() {
             rotation: Math.random() * 360,
             opacity: 0,
             duration: duration,
-            ease: 'power2.out',
+            ease: "power2.out",
             onComplete: () => {
-                container.removeChild(confetti)
+                container.removeChild(confetti);
                 if (container.children.length === 0) {
-                    document.body.removeChild(container)
+                    document.body.removeChild(container);
                 }
-            }
-        })
+            },
+        });
     }
 }
 
-function createParallaxEffect(element, options = {}) {
+function createParallaxEffect(
+    element: HTMLElement | null,
+    options: {
+        xOffset?: number
+        yOffset?: number
+        depth?: number
+        easing?: string
+        duration?: number
+        throttleTime?: number
+    } = {}
+): () => void {
+    const el = element
+    if (!el) return () => {}
+
     const {
         xOffset = 200,
         yOffset = 200,
         depth = 0.5,
         easing = 'power2.out',
         duration = 1.0,
-        throttleTime = 16 // 大约 60 FPS
-    } = options;
+        throttleTime = 16,
+    } = options
 
-    let throttleTimeout = null;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
+    let throttleTimeout: number | null = null
+    let lastMouseX = 0
+    let lastMouseY = 0
 
-    /**
-     * 节流函数，限制函数执行频率。
-     * @param {function} func - 要节流的函数。
-     * @param {number} limit - 节流时间（毫秒）。
-     * @returns {function} 节流后的函数。
-     */
-    const throttler = (func, limit) => {
-        return function(e) {
-            lastMouseX = e.clientX;
-            lastMouseY = e.clientY;
-
+    const throttler = (func: (e: MouseEvent) => void, limit: number) => {
+        return (e: MouseEvent) => {
+            lastMouseX = e.clientX
+            lastMouseY = e.clientY
             if (!throttleTimeout) {
-                throttleTimeout = setTimeout(() => {
-                    func.apply(this, [e]);
-                    throttleTimeout = null;
-                }, limit);
+                throttleTimeout = window.setTimeout(() => {
+                    func(e)
+                    throttleTimeout = null
+                }, limit) as unknown as number
             }
-        };
-    };
-
-    /**
-     * 实际处理鼠标移动并更新动画的函数。
-     * @param {MouseEvent} e - 鼠标事件对象。
-     */
-    function handleMouseMove(e) {
-        // 使用传入的事件对象或最后记录的鼠标位置，确保在节流后也能获取到最新位置
-        const currentClientX = e ? e.clientX : lastMouseX;
-        const currentClientY = e ? e.clientY : lastMouseY;
-
-        const rect = element.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-
-        // 计算鼠标相对于元素中心的归一化位置 (-1 到 1)
-        const relX = (currentClientX - centerX) / (rect.width / 2);
-        const relY = (currentClientY - centerY) / (rect.height / 2);
-
-        // 计算目标 x 和 y 值
-        const targetX = -relX * xOffset * depth;
-        const targetY = -relY * yOffset * depth;
-
-        // 使用 GSAP 的 .to() 方法来平滑地更新元素位置
-        // GSAP 会智能地计算从当前位置到目标位置的过渡
-        // overwrite: true 确保如果有多个动画在尝试控制 x/y，新的动画会覆盖旧的，避免冲突和卡顿
-        gsap.to(element, {
-            x: targetX,
-            y: targetY,
-            ease: easing,
-            duration: duration,
-            overwrite: true // 确保每次只运行一个 x/y 动画
-        });
+        }
     }
 
-    // 将鼠标移动事件监听器绑定到节流函数上
-    const throttledHandleMouseMove = throttler(handleMouseMove, throttleTime);
-    window.addEventListener('mousemove', throttledHandleMouseMove);
+    const handleMouseMove = (e: MouseEvent) => {
+        const rect = el.getBoundingClientRect()
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
 
-    // 返回一个清理函数
+        const relX = (e.clientX - centerX) / (rect.width / 2)
+        const relY = (e.clientY - centerY) / (rect.height / 2)
+
+        const targetX = -relX * xOffset * depth
+        const targetY = -relY * yOffset * depth
+
+        gsap.to(el, { x: targetX, y: targetY, ease: easing, duration: duration, overwrite: true })
+    }
+
+    const throttledHandleMouseMove = throttler(handleMouseMove, throttleTime)
+    window.addEventListener('mousemove', throttledHandleMouseMove)
+
     return () => {
-        window.removeEventListener('mousemove', throttledHandleMouseMove);
-        // 停止并清理与该元素相关的所有 GSAP 动画
-        gsap.killTweensOf(element);
-        // 动画结束后，将元素位置重置
-        gsap.set(element, { x: 0, y: 0 });
-    };
+        window.removeEventListener('mousemove', throttledHandleMouseMove)
+        gsap.killTweensOf(el)
+        gsap.set(el, { x: 0, y: 0 })
+    }
 }
 
-function handleHoverShowLocation() {
-    let el = showLocationButton.value
-    let duration = 0.1
-    let tl = gsap.timeline({
+
+function handleHoverShowLocation(): gsap.core.Timeline {
+    const el = showLocationButton.value
+    if (!el) return gsap.timeline()
+
+    const tl = gsap.timeline({
         paused: true,
-        repeat: 1, // 总共执行3次（初始1次+重复2次）
-        onComplete: () => gsap.to(el, { rotation: 0, duration: 0.2 })
+        repeat: 1,
+        onComplete: function () {
+            gsap.to(el, { rotation: 0, duration: 0.2 })
+        }
     })
 
-    tl.to(
-        el, {
-            rotation: 4, duration: duration
-        }
-    ).to(
-        el, {
-            rotation: -4, duration: duration
-        }
-    )
+    tl.to(el, { rotation: 4, duration: 0.1 }).to(el, { rotation: -4, duration: 0.1 })
     return tl.restart()
-
 }
-
 </script>
 
 <template>
-    <div class="flex h-screen items-center justify-center   bg-[#fefefe]  select-none ">
-
+    <div
+        class="flex h-screen items-center justify-center bg-[#fefefe] select-none"
+    >
         <RainEffect />
 
         <div
             ref="card"
-            class="login-card roof relative z-1 flex h-160 w-260 rounded-4xl bg-transparent border-8 shadow-[0_0_16px_rgba(30,30,30,0.5)] border-white max-sm:h-screen max-sm:bg-pink-100 sm:m-10   after:content-['']"
+            class="login-card roof relative z-1 flex h-160 w-260 rounded-4xl border-8 border-white bg-transparent shadow-[0_0_16px_rgba(30,30,30,0.5)] after:content-[''] max-sm:h-screen max-sm:bg-pink-100 sm:m-10"
         >
             <div
-                class="backdrop h-full overflow-hidden rounded-l-2xl bg-white max-md:hidden max-sm:hidden   pointer-events-none"
+                class="backdrop pointer-events-none h-full overflow-hidden rounded-l-2xl bg-white max-md:hidden max-sm:hidden"
             >
                 <div
                     class="flex h-full w-full flex-col justify-center bg-white"
@@ -446,12 +455,12 @@ function handleHoverShowLocation() {
                 </div>
             </div>
             <div
-                class="right-area z-2 flex flex-1 flex-col rounded-r-4xl backdrop-blur-xl py-6 max-sm:pb-0"
+                class="right-area z-2 flex flex-1 flex-col rounded-r-4xl py-6 backdrop-blur-xl max-sm:pb-0"
             >
                 <div class="location mx-6 ml-auto max-sm:mb-20">
                     <button
                         ref="showLocationButton"
-                        class=" flex cursor-pointer items-center rounded-xl border border-transparent bg-white px-4 py-2 text-center text-xs text-slate-800 shadow-sm hover:shadow-md focus:outline-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
+                        class="flex cursor-pointer items-center rounded-xl border border-transparent bg-white px-4 py-2 text-center text-xs text-slate-800 shadow-sm hover:shadow-md focus:outline-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
                         type="button"
                         @click="showLocation"
                         @mouseenter="handleHoverShowLocation"
@@ -483,7 +492,7 @@ function handleHoverShowLocation() {
                 </div>
                 <div
                     ref="login_card"
-                    class="login  relative mx-30 mb-8 flex-1 space-y-10 rounded-4xl px-8 pt-12 text-sm text-gray-700 shadow-sm before:absolute before:inset-0 before:-z-10 before:rounded-4xl before:bg-white before:bg-cover before:bg-center before:content-[''] max-sm:m-0 max-sm:px-10"
+                    class="login relative mx-30 mb-8 flex-1 space-y-10 rounded-4xl px-8 pt-12 text-sm text-gray-700 shadow-sm before:absolute before:inset-0 before:-z-10 before:rounded-4xl before:bg-white before:bg-cover before:bg-center before:content-[''] max-sm:m-0 max-sm:px-10"
                 >
                     <div class="user space-y-2">
                         <div class="title font-bold">用户名</div>
@@ -520,42 +529,42 @@ function handleHoverShowLocation() {
                         <span
                             class="cursor-pointer text-blue-600 hover:text-blue-400"
                             @click="showForgetPassword"
-                        >忘记密码？</span
+                            >忘记密码？</span
                         >
                     </div>
                 </div>
             </div>
         </div>
         <svg
-            class='absolute'
+            class="absolute"
             height="150"
             viewBox="0 0 300 150"
             width="300"
-            xmlns='http://www.w3.org/2000/svg'
+            xmlns="http://www.w3.org/2000/svg"
         >
             <defs>
-                <filter id='noiseFilter' color-interpolation-filters="sRGB">
+                <filter id="noiseFilter" color-interpolation-filters="sRGB">
                     <!-- 基础噪点生成 -->
                     <feTurbulence
-                        baseFrequency='0.65'
-                        numOctaves='3'
-                        result='turbulence'
-                        stitchTiles='stitch'
-                        type='fractalNoise'
+                        baseFrequency="0.65"
+                        numOctaves="3"
+                        result="turbulence"
+                        stitchTiles="stitch"
+                        type="fractalNoise"
                     />
 
                     <!-- 颜色调整 -->
                     <feColorMatrix
-                        result='coloredNoise'
-                        type='matrix'
-                        values='0 0 0 0 0.5
+                        result="coloredNoise"
+                        type="matrix"
+                        values="0 0 0 0 0.5
                 0 0 0 0 0.5
                 0 0 0 0 0.5
-                0 0 0 0.2 0'
+                0 0 0 0.2 0"
                     />
 
                     <!-- 对比度增强 -->
-                    <feComponentTransfer result='contrastNoise'>
+                    <feComponentTransfer result="contrastNoise">
                         <feFuncR intercept="-0.5" slope="2" type="linear" />
                         <feFuncG intercept="-0.5" slope="2" type="linear" />
                         <feFuncB intercept="-0.5" slope="2" type="linear" />
@@ -563,28 +572,29 @@ function handleHoverShowLocation() {
 
                     <!-- 与原图混合 -->
                     <feBlend
-                        in='SourceGraphic'
-                        in2='contrastNoise'
-                        mode='multiply'
+                        in="SourceGraphic"
+                        in2="contrastNoise"
+                        mode="multiply"
                     />
                 </filter>
             </defs>
-
         </svg>
         <div
-            class="bg absolute -z-0 flex h-full w-full flex-col items-center justify-center  overflow-hidden bg-gradient-to-br [filter:url(#noiseFilter)] from-white/20 via-white/8 to-white/3"
+            class="bg absolute -z-0 flex h-full w-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-white/20 via-white/8 to-white/3 [filter:url(#noiseFilter)]"
         >
             <!--            -->
             <!--            <div-->
             <!--                class="bg absolute -z-0 flex h-full w-full flex-col items-center justify-center overflow-hidden"-->
             <!--            >-->
-            <img ref="bgRef" :src="bg_img" alt="" class="w-full transition-transform blur-3xl duration-1000 ease-linear " />
+            <img
+                ref="bgRef"
+                :src="bg_img"
+                alt=""
+                class="w-full blur-3xl transition-transform duration-1000 ease-linear"
+            />
             <!--            -->
         </div>
     </div>
 </template>
 
-<style scoped>
-
-
-</style>
+<style scoped></style>

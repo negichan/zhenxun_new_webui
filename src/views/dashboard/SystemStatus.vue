@@ -1,32 +1,28 @@
 <script setup lang="ts">
 
+interface Props {
+    icon:any,
+    title: String,
+    data:Number,
+}
 
-const props = defineProps({
-    icon: {
-    },
-    title: {
-        type: String,
-    },
-    data:{
-        type: Number,
-    }
-})
+const props = defineProps<Props>()
 
 </script>
 
 <template>
-    <div class=" w-full h-30 bg-white rounded-4xl shadow-sm flex outline-1 p-4 outline-slate-200">
+    <div class="h-30 bg-white rounded-4xl shadow-sm flex outline-1 py-4 px-6 outline-slate-200 flex-1">
         <div class="left flex flex-col">
             <div class="title text-slate-600 mb-4">
-                {{title}}
+                {{props.title}}
             </div>
             <div class="data text-3xl flex-1 font-bold flex items-center">
-                {{data}}%
+                {{props.data}}%
             </div>
         </div>
         <div class="right ml-auto">
             <div class="icon p-3 bg-slate-900 rounded-full">
-                <component :is="icon" class="size-6 text-white"></component>
+                <component :is="props.icon" class="size-6 text-white"></component>
             </div>
         </div>
     </div>

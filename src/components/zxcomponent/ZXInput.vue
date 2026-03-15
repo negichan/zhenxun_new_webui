@@ -2,10 +2,9 @@
     <!-- 输入框 -->
     <input
         :placeholder="placeholder"
-        :value="modelValue"
+        v-model="inputValue"
         class="ease w-full rounded-md border border-slate-300 bg-white px-3 py-2 pl-6 text-sm font-light text-slate-700 transition duration-300 placeholder:text-slate-400 hover:border-slate-300 focus:border-slate-400 focus:shadow focus:outline-none"
         v-bind="attrs"
-        @input="emit('update:modelValue', $event.target.value)"
     />
 
     <!-- 状态图标 -->
@@ -37,14 +36,14 @@
     </span>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, useAttrs } from 'vue'
 
+const inputValue = defineModel<String | Number>({ required: true })
+const attrs = useAttrs()
+
+
 const props = defineProps({
-    modelValue: {
-        type: [String, Number],
-        default: ''
-    },
     placeholder: {
         type: String,
         default: '请输入'
@@ -56,7 +55,7 @@ const props = defineProps({
     messageType: {
         type: String,
         default: 'error', // 'error' | 'warning' | 'info' | 'success'
-        validator: value => ['error', 'warning', 'info', 'success'].includes(value)
+        validator: (value:string) => ['error', 'warning', 'info', 'success'].includes(value)
     },
     icon: {
         type: Boolean,
@@ -72,17 +71,13 @@ const props = defineProps({
     }
 })
 
-const attrs = useAttrs()
-const emit = defineEmits(['update:modelValue'])
 
 const iconType = computed(() => {
     let value = props.type
     if (typeof value === 'boolean') {
         return value ? 'success' : 'error'
     }
-    if (typeof value === 'string') {
-        return value.toLowerCase()
-    }
+
     return 'error'
 })
 

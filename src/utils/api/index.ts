@@ -13,15 +13,15 @@ export const getPort = () => {
     return localStorage.getItem("port") || window.location.port || "8080"
 }
 
-export const setBaseApiUrl = (baseUrl) => {
+export const setBaseApiUrl = (baseUrl:string) => {
     if(baseUrl) {
             baseApiUrl = baseUrl;
             localStorage.setItem("url", baseUrl);
     }
 }
-export const setPort = (port) => {
+export const setPort = (port:number) => {
     if(port) {
-            localStorage.setItem("port", port);
+            localStorage.setItem("port", port.toString());
     }
 }
 

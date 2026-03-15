@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { createWebSocket } from '@/utils/websocket/index.js'
-import { getHost } from '@/utils/api/index.js'
+import { getHost } from '@/utils/api/index.ts'
 
 export const useWebSocketStore = defineStore('websocket', () => {
     // 使用Map存储各命名空间的消息，保持灵活性和高性能

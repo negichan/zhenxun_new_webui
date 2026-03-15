@@ -1,6 +1,6 @@
 <script setup>
 
-import { botApi } from '@/utils/api/bot.js'
+import { botApi } from '@/utils/api/bot.ts'
 import {useGlobalStore} from "@/store/global.js";
 import {useBotStore} from "@/store/bot.js";
 
