@@ -77,9 +77,10 @@ const commitEdit = () => {
                 <Home class="h-4 w-4" />
             </button>
 
-            <!-- 选中模式：地址栏变为选中操作栏（资源管理器式） -->
+            <!-- 选中模式（多项）：地址栏变为选中操作栏（资源管理器式）；
+                 单选只是临时状态（浏览/打开），不占地址栏 -->
             <div
-                v-if="selectedCount > 0"
+                v-if="selectedCount > 1"
                 class="flex min-w-0 flex-1 items-center gap-2"
             >
                 <span
@@ -146,7 +147,7 @@ const commitEdit = () => {
 
             <!-- 选中模式右侧：批量操作按钮（替换搜索框） -->
             <div
-                v-if="selectedCount > 0"
+                v-if="selectedCount > 1"
                 class="flex flex-shrink-0 items-center gap-2"
             >
                 <ZxButton
