@@ -165,6 +165,7 @@ import {
 import { loadMonaco } from "./monacoLoader";
 import type * as MonacoNamespace from "monaco-editor/editor/editor.api";
 import { useThemeStore } from "@/store/theme";
+import { fileApi } from "@/utils/api-next";
 
 interface Props {
     modelValue?: string;
@@ -603,6 +604,60 @@ const togglePreview = () => {
     renderPreview();
 };
 
+// ---- 相对路径资源解析：md 里引用的同目录图片通过文件接口读成 base64 ----
+const imageFetchCache = new Map<string, Promise<string | null>>();
+
+/** 把 md 内的相对 src 解析为服务器绝对路径；非相对路径返回 null */
+const resolveRelativeImagePath = (src: string): string | null => {
+    const raw = src.trim();
+    if (!raw || !props.path) return null;
+    if (/^(data|https?):/i.test(raw) || raw.startsWith("//")) return null;
+
+    const dir = props.path.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
+    const base = dir.startsWith("/") ? `file://${dir}/` : `file:///${dir}/`;
+    try {
+        let pathname = new URL(raw, base).pathname;
+        // Windows 盘符路径（/C:/a/b.png）去掉 URL 器加的首斜杠
+        if (/^\/[A-Za-z]:\//.test(pathname)) pathname = pathname.slice(1);
+        return decodeURIComponent(pathname);
+    } catch {
+        return null;
+    }
+};
+
+const fetchRelativeImage = (serverPath: string): Promise<string | null> => {
+    if (!imageFetchCache.has(serverPath)) {
+        imageFetchCache.set(
+            serverPath,
+            fileApi
+                .readFile(serverPath, { skipInterceptor: true, as_image: true })
+                .then((res) =>
+                    res?.success && res?.data?.content ? res.data.content : null,
+                )
+                .catch(() => null),
+        );
+    }
+    return imageFetchCache.get(serverPath)!;
+};
+
+/** 预览渲染后把相对路径图片替换为可展示的 base64 */
+const resolvePreviewImages = () => {
+    const container = previewRef.value;
+    if (!container) return;
+
+    container.querySelectorAll("img").forEach((img) => {
+        const serverPath = resolveRelativeImagePath(img.getAttribute("src") || "");
+        if (!serverPath) return;
+        img.alt = img.alt || serverPath.split("/").pop() || "";
+        fetchRelativeImage(serverPath).then((dataUrl) => {
+            if (dataUrl) img.src = dataUrl;
+            else img.classList.add("md-img-broken");
+        });
+    });
+};
+
+watch(previewHtml, () => nextTick(resolvePreviewImages));
+
 watch(content, () => {
     if (isPreviewing.value) {
         window.clearTimeout(previewTimer);
@@ -1008,6 +1063,17 @@ defineExpose({
 .md-preview :deep(img) {
     max-width: 100%;
     border-radius: 0.75rem;
+}
+
+/* 相对路径图片解析失败时的占位样式 */
+.md-preview :deep(img.md-img-broken) {
+    display: inline-block;
+    min-width: 120px;
+    min-height: 60px;
+    border: 1px dashed var(--zx-color-border);
+    background-color: var(--zx-color-surface-muted);
+    object-fit: contain;
+    padding: 0.5rem;
 }
 
 .loading-overlay {
