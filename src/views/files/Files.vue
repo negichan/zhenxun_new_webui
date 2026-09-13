@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from "vue";
-import { Download, Package, Plus, Trash2, X } from "lucide-vue-next";
+import { Plus } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { fileApi } from "@/utils/api-next";
 import type { ArchiveEntry, FileItem } from "@/types/api-next.types";
@@ -83,6 +83,10 @@ const handleRowSelect = (file: FileItem, e: MouseEvent) => {
 const selectAll = () => {
     selectedPaths.value = new Set(sortedFileList.value.map((f) => f.path));
 };
+
+/** 当前选中的文件对象（地址栏批量操作用） */
+const getSelectedFiles = () =>
+    sortedFileList.value.filter((f) => selectedPaths.value.has(f.path));
 
 const hasAnyModalOpen = () =>
     showEditor.value ||
@@ -534,85 +538,27 @@ onBeforeUnmount(() => {
 <template>
     <div class="flex h-full w-full flex-col space-y-3 sm:space-y-4">
         <div
-            class="flex items-center justify-between rounded-3xl border-1 border-slate-200 bg-white p-2 shadow-sm sm:p-3"
+            v-if="!globalStore.isDesktopMode"
+            class="flex items-center justify-end rounded-3xl border-1 border-slate-200 bg-white p-2 shadow-sm sm:p-3"
         >
-            <!-- 选中操作栏：有选中项时替换显示 -->
-            <template v-if="selectedPaths.size > 0">
-                <div class="flex flex-1 flex-wrap items-center gap-2">
-                    <span
-                        class="rounded-full bg-zx-primary-soft px-3 py-1.5 text-sm font-medium text-zx-primary"
-                    >
-                        已选中 {{ selectedPaths.size }} 项
-                    </span>
-                    <ZxButton
-                        size="sm"
-                        variant="primary"
-                        :disabled="downloading"
-                        @click="
-                            handleDownload(
-                                sortedFileList.filter((f) =>
-                                    selectedPaths.has(f.path),
-                                ),
-                            )
-                        "
-                    >
-                        <Download class="h-4 w-4" />
-                        下载
-                    </ZxButton>
-                    <ZxButton
-                        size="sm"
-                        variant="outline"
-                        @click="
-                            handleCompress(
-                                sortedFileList.filter((f) =>
-                                    selectedPaths.has(f.path),
-                                ),
-                            )
-                        "
-                    >
-                        <Package class="h-4 w-4" />
-                        压缩为 zip
-                    </ZxButton>
-                    <ZxButton
-                        size="sm"
-                        variant="danger"
-                        @click="
-                            handleDelete(
-                                sortedFileList.filter((f) =>
-                                    selectedPaths.has(f.path),
-                                ),
-                            )
-                        "
-                    >
-                        <Trash2 class="h-4 w-4" />
-                        删除
-                    </ZxButton>
-                    <ZxButton size="sm" variant="ghost" @click="clearSelection">
-                        <X class="h-4 w-4" />
-                        取消选择
-                    </ZxButton>
-                </div>
-            </template>
-            <template v-else>
-                <div></div>
-                <ZxButton
-                    v-if="!globalStore.isDesktopMode"
-                    variant="primary"
-                    @click="showNewDialog = true"
-                >
-                    <Plus class="h-4 w-4" />
-                    <span class="hidden sm:inline">新建</span>
-                </ZxButton>
-            </template>
+            <ZxButton variant="primary" @click="showNewDialog = true">
+                <Plus class="h-4 w-4" />
+                <span class="hidden sm:inline">新建</span>
+            </ZxButton>
         </div>
 
         <FileBreadcrumbBar
             v-model:search-query="searchQuery"
             :current-path="currentPath"
             :path-segments="pathSegments"
+            :selected-count="selectedPaths.size"
             @back="goBack"
             @home="loadFileList('')"
             @navigate="loadFileList"
+            @clear-selection="clearSelection"
+            @compress-selected="handleCompress(getSelectedFiles())"
+            @delete-selected="handleDelete(getSelectedFiles())"
+            @download-selected="handleDownload(getSelectedFiles())"
         />
 
         <FileListPanel

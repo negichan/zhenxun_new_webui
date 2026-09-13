@@ -1,11 +1,21 @@
 <script setup lang="ts">
 import { nextTick, ref } from "vue";
-import { ArrowLeft, ChevronRight, Home, Search } from "lucide-vue-next";
+import {
+    ArrowLeft,
+    ChevronRight,
+    Download,
+    Home,
+    Package,
+    Search,
+    Trash2,
+    X,
+} from "lucide-vue-next";
 
 const props = defineProps<{
     currentPath: string;
     pathSegments: string[];
     searchQuery: string;
+    selectedCount: number;
 }>();
 
 const emit = defineEmits<{
@@ -13,6 +23,10 @@ const emit = defineEmits<{
     home: [];
     navigate: [path: string];
     "update:searchQuery": [value: string];
+    "clear-selection": [];
+    "download-selected": [];
+    "compress-selected": [];
+    "delete-selected": [];
 }>();
 
 // Windows 式可编辑路径：点击面包屑空白处进入编辑，回车跳转、Esc/失焦取消
@@ -63,9 +77,29 @@ const commitEdit = () => {
                 <Home class="h-4 w-4" />
             </button>
 
+            <!-- 选中模式：地址栏变为选中操作栏（资源管理器式） -->
+            <div
+                v-if="selectedCount > 0"
+                class="flex min-w-0 flex-1 items-center gap-2"
+            >
+                <span
+                    class="flex-shrink-0 rounded-full bg-zx-primary-soft px-3 py-1.5 text-sm font-medium text-zx-primary"
+                >
+                    已选中 {{ selectedCount }} 项
+                </span>
+                <button
+                    class="btn-touch flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                    type="button"
+                    @click="emit('clear-selection')"
+                >
+                    <X class="h-3.5 w-3.5" />
+                    取消选择
+                </button>
+            </div>
+
             <!-- 路径编辑模式（Windows 式：点空白处进入，回车跳转） -->
             <div
-                v-if="editingPath"
+                v-else-if="editingPath"
                 class="flex min-w-0 flex-1 items-center"
                 @click.stop
             >
@@ -110,7 +144,38 @@ const commitEdit = () => {
                 </span>
             </div>
 
-            <div class="relative flex-shrink-0">
+            <!-- 选中模式右侧：批量操作按钮（替换搜索框） -->
+            <div
+                v-if="selectedCount > 0"
+                class="flex flex-shrink-0 items-center gap-2"
+            >
+                <ZxButton
+                    size="sm"
+                    variant="primary"
+                    @click="emit('download-selected')"
+                >
+                    <Download class="h-4 w-4" />
+                    下载
+                </ZxButton>
+                <ZxButton
+                    class="hidden sm:inline-flex"
+                    size="sm"
+                    variant="outline"
+                    @click="emit('compress-selected')"
+                >
+                    <Package class="h-4 w-4" />
+                    压缩为 zip
+                </ZxButton>
+                <ZxButton
+                    size="sm"
+                    variant="danger"
+                    @click="emit('delete-selected')"
+                >
+                    <Trash2 class="h-4 w-4" />
+                    删除
+                </ZxButton>
+            </div>
+            <div v-else class="relative flex-shrink-0">
                 <input
                     :value="searchQuery"
                     class="w-32 rounded-2xl border border-gray-200 px-3 py-1.5 pl-9 text-sm transition-colors focus:outline-none sm:w-48"
