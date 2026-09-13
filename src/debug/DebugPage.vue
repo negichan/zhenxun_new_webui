@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import { modalJelly } from "@/composables/useGsapTransition";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import {
+    ArrowDown,
     ArrowLeft,
     Bot,
     Check,
     ImageIcon,
     ImageOff,
     Link2,
+    LogIn,
     MapPin,
     MessageSquare,
     Mic,
@@ -26,12 +29,13 @@ import {
 import ZXInput from "@/components/zxcomponent/ZXInput.vue";
 import ZXNotification from "@/components/zxcomponent/Notification";
 import { openContextMenu } from "@/components/zxcomponent/ContextMenu";
-import { api, getWsBaseUrl } from "./api";
+import { api, getWsBaseUrl, getWsTokenQuery } from "./api";
 import defaultAva from "@/assets/img/avatar.jpg";
 import { OneBotV11Simulator } from "@/utils/onebot/client";
 import {
     buildFriendRequestEvent,
     buildGroupDecreaseEvent,
+    buildGroupIncreaseEvent,
     buildGroupMessageEvent,
     buildPrivateMessageEvent,
 } from "@/utils/onebot/events";
@@ -56,10 +60,10 @@ const STORAGE_PREFIX = "debug.ob.";
 const loadSetting = (key: string, fallback: string) =>
     localStorage.getItem(STORAGE_PREFIX + key) ?? fallback;
 
-// 桥接地址：跟随 WebUI 的连接推导
+// 桥接地址：跟随 WebUI 的连接推导；WebUI JWT 走 query 参数做握手鉴权
 const bridgeWsUrl = () =>
     getWsBaseUrl().replace(/\/zhenxun\/ws\/v1.*$/, "") +
-    "/zhenxun/ws/v1/debug/onebot";
+    `/zhenxun/ws/v1/debug/onebot?${getWsTokenQuery()}`;
 
 // 连接配置（token / 心跳 / 开关）
 const accessToken = ref(loadSetting("token", ""));
@@ -115,20 +119,38 @@ try {
     /* 解析失败用默认列表 */
 }
 
-const persistUsers = () =>
+const persistUsersLocal = () =>
     localStorage.setItem(
         STORAGE_PREFIX + "users",
         JSON.stringify(users.value),
     );
 
+// 统一状态快照。不含身份选择：my_user_id/bot_id 只有新模拟端初次同步，
+// 上传本机值会覆盖云端、导致其他新端拿到错的"谁是用户/谁是 bot"
+const buildStatePayload = () => ({
+    groups: simState.groups,
+    members: simState.members,
+    friends: simState.friends,
+    users: users.value,
+});
+
+// 身份变更：写 localStorage（即时）+ 同步到后端（跨浏览器恢复）
+const persistUsers = () => {
+    persistUsersLocal();
+    if (!stateLoaded) return;
+    api.post("/debug/state", buildStatePayload()).catch(() => {
+        /* 保存失败下次变更再试 */
+    });
+};
+
 // ==================== 群聊持久化（存后端） ====================
 
 let stateLoaded = false;
 
-// 从后端拉取持久化的群聊与成员
+// 从后端拉取持久化的群聊与成员、身份
 const loadSimState = async () => {
     try {
-        const res = await api.get<{ groups: any[]; members: Record<string, SimMember[]>; friends: SimFriend[] }>(
+        const res = await api.get<{ groups: any[]; members: Record<string, SimMember[]>; friends: SimFriend[]; users?: SimUser[]; my_user_id?: string; bot_id?: string }>(
             "/debug/state",
         );
         const data = res.data;
@@ -142,8 +164,36 @@ const loadSimState = async () => {
             if (Array.isArray(data.friends) && data.friends.length) {
                 simState.friends.splice(0, simState.friends.length, ...data.friends);
             }
+            // 身份做合并而不是覆盖：后端有的保留，本地多出来的（可能是
+            // 其他浏览器还没同步的）也保留，任何一端都不会丢角色
+            if (Array.isArray(data.users) && data.users.length) {
+                const merged = [...data.users];
+                for (const u of users.value) {
+                    if (
+                        !merged.some(
+                            (m) => String(m.user_id) === String(u.user_id),
+                        )
+                    ) {
+                        merged.push(u);
+                    }
+                }
+                users.value = merged;
+                persistUsersLocal();
+            }
+            // 身份选择（我是谁 / bot 是谁）：本地有值就用本地，绝不覆盖；
+            // 只有本地为空（新端 / 清过存储）才采纳云端最近一次的设置
+            if (data.my_user_id && !myUserId.value) {
+                myUserId.value = String(data.my_user_id);
+            }
+            if (data.bot_id && !botId.value) {
+                botId.value = String(data.bot_id);
+            }
         }
         stateLoaded = true;
+        // 自愈：只要本机有身份就回推后端（换浏览器、补老数据都靠这一步）
+        if (users.value.length) {
+            persistUsers();
+        }
     } catch {
         /* 拉取失败保持空列表，后续保存会覆盖 */
     }
@@ -153,20 +203,60 @@ loadSimState();
 
 const persistGroups = () => {
     if (!stateLoaded) return;
-    api.post("/debug/state", {
-        groups: simState.groups,
-        members: simState.members,
-        friends: simState.friends,
-    }).catch(() => {
+    api.post("/debug/state", buildStatePayload()).catch(() => {
         /* 保存失败下次变更再试 */
     });
+};
+
+// ==================== 多端状态实时同步 ====================
+// 后端在任何一端保存状态后都会把最新状态推给所有接入的调试端，
+// 收到后直接应用——群/成员/好友的改动在所有端即时可见
+
+// 应用远端推送期间暂停本地变更的自动回传，
+// 防止"应用 → watcher 触发 → POST → 后端广播"回环风暴
+let applyingRemote = false;
+
+const applyRemoteState = (state?: Record<string, any>) => {
+    if (!state) return;
+    applyingRemote = true;
+    try {
+        if (Array.isArray(state.groups)) {
+            simState.groups.splice(0, simState.groups.length, ...state.groups);
+        }
+        if (state.members && typeof state.members === "object") {
+            for (const key of Object.keys(simState.members)) {
+                delete simState.members[Number(key)];
+            }
+            Object.assign(simState.members, state.members);
+        }
+        if (Array.isArray(state.friends)) {
+            simState.friends.splice(
+                0,
+                simState.friends.length,
+                ...state.friends,
+            );
+        }
+        // 身份列表以云端为准（替换）：另一端删除的身份也要同步消失
+        if (Array.isArray(state.users) && state.users.length) {
+            users.value = state.users;
+            persistUsersLocal();
+        }
+    } finally {
+        // watcher 是异步 flush 的，等本轮响应式更新走完再恢复回传
+        nextTick(() => {
+            applyingRemote = false;
+        });
+    }
 };
 
 // 深度监听模拟世界状态：动作回调里的变更（好友申请通过、改群名、
 // 退群等不经 UI 的路径）也会自动持久化
 watch(
     () => [simState.groups, simState.members, simState.friends],
-    () => persistGroups(),
+    () => {
+        if (applyingRemote) return;
+        persistGroups();
+    },
     { deep: true },
 );
 
@@ -174,10 +264,26 @@ watch(
 const myUserId = ref(loadSetting("myUserId", ""));
 const botId = ref(loadSetting("botId", ""));
 
+// 身份选择：打开时本地已有值就用本地，绝不被云端覆盖；本地每次改动都
+// 推送云端，保证云端始终是最近一次的设置——本地为空的新端打开时拿到
+// 的也是最新值，而不是停留在某次初期的旧选择
 watch([myUserId, botId], () => {
     localStorage.setItem(STORAGE_PREFIX + "myUserId", myUserId.value);
     localStorage.setItem(STORAGE_PREFIX + "botId", botId.value);
+    persistStateMeta();
 });
+
+// 身份选择变更时使用：全量状态 + my_user_id/bot_id
+const persistStateMeta = () => {
+    if (!stateLoaded) return;
+    api.post("/debug/state", {
+        ...buildStatePayload(),
+        my_user_id: myUserId.value,
+        bot_id: botId.value,
+    }).catch(() => {
+        /* 保存失败下次变更再试 */
+    });
+};
 
 const currentUser = computed(() =>
     users.value.find(u => String(u.user_id) === myUserId.value),
@@ -254,57 +360,13 @@ watch(
     },
 );
 
-// ==================== 单实例守护 ====================
-// Web Locks 保证同一浏览器里只有一个窗口持有模拟连接，
-// 避免两个窗口以相同 self_id 同时接入桥接端点
-const SIM_LOCK_NAME = "zhenxun-debug-ob";
-let releaseSimLock: (() => void) | null = null;
-
-const acquireSimLock = (): Promise<boolean> => {
-    if (!("locks" in navigator)) return Promise.resolve(true);
-    return new Promise(resolve => {
-        let settled = false;
-        navigator.locks
-            .request(
-                SIM_LOCK_NAME,
-                { ifAvailable: true },
-                lock => {
-                    settled = true;
-                    if (!lock) {
-                        resolve(false);
-                        return;
-                    }
-                    resolve(true);
-                    // 持锁直到 releaseSimLock 被调用（断开/卸载）或页面关闭
-                    return new Promise<void>(release => {
-                        releaseSimLock = () => {
-                            releaseSimLock = null;
-                            release();
-                        };
-                    });
-                },
-            )
-            .catch(() => {
-                // 锁 API 异常时不阻塞正常使用
-                if (!settled) resolve(true);
-            });
-    });
-};
-
+// 多端共享：同一 bot 号的连接由后端桥接统一维护，任何窗口/浏览器
+// 都可以直接连接，bot 下行动作由桥接广播给每一端
 const connect = async () => {
     if (!botId.value.trim()) {
         ZXNotification({
             title: "等等",
             message: "机器人的 QQ 号要填哦",
-            type: "warning",
-        });
-        return;
-    }
-    const locked = await acquireSimLock();
-    if (!locked) {
-        ZXNotification({
-            title: "已有实例在运行",
-            message: "调试客户端已在其他窗口连接，先在那边断开哦",
             type: "warning",
         });
         return;
@@ -318,6 +380,9 @@ const connect = async () => {
             heartbeatInterval: Number(heartbeatInterval.value) || 30,
             autoReconnect: autoReconnect.value,
             reconnectInterval: Number(reconnectInterval.value) || 3,
+            getUserAvatar: id =>
+                users.value.find(u => String(u.user_id) === id)?.avatar ||
+                undefined,
         },
         {
             onStateChange: open => {
@@ -361,6 +426,31 @@ const connect = async () => {
                     botAvatarUrl.value = info.ava_url;
                 }
             },
+            onPeerMessage: event => {
+                // 其他模拟端发的消息（多端统一状态）：显示为对方气泡
+                const senderId = String(event?.user_id ?? "");
+                if (!senderId) return;
+                const key =
+                    (event as any).message_type === "group"
+                        ? `group:${(event as any).group_id ?? ""}`
+                        : "bot";
+                const sender = users.value.find(
+                    u => String(u.user_id) === senderId,
+                );
+                appendBubble(key, {
+                    from: "peer",
+                    senderId,
+                    senderName:
+                        sender?.nickname ||
+                        (event as any).sender?.nickname ||
+                        senderId,
+                    parts: toBubbleParts(
+                        (event as any).message,
+                        (event as any).raw_message ?? "",
+                    ),
+                });
+            },
+            onStateUpdate: state => applyRemoteState(state),
             onError: message => {
                 if (showError.value) {
                     ZXNotification({
@@ -379,14 +469,12 @@ const disconnect = () => {
     simulator?.disconnect();
     simulator = null;
     connected.value = false;
-    releaseSimLock?.();
     pushLog("已断开连接");
 };
 
 onUnmounted(() => {
     simulator?.disconnect();
     simulator = null;
-    releaseSimLock?.();
 });
 
 // 打开即连接：从主站弹窗打开后无需手动点连接
@@ -657,7 +745,10 @@ const selectContact = (contact: DebugContact) => {
 
 interface Bubble {
     id: number;
-    from: "user" | "bot";
+    from: "user" | "bot" | "peer";
+    /** peer 消息（其他模拟端发的）的发送者身份，用于头像和昵称 */
+    senderId?: string;
+    senderName?: string;
     /** 气泡内容段（消息段或占位），渲染按 kind 区分 */
     parts: BubblePart[];
     time: string;
@@ -873,6 +964,43 @@ const currentMessages = computed(
     () => conversations.value[conversationKey.value] ?? [],
 );
 
+// ==================== Telegram 式消息窗口 ====================
+// 只渲染底部窗口内的气泡，往上翻按需扩窗并锚定滚动位置
+const RENDER_STEP = 100;
+const renderCount = ref(120);
+
+const windowedMessages = computed(() =>
+    currentMessages.value.slice(
+        Math.max(0, currentMessages.value.length - renderCount.value),
+    ),
+);
+
+const hiddenMessageCount = computed(
+    () => currentMessages.value.length - windowedMessages.value.length,
+);
+
+const isNearChatBottom = () => {
+    const el = messagesContainer.value;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+};
+
+const loadOlderBubbles = async () => {
+    const el = messagesContainer.value;
+    const prevHeight = el?.scrollHeight ?? 0;
+    const prevTop = el?.scrollTop ?? 0;
+    renderCount.value += RENDER_STEP;
+    await nextTick();
+    // 锚定：扩窗后保持视口内的内容不动
+    if (el) el.scrollTop = prevTop + (el.scrollHeight - prevHeight);
+};
+
+const showChatScrollBottom = ref(false);
+
+const onChatScroll = () => {
+    showChatScrollBottom.value = !isNearChatBottom();
+};
+
 // 消息间隔超过 5 分钟时插入时间分隔线
 type DisplayItem =
     | { kind: "sep"; key: string; label: string }
@@ -883,7 +1011,7 @@ const SEPARATOR_GAP = 5 * 60 * 1000;
 const displayMessages = computed<DisplayItem[]>(() => {
     const result: DisplayItem[] = [];
     let prevTs: number | null = null;
-    for (const message of currentMessages.value) {
+    for (const message of windowedMessages.value) {
         if (prevTs === null || message.ts - prevTs > SEPARATOR_GAP) {
             result.push({
                 kind: "sep",
@@ -926,6 +1054,8 @@ const appendBubble = (key: string, bubble: Omit<Bubble, "id" | "time" | "ts">) =
     cacheBubble({
         conversationKey: key,
         from: full.from,
+        senderId: full.senderId,
+        senderName: full.senderName,
         parts: full.parts.map((p) =>
             p.kind === "image" && (p.src ?? "").length > 20_000_000
                 ? { kind: "other", text: "[图片]" }
@@ -936,12 +1066,14 @@ const appendBubble = (key: string, bubble: Omit<Bubble, "id" | "time" | "ts">) =
     });
     const list = conversations.value[key];
     if (list.length > 100) list.splice(0, list.length - 100);
-    if (key === conversationKey.value) {
+    if (key === conversationKey.value && isNearChatBottom()) {
         scrollToBottom();
     }
 };
 
-/** 从 IndexedDB 恢复某个会话的历史气泡 */
+// 从 IndexedDB 恢复某个会话的历史气泡，并合并后端桥接层落库的记录
+// （跨设备/跨浏览器可见）。两路来源按时间排序，同一发送者 + 相同首段
+// 内容 + 3 秒内视为同一条去重
 const restoreConversation = async (key: string) => {
     if (!key || conversations.value[key]?.length) return;
     const cached = await getCachedBubbles(key);
@@ -951,6 +1083,8 @@ const restoreConversation = async (key: string) => {
     const restored: Bubble[] = cached.map(c => ({
         id: ++bubbleSeq,
         from: c.from,
+        senderId: c.senderId,
+        senderName: c.senderName,
         parts: c.parts as Bubble["parts"],
         time: c.time,
         ts: c.ts,
@@ -961,6 +1095,75 @@ const restoreConversation = async (key: string) => {
     if (key === conversationKey.value) {
         scrollToBottom();
     }
+
+    // 后端历史：拉回来与本地合并
+    if (!botId.value) return;
+    try {
+        const res = await api.get<
+            {
+                id: number;
+                sender: string;
+                sender_id: string;
+                sender_name: string;
+                message: { type: string; msg: string }[];
+                time: string;
+                ts: number;
+            }[]
+        >("/debug/chat-history", {
+            self_id: botId.value,
+            conversation: key,
+            limit: 200,
+        });
+        const remoteRows = res?.data;
+        if (!Array.isArray(remoteRows) || !remoteRows.length) return;
+        const remote: Bubble[] = remoteRows.map(r => ({
+            id: ++bubbleSeq,
+            from:
+                r.sender === "bot"
+                    ? "bot"
+                    : String(r.sender_id) === String(myUserId.value)
+                      ? "user"
+                      : "peer",
+            senderId: r.sender_id || undefined,
+            senderName: r.sender_name || undefined,
+            parts: (r.message || []).map(m =>
+                m.type === "img"
+                    ? { kind: "image", src: resolveImageSrc(m.msg) }
+                    : {
+                          kind: m.type === "text" ? "text" : "other",
+                          text: m.msg,
+                      },
+            ) as BubblePart[],
+            time: r.time || "",
+            ts: Number(r.ts) || 0,
+        }));
+        const list = [...(conversations.value[key] ?? []), ...remote].sort(
+            (a, b) => a.ts - b.ts,
+        );
+        const deduped: Bubble[] = [];
+        for (const b of list) {
+            const prev = deduped[deduped.length - 1];
+            const sameText =
+                (prev?.parts[0]?.text ?? "") === (b.parts[0]?.text ?? "") &&
+                (prev?.parts[0]?.src ?? "") === (b.parts[0]?.src ?? "");
+            if (
+                prev &&
+                prev.from === b.from &&
+                prev.senderId === b.senderId &&
+                sameText &&
+                Math.abs(prev.ts - b.ts) < 3000
+            ) {
+                continue;
+            }
+            deduped.push(b);
+        }
+        conversations.value[key] = deduped;
+        if (key === conversationKey.value && isNearChatBottom()) {
+            scrollToBottom();
+        }
+    } catch {
+        // 后端不可达时仅用本地缓存
+    }
 };
 
 // ==================== 头像（真实 QQ 头像，失败回退默认） ====================
@@ -968,9 +1171,9 @@ const restoreConversation = async (key: string) => {
 const userAvatarUrl = (id: string | number) =>
     `https://q1.qlogo.cn/g?b=qq&nk=${id}&s=160`;
 
-// 自定义头像优先，否则按 QQ 号取真实头像
+// 自定义头像优先（空串视为未设置），否则按 QQ 号取真实头像
 const resolveAvatar = (id: string | number) =>
-    users.value.find(u => String(u.user_id) === String(id))?.avatar ??
+    users.value.find(u => String(u.user_id) === String(id))?.avatar ||
     userAvatarUrl(id);
 
 const groupAvatarUrl = (id: string | number) =>
@@ -1204,13 +1407,10 @@ const resolveAudioSrc = (src: string) => {
 
 const scrollToBottom = () => {
     setTimeout(() => {
-        if (messagesContainer.value) {
-            messagesContainer.value.scrollTo({
-                top: messagesContainer.value.scrollHeight,
-                behavior: "smooth",
-            });
-        }
-    }, 100);
+        messagesContainer.value?.scrollTo({
+            top: messagesContainer.value.scrollHeight,
+        });
+    }, 0);
 };
 
 // 输入解析优先级：JSON 消息段数组 -> CQ 码字符串 -> 普通文本 + @QQ号 语法
@@ -1325,7 +1525,12 @@ const sendSegments = (messageSegments: import('@/utils/onebot/types').MessageCon
     return true;
 };
 
+// 移动端软键盘/触摸可能把同一次发送重复触发（连着两条一样的消息），
+// 600ms 内的重入直接忽略；正常手动连发的间隔远大于这个值
+let lastSendAt = 0;
+
 const handleSendMessage = () => {
+    if (Date.now() - lastSendAt < 600) return;
     if (!hasIdentity.value) {
         ZXNotification({
             title: "等等",
@@ -1363,6 +1568,7 @@ const handleSendMessage = () => {
     }
 
     if (sendSegments(segments, text || "[附件]")) {
+        lastSendAt = Date.now();
         clearEditor();
         voiceItems.value = [];
     }
@@ -1434,6 +1640,48 @@ const deleteBotFriend = () => {
         title: "已删除好友",
         message: "机器人的好友列表已更新",
         type: "success",
+    });
+};
+
+// 当前身份是否在所选群聊的成员列表里
+const isGroupMember = computed(() => {
+    const contact = selectedContact.value;
+    if (!contact || contact.type !== "group") return false;
+    const members = simState.members[Number(contact.id)] ?? [];
+    return members.some(m => m.user_id === Number(myUserId.value));
+});
+
+// 加入群聊：把自己加进群成员，并推送 group_increase 让真寻更新群成员缓存
+const joinGroup = () => {
+    const contact = selectedContact.value;
+    if (!contact || contact.type !== "group") return;
+    const groupId = Number(contact.id);
+    const members = simState.members[groupId] ?? [];
+    if (members.some(m => m.user_id === Number(myUserId.value))) return;
+    members.push({
+        user_id: Number(myUserId.value),
+        nickname: myNickname.value,
+        card: "",
+        role: "member",
+    });
+    simState.members[groupId] = members;
+    const group = simState.groups.find(g => g.group_id === groupId);
+    if (group) group.member_count = members.length;
+    persistGroups();
+    const sent = simulator?.connected
+        ? simulator.sendEvent(
+              buildGroupIncreaseEvent({
+                  selfId: botId.value,
+                  groupId: contact.id,
+                  userId: String(myUserId.value),
+              }),
+          )
+        : false;
+    pushLog(sent ? "已加入群聊并推送 group_increase" : "已加入群聊（未连接，仅本地加入）");
+    ZXNotification({
+        title: "已加入群聊",
+        message: sent ? "真寻会收到群成员增加通知" : "未连接，仅更新了本地群成员",
+        type: sent ? "success" : "warning",
     });
 };
 
@@ -1916,7 +2164,7 @@ const removeRole = (user: SimUser) => {
         <!-- 聊天区域 -->
         <div
             :class="[
-                'min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm',
+                'relative min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm',
                 selectedContact ? 'flex' : 'hidden sm:flex',
             ]"
         >
@@ -1993,13 +2241,22 @@ const removeRole = (user: SimUser) => {
                         <UserRoundX class="size-4.5" />
                     </button>
                     <button
-                        v-else-if="selectedContact?.type === 'group'"
+                        v-else-if="selectedContact?.type === 'group' && isGroupMember"
                         class="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                         title="退出群聊"
                         type="button"
                         @click="leaveGroup"
                     >
                         <LogOut class="size-4.5" />
+                    </button>
+                    <button
+                        v-else-if="selectedContact?.type === 'group'"
+                        class="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-zx-primary transition-colors hover:bg-zx-primary-soft"
+                        title="加入群聊"
+                        type="button"
+                        @click="joinGroup"
+                    >
+                        <LogIn class="size-4.5" />
                     </button>
                 </div>
             </div>
@@ -2008,7 +2265,16 @@ const removeRole = (user: SimUser) => {
             <div
                 ref="messagesContainer"
                 class="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:space-y-4 sm:p-4"
+                @scroll.passive="onChatScroll"
             >
+                <button
+                    v-if="hiddenMessageCount > 0"
+                    class="mx-auto mb-2 block cursor-pointer rounded-full px-4 py-1.5 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-zx-primary"
+                    type="button"
+                    @click="loadOlderBubbles"
+                >
+                    查看更早的消息（还有 {{ hiddenMessageCount }} 条）
+                </button>
                 <div
                     v-if="!selectedContact || currentMessages.length === 0"
                     class="flex h-full items-center justify-center text-gray-400"
@@ -2041,11 +2307,6 @@ const removeRole = (user: SimUser) => {
                     <!-- 消息 -->
                     <div
                         v-else
-                        :class="
-                            item.message.from === 'user'
-                                ? 'justify-end'
-                                : 'justify-start'
-                        "
                         class="flex items-start space-x-2 sm:space-x-3"
                     >
                         <!-- 机器人头像 -->
@@ -2059,8 +2320,29 @@ const removeRole = (user: SimUser) => {
                                 class="h-full w-full object-cover"
                             />
                         </div>
+                        <!-- 其他模拟端发消息的身份头像 -->
+                        <div
+                            v-else-if="item.message.from === 'peer'"
+                            class="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-full"
+                        >
+                            <img
+                                :src="resolveAvatar(item.message.senderId ?? '')"
+                                @error="onAvatarError"
+                                class="h-full w-full object-cover"
+                            />
+                        </div>
 
-                        <div>
+                        <!-- 消息内容列：flex-1 占满行内剩余宽度，气泡的百分比
+                             max-width 才有确定基准（宽度随内容收缩的包裹层会让
+                             70% 这类百分比陷入循环解析，塌陷成最小内容宽） -->
+                        <div
+                            class="flex min-w-0 flex-1 flex-col"
+                            :class="
+                                item.message.from === 'user'
+                                    ? 'items-end'
+                                    : 'items-start'
+                            "
+                        >
                             <p
                                 v-if="
                                     item.message.from === 'bot' &&
@@ -2071,20 +2353,27 @@ const removeRole = (user: SimUser) => {
                                 {{ botNickname }}
                             </p>
                             <p
+                                v-else-if="item.message.from === 'peer'"
+                                class="mb-1 text-xs text-gray-600"
+                            >
+                                {{ item.message.senderName }}
+                            </p>
+                            <p
                                 v-else-if="selectedContact?.type === 'group'"
-                                class="mb-1 text-right text-xs text-gray-600"
+                                class="mb-1 text-xs text-gray-600"
                             >
                                 {{ myNickname }}
                             </p>
                             <!-- 图片消息：不带气泡，样式与联系人页一致 -->
                             <div
                                 v-if="isImageOnly(item.message.parts)"
-                                class="max-w-[70%] overflow-hidden rounded-xl sm:max-w-xs"
+                                class="max-w-[min(70%,20rem)] overflow-hidden rounded-xl"
                             >
                                 <img
                                     v-if="!item.message.parts[0].broken"
+                                    v-image-viewer:debug-chat
                                     :src="resolveImageSrc(item.message.parts[0].src ?? '')"
-                                    class="block max-h-64 w-auto max-w-full cursor-pointer align-top"
+                                    class="block max-h-64 w-auto max-w-full align-top"
                                     @error="item.message.parts[0].broken = true"
                                 />
                                 <div
@@ -2103,7 +2392,7 @@ const removeRole = (user: SimUser) => {
                                         ? 'rounded-2xl rounded-br-xs bg-zx-primary text-white'
                                         : 'rounded-2xl rounded-bl-xs bg-gray-200 text-gray-800'
                                 "
-                                class="max-w-[70%] overflow-hidden sm:max-w-md"
+                                class="max-w-[min(70%,28rem)] overflow-hidden"
                             >
                                 <div
                                     class="flex flex-wrap items-center gap-x-1 gap-y-1 break-words px-3 py-2 text-xs sm:text-sm"
@@ -2126,6 +2415,7 @@ const removeRole = (user: SimUser) => {
                                             </span>
                                             <img
                                                 v-else
+                                                v-image-viewer:debug-chat
                                                 :src="resolveImageSrc(part.src ?? '')"
                                                 class="max-h-48 max-w-full rounded-lg object-contain"
                                                 @error="part.broken = true"
@@ -2262,6 +2552,18 @@ const removeRole = (user: SimUser) => {
                     </div>
                 </template>
             </div>
+
+
+        <!-- 回到底部：翻历史时出现 -->
+        <button
+            v-if="showChatScrollBottom"
+            class="btn-touch absolute right-5 bottom-32 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-500 shadow-md backdrop-blur-sm transition-colors hover:text-zx-primary"
+            type="button"
+            title="回到底部"
+            @click="scrollToBottom()"
+        >
+            <ArrowDown class="size-4" />
+        </button>
 
             <!-- 输入框 -->
             <div
@@ -2410,25 +2712,26 @@ const removeRole = (user: SimUser) => {
                         ref="editorRef"
                         contenteditable="true"
                         data-placeholder="输入消息，Enter 发送；@QQ号 / CQ 码 / JSON 段数组"
-                        class="rich-editor max-h-32 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 pr-12 text-sm leading-5 text-slate-700 focus:outline-none"
+                        class="rich-editor max-h-32 min-h-12 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-sm leading-5 text-slate-700 focus:outline-none"
                         @paste="handlePaste"
                         @keydown.enter.exact.prevent="handleSendMessage"
                     ></div>
-                    <button
-                        type="button"
-                        class="btn-touch absolute bottom-[5px] right-1.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-zx-primary text-white shadow-sm transition-colors hover:bg-zx-primary-hover"
+                    <ZxButton
+                        circle
+                        size="sm"
+                        class="absolute bottom-[5px] right-1.5 shadow-sm"
                         title="发送"
                         @click="handleSendMessage"
                     >
                         <Send class="h-4 w-4" />
-                    </button>
+                    </ZxButton>
                 </div>
             </div>
         </div>
 
         <!-- 身份管理弹窗 -->
         <Teleport to="body">
-            <Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+            <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
                 <div
                     v-if="identityOpen"
                     class="fixed inset-0 z-50 flex items-center justify-center"
@@ -2596,7 +2899,7 @@ const removeRole = (user: SimUser) => {
 
         <!-- 新建 / 编辑身份弹窗 -->
         <Teleport to="body">
-            <Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+            <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
                 <div
                     v-if="formOpen"
                     class="fixed inset-0 z-[60] flex items-center justify-center"
@@ -2685,13 +2988,12 @@ const removeRole = (user: SimUser) => {
                             </div>
                         </div>
 
-                        <button
-                            class="mt-5 flex h-10 w-full cursor-pointer items-center justify-center rounded-full bg-zx-primary text-sm font-medium text-white transition-colors hover:bg-zx-primary-hover"
-                            type="button"
+                        <ZxButton
+                            class="mt-5 h-10 w-full"
                             @click="saveUserForm"
                         >
                             保存
-                        </button>
+                        </ZxButton>
                         <button
                             class="mt-2 flex h-10 w-full cursor-pointer items-center justify-center rounded-full text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100"
                             type="button"
@@ -2706,7 +3008,7 @@ const removeRole = (user: SimUser) => {
 
         <!-- 设置弹窗（连接 / 群聊管理） -->
         <Teleport to="body">
-            <Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+            <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
                 <div
                     v-if="settingsOpen"
                     class="fixed inset-0 z-50 flex items-center justify-center"
@@ -2864,10 +3166,10 @@ const removeRole = (user: SimUser) => {
                                             <span
                                                 :class="
                                                     member.role === 'owner'
-                                                        ? 'bg-amber-100 text-amber-600'
+                                                        ? 'bg-amber-500 text-white'
                                                         : member.role === 'admin'
-                                                          ? 'bg-sky-100 text-sky-600'
-                                                          : 'bg-slate-100 text-slate-400'
+                                                          ? 'bg-sky-500 text-white'
+                                                          : 'bg-slate-200 text-slate-500'
                                                 "
                                                 class="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
                                             >
@@ -3363,7 +3665,7 @@ const removeRole = (user: SimUser) => {
 
         <!-- 创建群聊弹窗（带头像预览） -->
         <Teleport to="body">
-            <Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+            <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
                 <div
                     v-if="createGroupOpen"
                     class="fixed inset-0 z-50 flex items-center justify-center"

@@ -1,4 +1,6 @@
 import { defineConfig } from "vite";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Plugin, ViteDevServer } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { fileURLToPath, URL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
@@ -13,6 +15,66 @@ import compression from "vite-plugin-compression2";
 // 开启后开发服务器里所有 API 请求与 WebSocket 数据均来自 src/mocks 的本地数据，
 // 无需启动真寻后端即可开发前端页面（仅 dev 生效，build 永远关闭）
 const MOCK = false;
+// ===========================================================
+
+// ==================== 白屏开关 ====================
+// 登录/启动时的白幕与"未检测到协议端"红屏开关（dev 与 build 都生效）：
+// 开启后无协议端接入会被红屏直接拦下，不再进入主站
+const WHITE_SCREEN = true;
+// ===========================================================
+
+// ==================== 开发期页面导航闸门 ====================
+// 与生产部署在后端 dist 的伺服层闸门（zhenxun-plugin/config.py 的
+// webui_next_page_gate）行为保持一致：页面导航（Accept 含 text/html）
+// 除 /login 外必须携带 zx_auth 会话 cookie（登录后由前端写入），
+// 否则 302 到 /login。dev 在本机跑，只查 cookie 存在性不验 JWT 签名
+// （签名校验由后端 API/WS 鉴权负责，这里只求行为与部署后一致可测试）
+function devPageGate(): Plugin {
+    return {
+        name: "dev-page-gate",
+        apply: "serve",
+        configureServer(server: ViteDevServer) {
+            server.middlewares.use(
+                (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+                    const accept = String(req.headers?.accept ?? "");
+                    const path =
+                        (req.url ?? "/").split("?")[0].replace(/\/+$/, "") ||
+                        "/";
+                    const exempt = ["/login"];
+                    if (accept.includes("text/html") && !exempt.includes(path)) {
+                        const cookies = Object.fromEntries(
+                            String(req.headers?.cookie ?? "")
+                                .split(";")
+                                .filter(Boolean)
+                                .map((pair) => {
+                                    const idx = pair.indexOf("=");
+                                    return [
+                                        pair.slice(0, idx).trim(),
+                                        decodeURIComponent(
+                                            pair.slice(idx + 1),
+                                        ),
+                                    ];
+                                }),
+                        );
+                        if (!cookies["zx_auth"]) {
+                            // gate=1/redirect 与后端闸门语义一致：
+                            // 已登录但 cookie 缺失的老会话由前端守卫
+                            // 静默送回原页面
+                            res.statusCode = 302;
+                            res.setHeader(
+                                "Location",
+                                `/login?gate=1&redirect=${encodeURIComponent(path)}`,
+                            );
+                            res.end();
+                            return;
+                        }
+                    }
+                    next();
+                },
+            );
+        },
+    };
+}
 // ===========================================================
 
 export default defineConfig(({ command }) =>({
@@ -45,9 +107,29 @@ export default defineConfig(({ command }) =>({
                           ),
                       ),
                   }),
+            // 白屏开关注入载体：WhiteScreen 服务与登录流程 import
+            // { WHITE_SCREEN_ENABLED } from "virtual:white-screen" 拿到编译期常量
+            ...(WHITE_SCREEN
+                ? {
+                      "virtual:white-screen": fileURLToPath(
+                          new URL(
+                              "./src/components/zxcomponent/WhiteScreen/flag-on.ts",
+                              import.meta.url,
+                          ),
+                      ),
+                  }
+                : {
+                      "virtual:white-screen": fileURLToPath(
+                          new URL(
+                              "./src/components/zxcomponent/WhiteScreen/flag-off.ts",
+                              import.meta.url,
+                          ),
+                      ),
+                  }),
         },
     },
     plugins: [
+        devPageGate(),
         vue(),
         tailwindcss(),
         AutoImport({

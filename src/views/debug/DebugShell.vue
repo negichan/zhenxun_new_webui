@@ -1,14 +1,21 @@
 <script setup lang="ts">
+/**
+ * OneBot Bot 端（模拟端）壳（主站 /bot 路由，弹窗窗口加载）
+ *
+ * 沿用 Bot 端自己的登录与后端指向（可连任意后端），与主站登录态互不影响。
+ * onMounted 时清理历史上独立构建留下的 /debug 作用域 Service Worker，
+ * 避免旧缓存壳继续拦截弹窗窗口。
+ */
 import { onMounted, ref } from "vue";
 import { AppWindow, Loader2 } from "lucide-vue-next";
-import LoginView from "./LoginView.vue";
-import DebugPage from "./DebugPage.vue";
+import LoginView from "@/debug/LoginView.vue";
+import DebugPage from "@/debug/DebugPage.vue";
 import {
     authApi,
     getToken,
     setUnauthorizedHandler,
     updateApiBaseUrl,
-} from "./api";
+} from "@/debug/api";
 
 type Phase = "checking" | "login" | "ready";
 
@@ -30,6 +37,16 @@ setUnauthorizedHandler(() => {
 });
 
 onMounted(async () => {
+    // 历史遗留：独立构建时代的 /debug 作用域 Service Worker，反注册掉
+    navigator.serviceWorker
+        ?.getRegistrations()
+        .then(registrations => {
+            registrations
+                .filter(r => r.scope.includes("/debug"))
+                .forEach(r => r.unregister());
+        })
+        .catch(() => {});
+
     const token = getToken();
     if (!token) {
         phase.value = "login";

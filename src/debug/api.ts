@@ -49,6 +49,15 @@ export const getWsBaseUrl = () => {
     return `${protocol}//${host}:${port}/zhenxun/ws/v1`;
 };
 
+/**
+ * WebSocket 握手鉴权参数：浏览器原生 WS 带不了 Authorization 头，
+ * 后端从 query 参数读取 token 校验（未登录时返回空串，后端拒绝握手）
+ */
+export const getWsTokenQuery = () => {
+    const token = (getToken() || "").replace(/^Bearer\s+/i, "");
+    return token ? `token=${encodeURIComponent(token)}` : "";
+};
+
 // ==================== 令牌（与主站共用同一个 key） ====================
 
 export const getToken = () => localStorage.getItem("token");
@@ -105,6 +114,8 @@ apiClient.interceptors.response.use(
     error => {
         if (error.response?.status === 401) {
             clearToken();
+            // 会话 cookie 一并清掉（伺服层页面闸门依赖它，见 utils/auth.ts）
+            document.cookie = "zx_auth=; path=/; Max-Age=0";
             unauthorizedHandler?.();
         }
         return Promise.reject(error);
@@ -136,9 +147,8 @@ export const authApi = {
     ): Promise<
         APIResponse<{ valid: boolean; username?: string; error?: string }>
     > {
-        // 后端要的是裸 JWT；存储里的 token 带 "Bearer " 前缀（Authorization 头格式），
-        // 混用会导致后端解析失败抛 Token 无效
-        const raw = token.replace(/^(Bearer|bearer)\s+/, "");
-        return apiClient.get(`/auth/verify?token=${encodeURIComponent(raw)}`);
+        // token 经 Authorization 头传递（拦截器自动附带），不拼 query，
+        // 避免 JWT 落进服务器访问日志
+        return apiClient.get("/auth/verify");
     },
 };
