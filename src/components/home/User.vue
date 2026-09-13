@@ -1,13 +1,12 @@
 <script setup lang="ts">
+import { dropdownPop } from "@/composables/useGsapTransition";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useBotStore } from "@/store/bot";
-import { Check, ChevronDown, LogOut } from "lucide-vue-next";
+import { Check, ChevronDown } from "lucide-vue-next";
 import { useGlobalStore } from "@/store/global";
 import avatar from "@/assets/img/avatar.jpg";
 import { auth } from "@/utils/auth.ts";
 import { whiteScreen } from "components/zxcomponent/WhiteScreen";
-import { ZXMessageBox } from "@/services/ui";
-import { router } from "@/router/index.js";
 
 defineOptions({ inheritAttrs: false });
 
@@ -31,18 +30,6 @@ const selectBot = (botId: string) => {
     dropdownOpen.value = false;
 };
 
-const handleLogout = () => {
-    ZXMessageBox({
-        title: "退出登录",
-        message: "你是否要退出登录",
-        cancelButtonText: "取消",
-        onConfirm: () => {
-            auth.logout();
-            router.push({ name: "Login" });
-        },
-    });
-};
-
 // 点击外部关闭下拉菜单
 const handleClickOutside = (event: MouseEvent) => {
     if (
@@ -62,8 +49,11 @@ onMounted(async () => {
 
         if (!botStore.botList[0]?.self_id) {
             // 不清除登录态：红屏上的"启用模拟端"接入协议端后
-            // 要靠这个 token 直接进入首页
-            await whiteScreen.error();
+            // 要靠这个 token 直接进入首页。
+            // 本会话点过红屏"强制访问"的话不再重复拦截（刷新场景）
+            if (!auth.hasForceEnter()) {
+                await whiteScreen.error();
+            }
             return;
         }
 
@@ -86,7 +76,7 @@ onBeforeUnmount(() => {
         v-tile-glow="110"
         ref="dropdownRef"
         v-bind="$attrs"
-        class="relative flex h-15 w-full min-w-0 items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pr-1.5 shadow-sm sm:w-72 sm:gap-2 sm:pr-2"
+        class="relative flex h-15 min-w-0 flex-1 items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pr-1.5 shadow-sm sm:w-72 sm:flex-initial sm:gap-2 sm:pr-2"
     >
         <div class="avatar h-full flex-shrink-0 cursor-pointer rounded-full">
             <img
@@ -100,11 +90,13 @@ onBeforeUnmount(() => {
                 class="username truncate text-sm font-medium sm:text-base"
                 :title="botStore.selectedBot?.nickname ?? undefined"
             >
-                {{ botStore.selectedBot?.nickname || "未选择 Bot" }}
+                {{ botStore.selectedBot?.nickname || "等待接入协议端" }}
             </div>
         </div>
-        <button
-            class="flex h-8 w-8 flex-shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+        <ZxButton
+            variant="ghost"
+            circle
+            class="max-sm:h-10 max-sm:w-10"
             title="切换 Bot"
             @click="toggleDropdown"
         >
@@ -112,18 +104,11 @@ onBeforeUnmount(() => {
                 class="size-4 transition-transform duration-200"
                 :class="{ 'rotate-180': dropdownOpen }"
             />
-        </button>
-        <button
-            class="flex h-8 w-8 flex-shrink-0 cursor-pointer items-center justify-center rounded-full text-red-400 transition-colors hover:bg-red-50 hover:text-red-500"
-            title="退出登录"
-            @click.stop="handleLogout"
-        >
-            <LogOut class="size-4" />
-        </button>
+        </ZxButton>
     </div>
 
     <Teleport to="body">
-        <Transition name="dropdown">
+        <Transition :css="false" @enter="dropdownPop.onEnter" @leave="dropdownPop.onLeave">
             <div
                 v-if="dropdownOpen"
                 class="fixed z-[9999] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-lg"
@@ -195,17 +180,5 @@ onBeforeUnmount(() => {
 }
 
 /* 下拉菜单动画 */
-.dropdown-enter-active,
-.dropdown-leave-active {
-    transform-origin: top center;
-    transition:
-        opacity 0.18s ease,
-        transform 0.18s ease;
-}
 
-.dropdown-enter-from,
-.dropdown-leave-to {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-}
 </style>

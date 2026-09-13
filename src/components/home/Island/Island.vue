@@ -2,16 +2,16 @@
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 
-import DashboardIsland from "components/Island/DashboardIsland.vue";
-import AnalyticsIsland from "components/Island/AnalyticsIsland.vue";
-import ChatIsland from "components/Island/ChatIsland.vue";
-import PluginIsland from "components/Island/PluginIsland.vue";
-import StoreIsland from "components/Island/StoreIsland.vue";
-import FilesIsland from "components/Island/FilesIsland.vue";
-import ManageIsland from "components/Island/ManageIsland.vue";
+import DashboardIsland from "@/components/home/Island/DashboardIsland.vue";
+import AnalyticsIsland from "@/components/home/Island/AnalyticsIsland.vue";
+import ChatIsland from "@/components/home/Island/ChatIsland.vue";
+import PluginIsland from "@/components/home/Island/PluginIsland.vue";
+import StoreIsland from "@/components/home/Island/StoreIsland.vue";
+import FilesIsland from "@/components/home/Island/FilesIsland.vue";
+import ManageIsland from "@/components/home/Island/ManageIsland.vue";
 import { useGlobalStore } from "@/store/global.ts";
-import DatabaseIsland from "components/Island/DatabaseIsland.vue";
-import LogIsland from "components/Island/LogIsland.vue";
+import DatabaseIsland from "@/components/home/Island/DatabaseIsland.vue";
+import LogIsland from "@/components/home/Island/LogIsland.vue";
 
 const route = useRoute();
 

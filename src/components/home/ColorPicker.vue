@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { pickerPop } from "@/composables/useGsapTransition";
 import { ref, computed, onMounted, watch, nextTick, useTemplateRef } from "vue";
 import { onClickOutside } from "@vueuse/core";
 
@@ -186,17 +187,17 @@ onMounted(() => {
 </script>
 
 <template>
-    <Transition name="picker-pop">
+    <Transition :css="false" @enter="pickerPop.onEnter" @leave="pickerPop.onLeave">
         <div
             v-if="visible"
             ref="containerRef"
-            class="absolute top-full left-1/2 z-50 mt-2 w-60 -translate-x-1/2 space-y-3 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xl"
+            class="absolute top-full left-1/2 z-50 mt-2 w-60 -translate-x-1/2 max-sm:space-y-5 space-y-3 rounded-2xl border border-slate-200 bg-white max-sm:p-4 p-3.5 shadow-xl max-sm:fixed max-sm:top-24 max-sm:w-[min(20rem,calc(100vw-32px))]"
         >
             <!-- 色相选择器 -->
             <div class="space-y-1.5">
                 <div
                     ref="hueRef"
-                    class="relative h-2.5 w-full cursor-pointer rounded-full"
+                    class="relative max-sm:h-5 h-2.5 w-full cursor-pointer rounded-full"
                     style="background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)"
                     @mousedown="handleHueMouseDown"
                 >
@@ -210,7 +211,7 @@ onMounted(() => {
             <!-- 饱和度/亮度选择器 -->
             <div
                 ref="pickerRef"
-                class="relative h-32 w-full cursor-crosshair rounded-xl"
+                class="relative max-sm:h-40 h-32 w-full cursor-crosshair rounded-xl"
                 :style="{ background: pickerBg }"
                 @mousedown="handlePickerMouseDown"
             >
@@ -225,12 +226,12 @@ onMounted(() => {
             <!-- 输入和预览 -->
             <div class="flex items-center gap-2">
                 <div
-                    class="h-7 w-7 flex-shrink-0 rounded-full shadow-sm ring-1 ring-slate-200"
+                    class="max-sm:h-8 max-sm:w-8 h-7 w-7 flex-shrink-0 rounded-full shadow-sm ring-1 ring-slate-200"
                     :style="{ background: currentColor }"
                 />
                 <input
                     v-model="hexInput"
-                    class="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-mono text-slate-700 outline-none transition-colors focus:border-slate-300"
+                    class="flex-1 max-sm:py-2.5 max-sm:text-sm py-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-xs font-mono text-slate-700 outline-none transition-colors focus:border-slate-300"
                     @change="handleHexInput"
                     @keydown.enter="handleHexInput"
                 />
@@ -240,18 +241,5 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.picker-pop-enter-active {
-    transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.picker-pop-leave-active {
-    transition: opacity 0.12s ease, transform 0.12s ease;
-}
-.picker-pop-enter-from {
-    opacity: 0;
-    transform: translateY(8px);
-}
-.picker-pop-leave-to {
-    opacity: 0;
-    transform: translateY(4px);
-}
+
 </style>

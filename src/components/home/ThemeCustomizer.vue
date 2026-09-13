@@ -11,13 +11,14 @@ import {
     Monitor,
     CircleHelp,
     Pipette,
+    X,
 } from "lucide-vue-next";
 import ColorPicker from "./ColorPicker.vue";
 
 const themeStore = useThemeStore();
 const colorPickerContainer = useTemplateRef("colorPickerContainer");
 
-const emit = defineEmits<{ applied: [] }>();
+const emit = defineEmits<{ applied: []; close: [] }>();
 
 // 跟随系统时按系统深浅偏好解析（预览/校验用，取快照即可）
 const systemDark =
@@ -135,13 +136,25 @@ function onSyncToggle(value: string | number | boolean) {
 </script>
 
 <template>
-    <div class="space-y-4">
-        <div class="text-xs font-medium text-[var(--zx-color-text-muted)]">自定义主题</div>
+    <div class="max-sm:space-y-6 space-y-4">
+        <!-- 头部：标题 + 关闭 -->
+        <div class="flex items-center justify-between gap-2">
+            <p class="text-base font-medium text-[var(--zx-color-text)]">
+                自定义主题
+            </p>
+            <button
+                class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-[var(--zx-color-text-muted)] transition-colors hover:bg-[var(--zx-color-surface-muted)] hover:text-[var(--zx-color-text)]"
+                type="button"
+                @click="emit('close')"
+            >
+                <X class="h-4 w-4" />
+            </button>
+        </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center max-sm:gap-3 gap-2">
             <!-- 黑白合并的自适应色板：展示当前模式下可用的那个极端色 -->
             <button
-                class="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-slate-200 transition-transform hover:scale-110"
+                class="flex h-7 w-7 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 transition-transform hover:scale-110"
                 :style="{ background: extremeColor }"
                 :title="mode === 'light' ? '黑色' : '白色'"
                 @click="selectColor({ color: extremeColor })"
@@ -152,14 +165,14 @@ function onSyncToggle(value: string | number | boolean) {
                         primaryColor.toLowerCase() ===
                             extremeColor.toLowerCase()
                     "
-                    class="h-3 w-3 drop-shadow"
+                    class="h-3.5 w-3.5 max-sm:h-4 max-sm:w-4 drop-shadow"
                     :style="{ color: checkColorFor(extremeColor) }"
                 />
             </button>
             <button
                 v-for="item in presetColors"
                 :key="item.color"
-                class="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-slate-200 transition-transform hover:scale-110"
+                class="flex h-7 w-7 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 transition-transform hover:scale-110"
                 :style="{
                     background: item.color,
                 }"
@@ -167,17 +180,18 @@ function onSyncToggle(value: string | number | boolean) {
             >
                 <Check
                     v-if="colorSelected && primaryColor.toLowerCase() === item.color.toLowerCase()"
-                    class="h-3 w-3 drop-shadow"
+                    class="h-3.5 w-3.5 max-sm:h-4 max-sm:w-4 drop-shadow"
                     :style="{ color: checkColorFor(item.color) }"
                 />
             </button>
             <div class="relative" ref="colorPickerContainer">
                 <button
-                    class="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full transition-all hover:scale-110"
+                    class="flex h-7 w-7 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full transition-all hover:scale-110"
                     :class="showColorPicker ? 'bg-[var(--zx-color-text-strong)] text-[var(--zx-color-bg)]' : 'bg-[var(--zx-color-surface-muted)] text-[var(--zx-color-text-muted)] hover:opacity-80'"
-                    @click="showColorPicker = true"
+                    :title="showColorPicker ? '收起取色器' : '打开取色器'"
+                    @click="showColorPicker = !showColorPicker"
                 >
-                    <Pipette class="h-3 w-3" />
+                    <Pipette class="h-3.5 w-3.5 max-sm:h-4 max-sm:w-4" />
                 </button>
                 <ColorPicker
                     v-model="primaryColor"
@@ -197,7 +211,7 @@ function onSyncToggle(value: string | number | boolean) {
             }"
         >
             <button
-                class="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-full py-1.5 text-[11px] font-medium transition-all"
+                class="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-full max-sm:py-3 max-sm:text-xs py-1.5 text-[11px] font-medium transition-all"
                 :class="
                     mode === 'light'
                         ? themeStore.effectiveMode === 'dark'
@@ -208,11 +222,11 @@ function onSyncToggle(value: string | number | boolean) {
                 :style="mode !== 'light' ? { color: themeStore.activeTheme.cssVars['--zx-color-text-muted'] } : undefined"
                 @click="mode = 'light'"
             >
-                <Sun class="h-3 w-3" />
+                <Sun class="h-3.5 w-3.5 max-sm:h-4 max-sm:w-4" />
                 浅色
             </button>
             <button
-                class="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-full py-1.5 text-[11px] font-medium transition-all"
+                class="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-full max-sm:py-3 max-sm:text-xs py-1.5 text-[11px] font-medium transition-all"
                 :class="
                     mode === 'dark'
                         ? themeStore.effectiveMode === 'dark'
@@ -223,11 +237,11 @@ function onSyncToggle(value: string | number | boolean) {
                 :style="mode !== 'dark' ? { color: themeStore.activeTheme.cssVars['--zx-color-text-muted'] } : undefined"
                 @click="mode = 'dark'"
             >
-                <Moon class="h-3 w-3" />
+                <Moon class="h-3.5 w-3.5 max-sm:h-4 max-sm:w-4" />
                 深色
             </button>
             <button
-                class="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-full py-1.5 text-[11px] font-medium transition-all"
+                class="flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-full max-sm:py-3 max-sm:text-xs py-1.5 text-[11px] font-medium transition-all"
                 :class="
                     mode === 'system'
                         ? themeStore.effectiveMode === 'dark'
@@ -238,14 +252,14 @@ function onSyncToggle(value: string | number | boolean) {
                 :style="mode !== 'system' ? { color: themeStore.activeTheme.cssVars['--zx-color-text-muted'] } : undefined"
                 @click="mode = 'system'"
             >
-                <Monitor class="h-3 w-3" />
+                <Monitor class="h-3.5 w-3.5 max-sm:h-4 max-sm:w-4" />
                 跟随系统
             </button>
         </div>
 
         <!-- 多端统一 -->
         <div
-            class="flex items-center justify-between rounded-xl bg-[var(--zx-color-surface-muted)] px-3 py-2"
+            class="flex items-center justify-between rounded-xl bg-[var(--zx-color-surface-muted)] px-3 max-sm:py-3 py-2"
         >
             <div class="flex items-center gap-1.5">
                 <span class="text-xs font-medium text-[var(--zx-color-text)]">多端同步</span>
@@ -254,7 +268,7 @@ function onSyncToggle(value: string | number | boolean) {
                         class="h-3.5 w-3.5 cursor-help text-[var(--zx-color-text-subtle)] transition-colors group-hover/tip:text-[var(--zx-color-text)]"
                     />
                     <div
-                        class="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 w-52 -translate-x-1/2 rounded-xl px-3 py-2 text-left text-[11px] leading-relaxed opacity-0 shadow-lg transition-all duration-150 group-hover/tip:opacity-100"
+                        class="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 w-52 -translate-x-1/2 rounded-xl px-3 py-2 text-left text-[11px] leading-relaxed opacity-0 shadow-lg transition-all duration-150 group-hover/tip:opacity-100 group-active/tip:opacity-100"
                         :style="{
                             background:
                                 themeStore.activeTheme.cssVars['--zx-color-text-strong'],
@@ -326,7 +340,7 @@ function onSyncToggle(value: string | number | boolean) {
 
         <div class="flex gap-2">
             <button
-                class="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-black/5 px-3 py-1.5 text-xs font-medium transition-all hover:border-black/10"
+                class="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full border border-black/5 px-3 max-sm:py-3 py-1.5 max-sm:text-sm text-xs font-medium transition-all hover:border-black/10"
                 :style="{
                     background: previewTheme.cssVars['--zx-color-primary'],
                     color: previewTheme.cssVars['--zx-color-on-accent'],
@@ -336,7 +350,7 @@ function onSyncToggle(value: string | number | boolean) {
                 应用
             </button>
             <button
-                class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[var(--zx-color-surface-muted)] text-xs text-[var(--zx-color-text-muted)] transition-colors hover:opacity-80"
+                class="flex h-8 w-8 max-sm:h-11 max-sm:w-11 cursor-pointer items-center justify-center rounded-full bg-[var(--zx-color-surface-muted)] text-xs text-[var(--zx-color-text-muted)] transition-colors hover:opacity-80"
                 @click="handleReset"
             >
                 <RotateCcw class="h-3 w-3" />

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { Code, FileText, Folder, Settings } from "lucide-vue-next";
+import { Code, FileText, Folder } from "lucide-vue-next";
 import { configApi, fileApi, systemApi } from "@/utils/api-next";
 import { ZXMessageBox, ZXNotification } from "@/services/ui";
 import SettingsEditorPanel from "./SettingsEditorPanel.vue";
@@ -196,16 +196,6 @@ const switchTab = (tab: TabType) => {
 
 <template>
     <div class="flex h-full w-full flex-col space-y-3 sm:space-y-4">
-        <!-- 头部标题 -->
-        <div
-            class="flex items-center justify-between rounded-3xl bg-white p-4 shadow-sm border border-slate-200"
-        >
-            <div class="flex items-center space-x-3">
-                <Settings class="h-6 w-6 flex-shrink-0 text-blue-500" />
-                <h2 class="text-lg font-semibold text-gray-800">系统设置</h2>
-            </div>
-        </div>
-
         <!-- Tab 切换 -->
         <div
             class="rounded-3xl bg-white p-2 shadow-sm border border-slate-200"
@@ -214,7 +204,7 @@ const switchTab = (tab: TabType) => {
                 <button
                     :class="
                         activeTab === 'env'
-                            ? 'bg-blue-100 text-blue-700'
+                            ? 'bg-zx-primary-soft text-zx-primary'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     "
                     class="btn-touch flex flex-1 items-center justify-center space-x-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-colors"
@@ -226,7 +216,7 @@ const switchTab = (tab: TabType) => {
                 <button
                     :class="
                         activeTab === 'config'
-                            ? 'bg-blue-100 text-blue-700'
+                            ? 'bg-zx-primary-soft text-zx-primary'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     "
                     class="btn-touch flex flex-1 items-center justify-center space-x-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-colors"
@@ -253,7 +243,7 @@ const switchTab = (tab: TabType) => {
                     <Folder class="h-4 w-4 text-gray-400" />
                     <select
                         v-model="selectedEnvFile"
-                        class="rounded-2xl border border-gray-200 px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        class="rounded-2xl border border-gray-200 px-3 py-1.5 text-sm focus:ring-2 focus:ring-zx-primary focus:outline-none"
                         @change="loadEnv"
                     >
                         <option

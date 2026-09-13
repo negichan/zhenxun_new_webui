@@ -22,6 +22,7 @@ import { useBotStore } from "@/store/bot";
 import { useManageStore } from "@/store/manage";
 import { useThemeStore } from "@/store/theme";
 import { useChatStore } from "@/store/chat";
+import { useConnectionLogStore } from "@/store/connectionLog";
 
 // 引入拆分出的组件
 import HomeHeader from "@/components/home/HomeHeader.vue";
@@ -68,6 +69,12 @@ const onPageEnter = (el: Element, done: () => void) => {
     style.left = "";
     style.width = "";
     style.pointerEvents = "";
+    // 动画开关关闭：直接落位
+    if (!globalStore.animationsEnabled) {
+        gsap.set(el, { clearProps: "transform" });
+        done();
+        return;
+    }
     gsap.fromTo(
         el,
         { yPercent: slideName.value === "slide-from-top" ? -100 : 100 },
@@ -94,6 +101,11 @@ const onPageLeave = (el: Element, done: () => void) => {
     style.left = "0";
     style.width = "100%";
     style.pointerEvents = "none";
+    // 动画开关关闭：原地让位
+    if (!globalStore.animationsEnabled) {
+        done();
+        return;
+    }
     gsap.to(el, {
         yPercent: slideName.value === "slide-from-top" ? 100 : -100,
         duration: 0.55,
@@ -108,7 +120,10 @@ const handleStatusMessage = (data: any) => {
     // bot 上下线事件（真实协议端 / 调试模拟端接入或断开）：即时刷新 bot 列表，
     // 并联动刷新联系人——下线 bot 的好友/群列表可能变化，右侧需同步回到空状态
     if (data?.type === "bot_update") {
-        botStore.getBotList().then(() => useChatStore().loadContacts());
+        botStore
+            .getBotList()
+            .then(() => useChatStore().loadContacts())
+            .then(() => useConnectionLogStore().load());
         return;
     }
     // 收到新的好友/群请求：即时刷新请求列表（侧栏徽标数跟着变）

@@ -184,29 +184,29 @@ onBeforeUnmount(() => {
     <Transition :css="false" @enter="onEnter" @leave="onLeave">
         <div
             v-if="requestDialogOpen && visible"
-            class="absolute right-0 top-full z-40 mt-2 flex max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg"
+            class="absolute right-0 top-full z-40 mt-2 flex max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg max-sm:max-h-[82vh] max-sm:min-h-[55vh]"
         >
                     <!-- 头部：标题 + 关闭 -->
                     <div
-                        class="flex items-center justify-between gap-2 px-5 pt-4 pb-2.5"
+                        class="flex items-center justify-between gap-2 max-sm:px-4 px-5 pt-4 pb-2.5"
                     >
                         <p class="text-base font-medium text-[var(--zx-color-text)]">
                             请求处理
                         </p>
                         <button
-                            class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-[var(--zx-color-text-muted)] transition-colors hover:bg-[var(--zx-color-surface-muted)] hover:text-[var(--zx-color-text)]"
+                            class="flex h-8 w-8 max-sm:h-9 max-sm:w-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-[var(--zx-color-text-muted)] transition-colors hover:bg-[var(--zx-color-surface-muted)] hover:text-[var(--zx-color-text)]"
                             type="button"
                             @click="requestDialogOpen = false"
                         >
                             <X class="h-4.5 w-4.5" />
                         </button>
                     </div>
-                    <div class="mx-5 border-t border-[var(--zx-color-border-soft)]"></div>
+                    <div class="mx-5 max-sm:mx-4 border-t border-[var(--zx-color-border-soft)]"></div>
 
                     <!-- 分段式标签切换 -->
-                    <div class="px-5 pt-3">
+                    <div class="px-5 max-sm:px-4 pt-3">
                         <div
-                            class="grid h-9 grid-cols-2 rounded-2xl bg-[var(--zx-color-surface-muted)] p-1"
+                            class="grid h-9 max-sm:h-11 grid-cols-2 rounded-2xl bg-[var(--zx-color-surface-muted)] p-1"
                         >
                             <button
                                 :class="[
@@ -256,7 +256,7 @@ onBeforeUnmount(() => {
                     </div>
 
                     <!-- 列表 -->
-                    <div class="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+                    <div class="min-h-0 flex-1 overflow-y-auto px-5 max-sm:px-4 py-3">
                         <div
                             v-if="requestsLoading"
                             class="flex items-center justify-center py-12"
@@ -295,12 +295,12 @@ onBeforeUnmount(() => {
                             <!-- 好友请求列表 -->
                             <div
                                 v-else-if="activeRequestTab === 'friend'"
-                                class="space-y-2"
+                                class="max-sm:space-y-2.5 space-y-2"
                             >
                                 <div
                                     v-for="req in friendRequests"
                                     :key="req.oid"
-                                    class="group flex items-center gap-3 rounded-2xl bg-slate-50 p-2.5 transition-colors hover:bg-slate-100"
+                                    class="group flex items-center gap-3 rounded-2xl bg-slate-50 max-sm:p-3 p-2.5 transition-colors hover:bg-slate-100"
                                 >
                                     <div
                                         class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zx-primary-soft text-sm font-bold text-zx-primary"
@@ -330,7 +330,7 @@ onBeforeUnmount(() => {
                                             >
                                         </p>
                                     </div>
-                                    <div class="flex shrink-0 items-center gap-0.5">
+                                    <div class="flex shrink-0 items-center gap-0.5 max-sm:gap-2">
                                         <button
                                             class="btn-touch flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-green-600 transition-colors hover:bg-green-50"
                                             title="同意"
@@ -347,14 +347,15 @@ onBeforeUnmount(() => {
                                         >
                                             <X class="size-4" />
                                         </button>
-                                        <button
-                                            class="btn-touch flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                                        <ZxButton
+                                            variant="ghost"
+                                            circle
+                                            size="sm"
                                             title="忽略"
-                                            type="button"
                                             @click="handleRequest(req, 'ignore')"
                                         >
                                             <EyeOff class="size-4" />
-                                        </button>
+                                        </ZxButton>
                                     </div>
                                 </div>
                             </div>
@@ -362,12 +363,12 @@ onBeforeUnmount(() => {
                             <!-- 群组请求列表 -->
                             <div
                                 v-else-if="activeRequestTab === 'group'"
-                                class="space-y-2"
+                                class="max-sm:space-y-2.5 space-y-2"
                             >
                                 <div
                                     v-for="req in groupRequests"
                                     :key="req.oid"
-                                    class="group flex items-center gap-3 rounded-2xl bg-slate-50 p-2.5 transition-colors hover:bg-slate-100"
+                                    class="group flex items-center gap-3 rounded-2xl bg-slate-50 max-sm:p-3 p-2.5 transition-colors hover:bg-slate-100"
                                 >
                                     <div
                                         class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-zx-primary-soft text-sm font-bold text-zx-primary"
@@ -399,7 +400,7 @@ onBeforeUnmount(() => {
                                             >
                                         </p>
                                     </div>
-                                    <div class="flex shrink-0 items-center gap-0.5">
+                                    <div class="flex shrink-0 items-center gap-0.5 max-sm:gap-2">
                                         <button
                                             class="btn-touch flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-green-600 transition-colors hover:bg-green-50"
                                             title="同意"
@@ -416,14 +417,15 @@ onBeforeUnmount(() => {
                                         >
                                             <X class="size-4" />
                                         </button>
-                                        <button
-                                            class="btn-touch flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                                        <ZxButton
+                                            variant="ghost"
+                                            circle
+                                            size="sm"
                                             title="忽略"
-                                            type="button"
                                             @click="handleRequest(req, 'ignore')"
                                         >
                                             <EyeOff class="size-4" />
-                                        </button>
+                                        </ZxButton>
                                     </div>
                                 </div>
                             </div>
@@ -432,7 +434,7 @@ onBeforeUnmount(() => {
 
                     <!-- 底部：统计 + 清空 -->
                     <div
-                        class="flex items-center justify-between border-t border-[var(--zx-color-border-soft)] px-5 py-3"
+                        class="flex items-center justify-between border-t border-[var(--zx-color-border-soft)] px-5 max-sm:px-4 py-3"
                     >
                         <p class="text-xs text-[var(--zx-color-text-subtle)]">
                             好友 {{ friendRequests.length }} · 群组
@@ -441,7 +443,7 @@ onBeforeUnmount(() => {
                         <div class="flex gap-2">
                             <button
                                 :disabled="friendRequests.length === 0"
-                                class="cursor-pointer rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-[var(--zx-color-text-muted)] transition-colors hover:text-[var(--zx-color-text)] disabled:pointer-events-none disabled:opacity-40"
+                                class="cursor-pointer rounded-full border border-slate-200 max-sm:px-4 max-sm:py-2 max-sm:text-xs px-3 py-1.5 text-[11px] font-semibold text-[var(--zx-color-text-muted)] transition-colors hover:text-[var(--zx-color-text)] disabled:pointer-events-none disabled:opacity-40"
                                 type="button"
                                 @click="clearRequests('friend')"
                             >
@@ -449,7 +451,7 @@ onBeforeUnmount(() => {
                             </button>
                             <button
                                 :disabled="groupRequests.length === 0"
-                                class="cursor-pointer rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-[var(--zx-color-text-muted)] transition-colors hover:text-[var(--zx-color-text)] disabled:pointer-events-none disabled:opacity-40"
+                                class="cursor-pointer rounded-full border border-slate-200 max-sm:px-4 max-sm:py-2 max-sm:text-xs px-3 py-1.5 text-[11px] font-semibold text-[var(--zx-color-text-muted)] transition-colors hover:text-[var(--zx-color-text)] disabled:pointer-events-none disabled:opacity-40"
                                 type="button"
                                 @click="clearRequests('group')"
                             >

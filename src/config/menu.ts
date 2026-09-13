@@ -7,13 +7,13 @@ import { reactive } from "vue";
 import type { Component } from "vue";
 import {
     Blocks,
-    Bug,
     ChartBar,
     Database,
     FlaskConical,
     Folder,
     LayoutPanelLeft,
     MessageSquareMore,
+    Settings,
     Sparkles,
 } from "lucide-vue-next";
 
@@ -36,8 +36,8 @@ export interface MenuItem {
     hidden?: boolean;
 }
 
-/** 独立调试客户端地址（随主站部署；dev 下主站 dev server 直接可访问） */
-export const DEBUG_CLIENT_URL = `${import.meta.env.BASE_URL}debug/index.html`;
+/** OneBot Bot 端（模拟端）路由地址（主站 /bot 路由，弹窗窗口加载，改代码无需单独构建） */
+export const BOT_CLIENT_URL = `${window.location.origin}${import.meta.env.BASE_URL}bot`;
 
 /**
  * 以独立应用窗口（popup，无标签栏/地址栏）打开外部页面，
@@ -57,32 +57,32 @@ export const openExternalWindow = (url: string, windowName: string) => {
 };
 
 /**
- * 打开独立 OneBot 调试客户端；已打开过则直接聚焦原窗口（不会重载页面、连接不断）。
+ * 打开 Bot 端（模拟端）；已打开过则直接聚焦原窗口（不会重载页面、连接不断）。
  * 返回 false 表示窗口被浏览器弹窗拦截。
  *
  * 注意必须只做一次 window.open：老实现的"空白探针→关闭→再开"一次点击连开
  * 两个窗口，容易被 Chrome 的弹窗拦截规则吃掉第二个。这里改为持有窗口引用
  * （因此不能带 noopener），活着就聚焦，否则新开
  */
-let debugClientWindow: Window | null = null;
+let botClientWindow: Window | null = null;
 
-export const openDebugClient = (): boolean => {
-    if (debugClientWindow && !debugClientWindow.closed) {
-        debugClientWindow.focus();
+export const openBotClient = (): boolean => {
+    if (botClientWindow && !botClientWindow.closed) {
+        botClientWindow.focus();
         return true;
     }
-    debugClientWindow = null;
+    botClientWindow = null;
 
     const width = Math.max(480, Math.round(window.innerWidth * 0.9));
     const height = Math.max(600, Math.round(window.innerHeight * 0.9));
     const left = Math.max(0, window.screenX + (window.innerWidth - width) / 2);
     const top = Math.max(0, window.screenY + (window.innerHeight - height) / 2);
-    debugClientWindow = window.open(
-        DEBUG_CLIENT_URL,
-        "zhenxun-debug-client",
+    botClientWindow = window.open(
+        BOT_CLIENT_URL,
+        "zhenxun-bot-client",
         `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
     );
-    return debugClientWindow != null;
+    return botClientWindow != null;
 };
 
 /**
@@ -128,13 +128,10 @@ export const mainMenus = reactive<MenuItem[]>([
         path: "/analytics",
     },
     {
-        name: "调试",
-        key: "debug",
-        icon: Bug,
-        // 独立 OneBot 调试客户端，以独立应用窗口打开
-        path: DEBUG_CLIENT_URL,
-        external: true,
-        externalWindow: "zhenxun-debug-client",
+        name: "配置",
+        key: "config",
+        icon: Settings,
+        path: "/config",
     },
     {
         name: "扩展",

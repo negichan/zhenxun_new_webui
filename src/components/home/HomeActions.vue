@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { Bell, Settings, Palette, Ellipsis } from "lucide-vue-next";
+import { Bell, Bot, Settings, Palette, Ellipsis, X } from "lucide-vue-next";
 import { computed, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useThemeStore } from "@/store/theme";
 import { useManageStore } from "@/store/manage.ts";
 import { onClickOutside } from "@vueuse/core";
 import { gsap } from "gsap";
+import { openBotClient } from "@/config/menu";
 import ThemeCustomizer from "./ThemeCustomizer.vue";
 import RequestCenter from "./RequestCenter.vue";
+import SettingsModal from "./SettingsModal.vue";
 
 const themeStore = useThemeStore();
 const manageStore = useManageStore();
@@ -26,11 +28,25 @@ onClickOutside(themePanelRef, () => {
     showThemePanel.value = false;
 });
 
+// 设置弹窗（桌面端与紧凑菜单共用一个状态）
+const showSettingsModal = ref(false);
+
 // 移动端 / 平板端（lg 以下）：三个按钮收纳为一个展开菜单
 const showCompactMenu = ref(false);
 const compactThemeOpen = ref(false);
 const compactRef = ref<HTMLElement | null>(null);
 const requestWrapRef = ref<HTMLElement | null>(null);
+
+// 展开/收起：收起时把主题面板状态一起复位——否则"开面板 → 点···收起 →
+// 再点···展开"会因为 compactThemeOpen 仍是 true 而直接打开主题面板
+const toggleCompact = () => {
+    if (showCompactMenu.value) {
+        showCompactMenu.value = false;
+        compactThemeOpen.value = false;
+    } else {
+        showCompactMenu.value = true;
+    }
+};
 
 onClickOutside(compactRef, () => {
     showCompactMenu.value = false;
@@ -84,6 +100,63 @@ const onDropdownLeave = (el: Element, done: () => void) => {
     });
 };
 
+// 折叠按钮列的进出场：容器整体从"···"下滑出，按钮再轻交错跟进；
+// 进出都把容器与按钮的补间杀干净，leave 结束清内联样式防残留
+const onStackEnter = (el: Element, done: () => void) => {
+    const buttons = [...el.querySelectorAll(":scope > button")];
+    const targets = [el, ...buttons];
+    gsap.killTweensOf(targets);
+    // 按钮自带 transition-all（hover 过渡），会和 gsap 每帧写入打架——先压掉，
+    // 动画结束再恢复
+    gsap.set(targets, { transition: "none" });
+    const state = el as Element & { _tipDone?: () => void };
+    state._tipDone = done;
+    gsap.fromTo(
+        el,
+        { autoAlpha: 0, y: -12 },
+        {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.22,
+            ease: "power2.out",
+            onComplete: () => state._tipDone?.(),
+        },
+    );
+    gsap.fromTo(
+        buttons,
+        { autoAlpha: 0, y: -6 },
+        {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.24,
+            ease: "power2.out",
+            stagger: 0.05,
+            onComplete: () => {
+                gsap.set(buttons, { clearProps: "transition" });
+            },
+        },
+    );
+};
+
+const onStackLeave = (el: Element, done: () => void) => {
+    const buttons = [...el.querySelectorAll(":scope > button")];
+    const targets = [el, ...buttons];
+    gsap.killTweensOf(targets);
+    gsap.set(targets, { transition: "none" });
+    const state = el as Element & { _tipDone?: () => void };
+    state._tipDone = done;
+    gsap.to(el, {
+        autoAlpha: 0,
+        y: -8,
+        duration: 0.16,
+        ease: "power2.in",
+        onComplete: () => {
+            gsap.set(targets, { clearProps: "all" });
+            state._tipDone?.();
+        },
+    });
+};
+
 // 两个面板互斥：打开一个就显式关掉另一个
 const toggleRequestPanel = () => {
     requestDialogOpen.value = !requestDialogOpen.value;
@@ -94,6 +167,13 @@ const toggleThemePanel = () => {
     showThemePanel.value = !showThemePanel.value;
     requestDialogOpen.value = false;
 };
+
+// 打开 Bot 端（模拟端）独立窗口；紧凑堆叠里点完顺手收起菜单
+const openBotClientWindow = () => {
+    openBotClient();
+    showCompactMenu.value = false;
+    compactThemeOpen.value = false;
+};
 </script>
 
 <template>
@@ -102,11 +182,11 @@ const toggleThemePanel = () => {
         <div class="hidden items-center space-x-1 sm:space-x-2 lg:flex">
             <div ref="requestWrapRef" class="relative hidden lg:block">
                 <button
-                    class="bell-btn group relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md sm:h-9 sm:w-9"
+                    class="bell-btn group relative flex h-9 w-9 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md"
                     title="请求处理"
                     @click="toggleRequestPanel"
                 >
-                    <Bell class="h-3.5 w-3.5 transition-colors sm:h-4 sm:w-4" :class="messageCount > 0 ? 'text-orange-500 bell-notify' : 'text-slate-600 group-hover:text-orange-500'" />
+                    <Bell class="h-4.5 w-4.5 transition-colors sm:h-4 sm:w-4" :class="messageCount > 0 ? 'text-orange-500 bell-notify' : 'text-slate-600 group-hover:text-orange-500'" />
                     <span v-if="messageCount > 0" class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold leading-none text-white">{{ messageCount }}</span>
                 </button>
                 <RequestCenter variant="desktop" />
@@ -114,85 +194,137 @@ const toggleThemePanel = () => {
 
             <div class="relative" ref="themePanelRef">
                 <button
-                    class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md sm:h-9 sm:w-9"
+                    class="flex h-9 w-9 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md"
                     title="主题选择"
                     @click="toggleThemePanel"
                 >
-                    <Palette class="h-3.5 w-3.5 text-slate-600 sm:h-4 sm:w-4" />
+                    <Palette class="h-4.5 w-4.5 text-slate-600 sm:h-4 sm:w-4" />
                 </button>
                 <Transition :css="false" @enter="onDropdownEnter" @leave="onDropdownLeave">
                     <div
                         v-if="showThemePanel"
                         class="absolute right-0 top-full mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-lg"
                     >
-                        <ThemeCustomizer @applied="showThemePanel = false" />
+                        <ThemeCustomizer
+                            @applied="showThemePanel = false"
+                            @close="showThemePanel = false"
+                        />
                     </div>
                 </Transition>
             </div>
 
             <button
-                class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md sm:h-9 sm:w-9"
-                title="设置"
+                class="flex h-9 w-9 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md"
+                title="Bot 端（模拟端）"
+                @click="openBotClientWindow"
             >
-                <Settings class="h-3.5 w-3.5 text-slate-600 sm:h-4 sm:w-4" />
+                <Bot class="h-4.5 w-4.5 text-slate-600 sm:h-4 sm:w-4" />
+            </button>
+
+            <button
+                class="flex h-9 w-9 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md"
+                title="设置"
+                @click="showSettingsModal = true"
+            >
+                <Settings class="h-4.5 w-4.5 text-slate-600 sm:h-4 sm:w-4" />
             </button>
         </div>
 
         <!-- 移动端 / 平板端：收纳为一个按钮，点开菜单 -->
         <div class="relative lg:hidden" ref="compactRef">
             <button
-                class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md sm:h-9 sm:w-9"
+                class="flex h-9 w-9 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md"
                 title="更多"
-                @click="showCompactMenu = !showCompactMenu"
+                @click="toggleCompact"
             >
-                <Ellipsis class="h-3.5 w-3.5 text-slate-600 sm:h-4 sm:w-4" />
+                <X
+                    v-if="showCompactMenu"
+                    class="h-4.5 w-4.5 text-slate-600 sm:h-4 sm:w-4"
+                />
+                <Ellipsis
+                    v-else
+                    class="h-4.5 w-4.5 text-slate-600 sm:h-4 sm:w-4"
+                />
                 <span v-if="messageCount > 0" class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold leading-none text-white">{{ messageCount }}</span>
             </button>
-            <Transition :css="false" @enter="onDropdownEnter" @leave="onDropdownLeave">
+            <Transition :css="false" @enter="onStackEnter" @leave="onStackLeave">
                 <div
                     v-if="showCompactMenu"
-                    class="absolute right-0 top-full z-20 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-lg"
+                    class="absolute right-0 top-full z-20 mt-3 flex flex-col items-end gap-3"
                 >
-                    <ThemeCustomizer
+                    <!-- 主题面板：补回面板壳并固定宽度（按钮列容器是透明
+                         弹性布局，裸放会宽度失控） -->
+                    <div
                         v-if="compactThemeOpen"
-                        @applied="
-                            compactThemeOpen = false;
-                            showCompactMenu = false;
-                        "
-                    />
+                        class="w-72 max-sm:w-[calc(100vw-32px)] rounded-2xl border border-slate-200 bg-white max-sm:p-5 p-3 shadow-lg"
+                    >
+                        <ThemeCustomizer
+                            @applied="
+                                compactThemeOpen = false;
+                                showCompactMenu = false;
+                            "
+                            @close="compactThemeOpen = false"
+                        />
+                    </div>
                     <template v-else>
                         <button
-                            class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-[var(--zx-color-text)] transition-colors hover:bg-[var(--zx-color-surface-muted)]"
+                            class="relative flex h-9 w-9 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md"
+                            title="请求处理"
                             type="button"
                             @click="openRequestCenter"
                         >
-                            <Bell class="h-4 w-4 shrink-0 text-[var(--zx-color-text-muted)]" />
-                            <span class="flex-1 text-left text-sm">请求处理</span>
+                            <Bell
+                                class="h-4.5 w-4.5 text-slate-600 sm:h-4 sm:w-4"
+                                :class="messageCount > 0 ? 'text-orange-500' : ''"
+                            />
                             <span
                                 v-if="messageCount > 0"
-                                class="flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1.5 text-[10px] font-bold leading-none text-white"
+                                class="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold leading-none text-white"
                             >{{ messageCount }}</span>
                         </button>
                         <button
-                            class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-[var(--zx-color-text)] transition-colors hover:bg-[var(--zx-color-surface-muted)]"
+                            class="flex h-9 w-9 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md"
+                            title="主题选择"
                             type="button"
                             @click="compactThemeOpen = true"
                         >
-                            <Palette class="h-4 w-4 shrink-0 text-[var(--zx-color-text-muted)]" />
-                            <span class="flex-1 text-left text-sm">主题选择</span>
+                            <Palette
+                                class="h-4.5 w-4.5 text-slate-600 sm:h-4 sm:w-4"
+                            />
                         </button>
                         <button
-                            class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2 text-[var(--zx-color-text)] transition-colors hover:bg-[var(--zx-color-surface-muted)]"
+                            class="flex h-9 w-9 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md"
+                            title="Bot 端（模拟端）"
                             type="button"
+                            @click="openBotClientWindow"
                         >
-                            <Settings class="h-4 w-4 shrink-0 text-[var(--zx-color-text-muted)]" />
-                            <span class="flex-1 text-left text-sm">设置</span>
+                            <Bot
+                                class="h-4.5 w-4.5 text-slate-600 sm:h-4 sm:w-4"
+                            />
+                        </button>
+                        <button
+                            class="flex h-9 w-9 max-sm:h-10 max-sm:w-10 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:shadow-md"
+                            title="设置"
+                            type="button"
+                            @click="
+                                showSettingsModal = true;
+                                showCompactMenu = false;
+                            "
+                        >
+                            <Settings
+                                class="h-4.5 w-4.5 text-slate-600 sm:h-4 sm:w-4"
+                            />
                         </button>
                     </template>
                 </div>
             </Transition>
             <RequestCenter variant="compact" />
         </div>
+
+        <SettingsModal
+            :visible="showSettingsModal"
+            @close="showSettingsModal = false"
+        />
     </div>
 </template>
 
