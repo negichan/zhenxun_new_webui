@@ -1,31 +1,42 @@
 <template>
     <div
         ref="modalRoot"
-        class="file-editor-modal fixed inset-0 glass-overlay flex items-center justify-center z-50"
-        :class="animationClass"
+        class="file-editor-modal fixed inset-0 z-50 glass-overlay flex items-center justify-center"
         @click="handleClose"
     >
         <div
-            class="modal-content bg-white rounded-2xl w-[900px] max-w-[95vw] h-[85vh] max-h-[90vh] shadow-xl flex flex-col"
+            class="modal-content flex h-[85vh] max-h-[90vh] w-[900px] max-w-[95vw] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl"
             @click.stop
         >
             <!-- 标题栏 -->
-            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-                <div class="flex items-center space-x-2">
-                    <FileText class="w-5 h-5 text-blue-500" />
-                    <h3 class="text-lg font-semibold text-gray-800">文件编辑</h3>
-                    <span class="text-sm text-gray-500 ml-2 truncate max-w-[300px]">{{ currentFilePath }}</span>
+            <div
+                class="flex items-center justify-between border-b border-gray-200 px-4 py-3"
+            >
+                <div class="flex min-w-0 items-center gap-2.5">
+                    <div
+                        class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl bg-zx-primary-soft"
+                    >
+                        <FileText class="h-5 w-5 text-zx-primary" />
+                    </div>
+                    <h3 class="flex-shrink-0 text-lg font-semibold text-gray-800">
+                        文件编辑
+                    </h3>
+                    <span
+                        class="ml-1 truncate rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500"
+                        :title="currentFilePath"
+                        >{{ currentFilePath }}</span
+                    >
                 </div>
                 <button
+                    class="cursor-pointer rounded-full p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
                     @click="handleClose"
-                    class="p-1.5 hover:bg-gray-100 rounded-2xl transition-colors text-gray-500"
                 >
-                    <X class="w-5 h-5" />
+                    <X class="h-5 w-5" />
                 </button>
             </div>
 
             <!-- 编辑器主体 -->
-            <div class="flex-1 min-h-0 p-3">
+            <div class="min-h-0 flex-1 p-3">
                 <ZXTextEditor
                     ref="editorRef"
                     v-model="editorContent"
@@ -45,6 +56,7 @@ import { FileText, X } from 'lucide-vue-next'
 import { fileApi } from '@/utils/api-next'
 import { ZXNotification } from '@/services/ui'
 import ZXTextEditor from '@/components/ZXTextEditor'
+import { modalJelly } from '@/composables/useGsapTransition'
 
 // Props
 interface Props {
@@ -65,17 +77,15 @@ const editorRef = ref<InstanceType<typeof ZXTextEditor> | null>(null)
 const editorContent = ref('')
 const loading = ref(false)
 const currentLanguage = ref('auto')
-const animationClass = ref('modal-jelly-enter-active')
+const modalRoot = ref<HTMLElement | null>(null)
 const isClosing = ref(false)
 
 // 当前文件路径（计算属性）
 const currentFilePath = computed(() => props.initialFile?.path || '')
 
-// 动画进入完成后清理类名
+// 挂载即播放果冻进场动画（动画开关关闭时钩子内部直接落位）
 onMounted(() => {
-    setTimeout(() => {
-        animationClass.value = ''
-    }, 500)
+    if (modalRoot.value) modalJelly.onEnter(modalRoot.value, () => {})
 })
 
 // 保存文件
@@ -113,12 +123,9 @@ const handleSave = async (content: string) => {
 const handleClose = () => {
     if (isClosing.value) return
     isClosing.value = true
-    animationClass.value = 'modal-jelly-leave-active'
 
-    // 等待离开动画完成
-    setTimeout(() => {
-        emit('close')
-    }, 250)
+    // 等待离场动画完成（动画开关关闭时立即完成）
+    modalJelly.onLeave(modalRoot.value!, () => emit('close'))
 }
 
 // 监听初始文件变化
@@ -150,21 +157,44 @@ watch(() => props.initialFile, async (file) => {
         }
 
         nextTick(() => {
-            // 自动检测语言
+            // 自动检测语言（值与 ZXTextEditor 的语言下拉对齐）
             const ext = file.name.split('.').pop()?.toLowerCase()
             const langMap: Record<string, string> = {
-                'js': 'javascript',
-                'ts': 'typescript',
-                'py': 'python',
-                'json': 'json',
-                'yaml': 'yaml',
-                'yml': 'yaml',
-                'html': 'html',
-                'css': 'css',
-                'scss': 'scss',
-                'md': 'markdown',
-                'sql': 'sql',
-                'sh': 'shell',
+                bat: 'bat',
+                bash: 'shell',
+                c: 'c',
+                cpp: 'cpp',
+                cjs: 'javascript',
+                css: 'css',
+                dockerfile: 'dockerfile',
+                go: 'go',
+                h: 'c',
+                hpp: 'cpp',
+                htm: 'html',
+                html: 'html',
+                ini: 'ini',
+                java: 'java',
+                js: 'javascript',
+                json: 'json',
+                jsonc: 'json',
+                jsx: 'javascript',
+                less: 'less',
+                md: 'markdown',
+                markdown: 'markdown',
+                mjs: 'javascript',
+                py: 'python',
+                rs: 'rust',
+                scss: 'scss',
+                sh: 'shell',
+                sql: 'sql',
+                svg: 'xml',
+                toml: 'toml',
+                ts: 'typescript',
+                tsx: 'typescript',
+                vue: 'vue',
+                xml: 'xml',
+                yaml: 'yaml',
+                yml: 'yaml',
             }
             currentLanguage.value = langMap[ext || ''] || 'auto'
         })

@@ -1,5 +1,5 @@
 <template>
-    <div class="zx-editor-container" :class="themeClass">
+    <div class="zx-editor-container">
         <div v-if="!hideToolbar" class="editor-toolbar">
             <div class="toolbar-left">
                 <select
@@ -17,18 +17,19 @@
                     </option>
                 </select>
 
-                <button class="dropdown-link" type="button" @click="toggleTheme">
-                    <component :is="themeIcon" class="icon" />
-                    <span>{{ currentThemeLabel }}</span>
-                </button>
-
-                <button class="dropdown-link" type="button" @click="changeEOL">
+                <button
+                    v-if="!isPreviewing"
+                    class="toolbar-chip"
+                    type="button"
+                    @click="changeEOL"
+                >
                     <WrapText class="icon" />
                     <span>{{ currentEolLabel }}</span>
                 </button>
 
                 <button
-                    class="dropdown-link"
+                    v-if="!isPreviewing"
+                    class="toolbar-chip"
                     type="button"
                     @click="toggleWordWrap"
                 >
@@ -38,42 +39,95 @@
             </div>
 
             <div class="toolbar-right">
-                <button
-                    class="dropdown-link"
-                    type="button"
-                    :disabled="!isDirty || readonly"
-                    @click="handleReset"
-                >
-                    <RefreshCw class="icon" />
-                    <span>重置</span>
-                </button>
-                <button
-                    class="dropdown-link dropdown-link-primary"
-                    type="button"
-                    :disabled="readonly"
-                    @click="handleSave"
-                >
-                    <Save class="icon" />
-                    <span>保存</span>
-                </button>
+                <!-- Markdown 预览切换 -->
+                <div v-if="isMarkdown" class="preview-segmented">
+                    <button
+                        type="button"
+                        :class="{ 'segmented-active': !isPreviewing }"
+                        @click="isPreviewing = false"
+                    >
+                        <Edit3 class="icon" />
+                        <span>编辑</span>
+                    </button>
+                    <button
+                        type="button"
+                        :class="{ 'segmented-active': isPreviewing }"
+                        @click="togglePreview"
+                    >
+                        <Eye class="icon" />
+                        <span>预览</span>
+                    </button>
+                </div>
+                <template v-if="!isPreviewing">
+                    <ZxButton
+                        variant="ghost"
+                        size="sm"
+                        :disabled="!isDirty || readonly"
+                        @click="handleReset"
+                    >
+                        <RefreshCw class="icon" />
+                        重置
+                    </ZxButton>
+                    <ZxButton
+                        size="sm"
+                        :disabled="readonly"
+                        @click="handleSave"
+                    >
+                        <Save class="icon" />
+                        保存
+                    </ZxButton>
+                </template>
             </div>
         </div>
 
-        <div class="editor-wrapper">
-            <div class="line-number-gutter" aria-hidden="true">
-                <span v-for="line in lineCount" :key="line">{{ line }}</span>
-            </div>
-            <textarea
-                ref="textareaRef"
-                v-model="content"
-                class="editor-textarea"
-                :class="{ 'whitespace-pre': !wordWrap }"
-                :readonly="readonly"
-                :spellcheck="false"
-                @input="handleInput"
-                @keydown="handleKeydown"
-                @scroll="syncGutterScroll"
-            />
+        <!-- Markdown 预览视图 -->
+        <div v-if="isPreviewing" class="editor-wrapper">
+            <div
+                ref="previewRef"
+                class="md-preview"
+                v-html="previewHtml"
+            ></div>
+        </div>
+
+        <!-- 编辑视图：monaco 就绪前先用轻量 textarea 兜底渲染 -->
+        <!-- 编辑视图：保持挂载（v-show），避免预览切换反复重建 monaco 容器 -->
+        <div
+            v-show="!isPreviewing"
+            class="editor-wrapper"
+            :class="{ 'is-monaco': monacoReady }"
+        >
+            <template v-if="!monacoReady">
+                <div class="line-number-gutter" aria-hidden="true">
+                    <span v-for="line in lineCount" :key="line">{{
+                        line
+                    }}</span>
+                </div>
+                <div class="editor-content-host">
+                    <!-- 语法高亮层：垫在透明文本的 textarea 下面 -->
+                    <div
+                        ref="highlightRef"
+                        class="editor-highlight"
+                        :class="{ 'is-wrap': wordWrap }"
+                        aria-hidden="true"
+                        v-html="highlightHtml"
+                    ></div>
+                    <textarea
+                        ref="textareaRef"
+                        v-model="content"
+                        class="editor-textarea"
+                        :class="{
+                            'whitespace-pre': !wordWrap,
+                            'has-highlight': highlightHtml !== '',
+                        }"
+                        :readonly="readonly"
+                        :spellcheck="false"
+                        @input="handleInput"
+                        @keydown="handleKeydown"
+                        @scroll="syncOverlayScroll"
+                    />
+                </div>
+            </template>
+            <div v-show="monacoReady" ref="monacoHost" class="monaco-host"></div>
 
             <div v-if="loading" class="loading-overlay">
                 <div class="loading-content">
@@ -86,17 +140,31 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
 import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch,
+} from "vue";
+import {
+    Edit3,
+    Eye,
     Loader2,
-    Monitor,
-    Moon,
     RefreshCw,
     Save,
     Settings,
-    Sun,
     WrapText,
 } from "lucide-vue-next";
+import {
+    highlightCode,
+    resolveShikiLang,
+    selectLangToShiki,
+} from "./highlighter";
+import { loadMonaco } from "./monacoLoader";
+import type * as MonacoNamespace from "monaco-editor/editor/editor.api";
+import { useThemeStore } from "@/store/theme";
 
 interface Props {
     modelValue?: string;
@@ -126,20 +194,26 @@ const languages = [
     { label: "Plain Text", value: "plaintext" },
     { label: "JavaScript", value: "javascript" },
     { label: "TypeScript", value: "typescript" },
+    { label: "Vue", value: "vue" },
     { label: "Python", value: "python" },
     { label: "JSON", value: "json" },
     { label: "YAML", value: "yaml" },
+    { label: "TOML", value: "toml" },
     { label: "HTML", value: "html" },
+    { label: "XML", value: "xml" },
     { label: "CSS", value: "css" },
+    { label: "SCSS", value: "scss" },
+    { label: "Less", value: "less" },
     { label: "Markdown", value: "markdown" },
     { label: "SQL", value: "sql" },
     { label: "Shell", value: "shell" },
-];
-
-const themes = [
-    { label: "浅色", value: "light", icon: Sun },
-    { label: "深色", value: "dark", icon: Moon },
-    { label: "高对比", value: "contrast", icon: Monitor },
+    { label: "Batch", value: "bat" },
+    { label: "Dockerfile", value: "dockerfile" },
+    { label: "Go", value: "go" },
+    { label: "Rust", value: "rust" },
+    { label: "Java", value: "java" },
+    { label: "C", value: "c" },
+    { label: "C++", value: "cpp" },
 ];
 
 const detectLanguage = () => {
@@ -147,17 +221,39 @@ const detectLanguage = () => {
 
     const ext = props.path.split(".").pop()?.toLowerCase();
     const langMap: Record<string, string> = {
-        c: "plaintext",
+        bat: "bat",
+        bash: "shell",
+        c: "c",
+        cpp: "cpp",
+        cjs: "javascript",
         css: "css",
+        dockerfile: "dockerfile",
+        go: "go",
+        h: "c",
+        hpp: "cpp",
+        htm: "html",
         html: "html",
+        ini: "ini",
+        java: "java",
         js: "javascript",
         json: "json",
+        jsonc: "json",
+        jsx: "javascript",
+        less: "less",
         md: "markdown",
+        markdown: "markdown",
+        mjs: "javascript",
         py: "python",
-        scss: "css",
+        rs: "rust",
+        scss: "scss",
         sh: "shell",
         sql: "sql",
+        svg: "xml",
+        toml: "toml",
         ts: "typescript",
+        tsx: "typescript",
+        vue: "vue",
+        xml: "xml",
         yaml: "yaml",
         yml: "yaml",
     };
@@ -169,7 +265,6 @@ const textareaRef = ref<HTMLTextAreaElement | null>(null);
 const content = ref(props.modelValue);
 const initialValue = ref(props.modelValue);
 const selectedLanguage = ref(detectLanguage());
-const currentTheme = ref(localStorage.getItem("zx-editor-theme") || "dark");
 const currentEOL = ref<"lf" | "crlf">("lf");
 const wordWrap = ref(localStorage.getItem("zx-editor-wordwrap") !== "false");
 
@@ -178,12 +273,6 @@ const lineCount = computed(() => Math.max(content.value.split("\n").length, 1));
 const currentEolLabel = computed(() =>
     currentEOL.value === "lf" ? "LF" : "CRLF",
 );
-const currentThemeConfig = computed(
-    () => themes.find((theme) => theme.value === currentTheme.value) || themes[1],
-);
-const currentThemeLabel = computed(() => currentThemeConfig.value.label);
-const themeIcon = computed(() => currentThemeConfig.value.icon);
-const themeClass = computed(() => `theme-${currentTheme.value}`);
 
 const normalizeEOL = (value: string) =>
     currentEOL.value === "crlf"
@@ -195,23 +284,17 @@ const handleInput = () => {
 };
 
 const handleSave = () => {
-    emit("save", normalizeEOL(content.value));
-    initialValue.value = content.value;
+    const raw = monacoEditor ? monacoEditor.getValue() : content.value;
+    content.value = raw;
+    emit("save", normalizeEOL(raw));
+    initialValue.value = raw;
 };
 
 const handleReset = () => {
     if (!isDirty.value) return;
     content.value = initialValue.value;
+    syncMonacoValue();
     emit("update:modelValue", content.value);
-};
-
-const toggleTheme = () => {
-    const currentIndex = themes.findIndex(
-        (theme) => theme.value === currentTheme.value,
-    );
-    const nextTheme = themes[(currentIndex + 1) % themes.length];
-    currentTheme.value = nextTheme.value;
-    localStorage.setItem("zx-editor-theme", nextTheme.value);
 };
 
 const changeEOL = () => {
@@ -251,13 +334,299 @@ const insertAtCursor = (text: string) => {
     });
 };
 
-const syncGutterScroll = () => {
+const syncOverlayScroll = () => {
     const textarea = textareaRef.value;
-    const gutter = textarea?.previousElementSibling as HTMLElement | null;
-    if (!textarea || !gutter) return;
+    if (!textarea) return;
 
-    gutter.scrollTop = textarea.scrollTop;
+    const overlay = highlightRef.value;
+    if (overlay) {
+        overlay.scrollTop = textarea.scrollTop;
+        overlay.scrollLeft = textarea.scrollLeft;
+    }
+
+    const gutter = textarea
+        .closest(".editor-wrapper")
+        ?.querySelector(".line-number-gutter") as HTMLElement | null;
+    if (gutter) gutter.scrollTop = textarea.scrollTop;
 };
+
+// ==================== Monaco 引擎（CDN 优先，失败回退本地打包） ====================
+const monacoHost = ref<HTMLElement | null>(null);
+const monacoReady = ref(false);
+let monacoInstance: typeof MonacoNamespace | null = null;
+let monacoEditor: MonacoNamespace.editor.IStandaloneCodeEditor | null = null;
+let applyingMonacoValue = false;
+
+// 编辑器语言（含 shiki 命名）→ monaco 语言 id
+const MONACO_LANG_MAP: Record<string, string> = {
+    bat: "bat",
+    c: "cpp",
+    cpp: "cpp",
+    cjs: "javascript",
+    css: "css",
+    docker: "dockerfile",
+    dockerfile: "dockerfile",
+    go: "go",
+    h: "cpp",
+    hpp: "cpp",
+    htm: "html",
+    html: "html",
+    ini: "ini",
+    java: "java",
+    javascript: "javascript",
+    json: "json",
+    jsx: "javascript",
+    less: "less",
+    md: "markdown",
+    markdown: "markdown",
+    mjs: "javascript",
+    plaintext: "plaintext",
+    py: "python",
+    python: "python",
+    rs: "rust",
+    rust: "rust",
+    scss: "scss",
+    sh: "shell",
+    shell: "shell",
+    shellscript: "shell",
+    sql: "sql",
+    svg: "xml",
+    toml: "ini",
+    ts: "typescript",
+    tsx: "typescript",
+    typescript: "typescript",
+    vue: "html",
+    xml: "xml",
+    yaml: "yaml",
+    yml: "yaml",
+};
+
+const monacoLang = computed(() => {
+    const key =
+        selectedLanguage.value === "auto"
+            ? resolveShikiLang(props.path.split(".").pop()?.toLowerCase())
+            : selectLangToShiki(selectedLanguage.value) ||
+              selectedLanguage.value;
+    return MONACO_LANG_MAP[key] || "plaintext";
+});
+
+const cssVar = (name: string, fallback: string) =>
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim() ||
+    fallback;
+
+/** 用主题变量定义编辑器深浅主题，颜色跟随全局换肤 */
+const defineZxThemes = (monaco: typeof MonacoNamespace) => {
+    const colors = () => ({
+        "editor.background": cssVar("--zx-color-surface", "#ffffff"),
+        "editor.foreground": cssVar("--zx-color-text-strong", "#0f172a"),
+        "editorLineNumber.foreground": cssVar(
+            "--zx-color-text-subtle",
+            "#94a3b8",
+        ),
+        "editorLineNumber.activeForeground": cssVar(
+            "--zx-color-primary",
+            "#3b82f6",
+        ),
+        "editorIndentGuide.background": cssVar(
+            "--zx-color-border",
+            "#e2e8f0",
+        ),
+    });
+    monaco.editor.defineTheme("zx-light", {
+        base: "vs",
+        inherit: true,
+        rules: [],
+        colors: colors(),
+    });
+    monaco.editor.defineTheme("zx-dark", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [],
+        colors: colors(),
+    });
+};
+
+const zxThemeName = () =>
+    editorShikiTheme.value === "dark" ? "zx-dark" : "zx-light";
+
+const syncMonacoValue = () => {
+    if (monacoEditor && monacoEditor.getValue() !== content.value) {
+        applyingMonacoValue = true;
+        monacoEditor.setValue(content.value);
+        applyingMonacoValue = false;
+    }
+};
+
+onMounted(async () => {
+    try {
+        monacoInstance = await loadMonaco();
+        if (!monacoHost.value) return;
+        defineZxThemes(monacoInstance);
+        monacoEditor = monacoInstance.editor.create(monacoHost.value, {
+            value: content.value,
+            language: monacoLang.value,
+            theme: zxThemeName(),
+            automaticLayout: true,
+            fontFamily: '"JetBrains Mono", "Cascadia Mono", Consolas, monospace',
+            fontSize: 14,
+            lineHeight: 22,
+            fontLigatures: false,
+            minimap: { enabled: false },
+            wordWrap: wordWrap.value ? "on" : "off",
+            scrollBeyondLastLine: false,
+            tabSize: 4,
+            renderLineHighlight: "none",
+            smoothScrolling: true,
+            padding: { top: 10, bottom: 10 },
+        });
+        monacoEditor.onDidChangeModelContent(() => {
+            if (applyingMonacoValue) return;
+            content.value = monacoEditor!.getValue();
+            emit("update:modelValue", content.value);
+        });
+        monacoEditor.addCommand(
+            monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
+            () => handleSave(),
+        );
+        monacoReady.value = true;
+    } catch (e) {
+        console.warn("Monaco 初始化失败，继续使用轻量编辑器", e);
+    }
+});
+
+watch(monacoLang, (lang) => {
+    const model = monacoEditor?.getModel();
+    if (model && monacoInstance) {
+        monacoInstance.editor.setModelLanguage(model, lang);
+    }
+});
+
+watch(wordWrap, (wrap) => {
+    monacoEditor?.updateOptions({ wordWrap: wrap ? "on" : "off" });
+});
+
+watch(currentEOL, (eol) => {
+    const model = monacoEditor?.getModel();
+    if (!model) return;
+    // EndOfLineSequence：LF=1, CRLF=2（monaco 0.56 未从 editor.api 顶层导出）
+    model.setEOL((eol === "crlf" ? 2 : 1) as MonacoNamespace.editor.EndOfLineSequence);
+});
+
+watch(
+    () => props.readonly,
+    (readonly) => {
+        monacoEditor?.updateOptions({ readOnly: readonly });
+    },
+);
+
+// ==================== 语法高亮（shiki 按需加载，主题跟随应用深浅色） ====================
+const themeStore = useThemeStore();
+const editorShikiTheme = computed(() =>
+    themeStore.effectiveMode === "dark" ? "dark" : "light",
+);
+const highlightRef = ref<HTMLElement | null>(null);
+const highlightHtml = ref("");
+
+const shikiLang = computed(() => {
+    if (selectedLanguage.value === "auto") {
+        return resolveShikiLang(props.path.split(".").pop()?.toLowerCase());
+    }
+    return selectLangToShiki(selectedLanguage.value);
+});
+
+let highlightTimer: number | undefined;
+let highlightSeq = 0;
+
+const requestHighlight = () => {
+    if (monacoReady.value) return; // monaco 引擎接管后垫层不再需要
+    window.clearTimeout(highlightTimer);
+    const seq = ++highlightSeq;
+    highlightTimer = window.setTimeout(async () => {
+        try {
+            const html = await highlightCode(
+                content.value,
+                shikiLang.value,
+                editorShikiTheme.value,
+            );
+            if (seq !== highlightSeq) return;
+            highlightHtml.value = html;
+            nextTick(syncOverlayScroll);
+        } catch {
+            if (seq === highlightSeq) highlightHtml.value = "";
+        }
+    }, 250);
+};
+
+watch([content, shikiLang, editorShikiTheme], requestHighlight, {
+    immediate: true,
+});
+
+// 应用深浅切换时同步 monaco 主题（颜色值从主题变量重读）
+watch(editorShikiTheme, () => {
+    if (!monacoInstance || !monacoEditor) return;
+    defineZxThemes(monacoInstance);
+    monacoInstance.editor.setTheme(zxThemeName());
+});
+
+// ==================== Markdown 预览 ====================
+const isMarkdown = computed(() => {
+    if (selectedLanguage.value === "markdown") return true;
+    if (selectedLanguage.value === "auto") {
+        const ext = props.path.split(".").pop()?.toLowerCase();
+        return ext === "md" || ext === "markdown";
+    }
+    return false;
+});
+
+const isPreviewing = ref(false);
+const previewRef = ref<HTMLElement | null>(null);
+const previewHtml = ref("");
+
+let markedPromise: Promise<typeof import("marked")> | null = null;
+
+const renderPreview = async () => {
+    if (!markedPromise) markedPromise = import("marked");
+    const { marked } = await markedPromise;
+    try {
+        previewHtml.value = await marked.parse(content.value, {
+            async: false,
+            gfm: true,
+            breaks: true,
+        });
+    } catch {
+        previewHtml.value = "";
+    }
+};
+
+const togglePreview = () => {
+    isPreviewing.value = true;
+    renderPreview();
+};
+
+watch(content, () => {
+    if (isPreviewing.value) {
+        window.clearTimeout(previewTimer);
+        previewTimer = window.setTimeout(renderPreview, 300);
+    }
+});
+
+let previewTimer: number | undefined;
+
+// 文件切换时回到编辑视图
+watch(
+    () => props.path,
+    () => {
+        isPreviewing.value = false;
+    },
+);
+
+onBeforeUnmount(() => {
+    window.clearTimeout(highlightTimer);
+    window.clearTimeout(previewTimer);
+    monacoEditor?.getModel()?.dispose();
+    monacoEditor?.dispose();
+    monacoEditor = null;
+});
 
 watch(
     () => props.modelValue,
@@ -265,6 +634,7 @@ watch(
         if (newValue === content.value) return;
         content.value = newValue || "";
         initialValue.value = newValue || "";
+        syncMonacoValue();
     },
 );
 
@@ -314,52 +684,87 @@ defineExpose({
     display: flex;
     flex-shrink: 0;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.375rem;
 }
 
-.dropdown-link,
-.toolbar-select {
+.toolbar-select,
+.toolbar-chip {
     display: inline-flex;
     height: 2rem;
     align-items: center;
     gap: 0.25rem;
-    border: 0;
-    border-radius: 0.375rem;
-    background-color: transparent;
-    padding: 0 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 9999px;
+    background-color: var(--zx-color-surface);
+    padding: 0 0.625rem;
     color: var(--zx-color-text-muted);
     font-size: 0.75rem;
     line-height: 1;
     white-space: nowrap;
-    transition: background-color 0.15s;
-}
-
-.dropdown-link {
     cursor: pointer;
+    transition:
+        background-color 0.15s,
+        border-color 0.15s;
 }
 
-.dropdown-link:hover,
-.toolbar-select:hover {
-    background-color: var(--zx-gray-100);
+.toolbar-select {
+    cursor: pointer;
+    appearance: none;
 }
 
-.dropdown-link:disabled {
+.toolbar-select:hover,
+.toolbar-chip:hover {
+    border-color: var(--zx-color-border);
+    color: var(--zx-color-text-strong);
+}
+
+.toolbar-select:disabled {
     cursor: not-allowed;
     opacity: 0.5;
-}
-
-.dropdown-link-primary {
-    background-color: var(--zx-color-primary);
-    color: var(--zx-color-on-accent);
-}
-
-.dropdown-link-primary:hover {
-    background-color: var(--zx-color-primary-hover);
 }
 
 .icon {
     width: 1rem;
     height: 1rem;
+    flex-shrink: 0;
+}
+
+/* 编辑 / 预览 分段切换 */
+.preview-segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    border-radius: 1rem;
+    background-color: var(--zx-gray-100);
+    padding: 0.25rem;
+}
+
+.preview-segmented button {
+    display: inline-flex;
+    height: 1.75rem;
+    align-items: center;
+    gap: 0.25rem;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    padding: 0 0.75rem;
+    color: var(--zx-color-text-muted);
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+        background-color 0.15s,
+        color 0.15s;
+}
+
+.preview-segmented button:hover {
+    color: var(--zx-color-text-strong);
+}
+
+.preview-segmented .segmented-active {
+    background-color: var(--zx-color-surface);
+    color: var(--zx-color-primary);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
 }
 
 .editor-wrapper {
@@ -369,6 +774,62 @@ defineExpose({
     flex: 1;
     grid-template-columns: auto minmax(0, 1fr);
     overflow: hidden;
+}
+
+.editor-wrapper:has(> .md-preview) {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-y: auto;
+}
+
+.editor-wrapper.is-monaco {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.monaco-host {
+    min-width: 0;
+    min-height: 0;
+}
+
+.editor-content-host {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* 高亮层垫在 textarea 下面，字体度量必须与 textarea 完全一致 */
+.editor-highlight {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    padding: 0.75rem 1rem;
+    color: var(--zx-color-text-strong);
+    font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+    font-size: 0.875rem;
+    line-height: 1.55rem;
+    tab-size: 4;
+    user-select: none;
+}
+
+.editor-highlight :deep(pre) {
+    margin: 0;
+    padding: 0;
+    background: transparent !important;
+    font: inherit;
+    tab-size: 4;
+    white-space: pre;
+}
+
+.editor-highlight.is-wrap :deep(pre) {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.editor-highlight :deep(code) {
+    display: block;
+    font: inherit;
+    tab-size: 4;
 }
 
 .line-number-gutter {
@@ -410,6 +871,145 @@ defineExpose({
     overflow-wrap: anywhere;
 }
 
+/* 高亮开启时 textarea 文字透明、只留光标 */
+.editor-textarea.has-highlight {
+    color: transparent;
+    caret-color: var(--zx-color-text-strong);
+}
+
+/* ==================== Markdown 预览 ==================== */
+.md-preview {
+    min-height: 0;
+    padding: 1.25rem 1.5rem 2rem;
+    color: var(--zx-color-text-strong);
+    font-size: 0.9375rem;
+    line-height: 1.75;
+    overflow-wrap: break-word;
+}
+
+.md-preview :deep(h1),
+.md-preview :deep(h2),
+.md-preview :deep(h3),
+.md-preview :deep(h4),
+.md-preview :deep(h5),
+.md-preview :deep(h6) {
+    margin: 1.5em 0 0.6em;
+    color: var(--zx-color-text-strong);
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.md-preview :deep(h1) {
+    padding-bottom: 0.35em;
+    border-bottom: 1px solid var(--zx-color-border);
+    font-size: 1.6em;
+}
+
+.md-preview :deep(h2) {
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--zx-color-border);
+    font-size: 1.35em;
+}
+
+.md-preview :deep(h3) {
+    font-size: 1.15em;
+}
+
+.md-preview :deep(h4) {
+    font-size: 1em;
+}
+
+.md-preview :deep(p) {
+    margin: 0.75em 0;
+}
+
+.md-preview :deep(a) {
+    color: var(--zx-color-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.md-preview :deep(ul),
+.md-preview :deep(ol) {
+    margin: 0.75em 0;
+    padding-left: 1.5em;
+}
+
+.md-preview :deep(ul) {
+    list-style: disc;
+}
+
+.md-preview :deep(ol) {
+    list-style: decimal;
+}
+
+.md-preview :deep(li) {
+    margin: 0.25em 0;
+}
+
+.md-preview :deep(blockquote) {
+    margin: 1em 0;
+    border-left: 3px solid var(--zx-color-primary);
+    border-radius: 0 0.5rem 0.5rem 0;
+    background-color: var(--zx-color-surface-muted);
+    padding: 0.5em 1em;
+    color: var(--zx-color-text-muted);
+}
+
+.md-preview :deep(code) {
+    border-radius: 0.375rem;
+    background-color: var(--zx-color-surface-muted);
+    padding: 0.15em 0.4em;
+    font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+    font-size: 0.85em;
+}
+
+.md-preview :deep(pre) {
+    margin: 1em 0;
+    border: 1px solid var(--zx-color-border);
+    border-radius: 0.75rem;
+    background-color: var(--zx-color-surface-muted);
+    padding: 0.875rem 1rem;
+    overflow-x: auto;
+}
+
+.md-preview :deep(pre code) {
+    background: transparent;
+    padding: 0;
+    font-size: 0.85em;
+    line-height: 1.6;
+}
+
+.md-preview :deep(table) {
+    margin: 1em 0;
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.875em;
+}
+
+.md-preview :deep(th),
+.md-preview :deep(td) {
+    border: 1px solid var(--zx-color-border);
+    padding: 0.45em 0.75em;
+    text-align: left;
+}
+
+.md-preview :deep(th) {
+    background-color: var(--zx-color-surface-muted);
+    font-weight: 600;
+}
+
+.md-preview :deep(hr) {
+    margin: 1.5em 0;
+    border: 0;
+    border-top: 1px solid var(--zx-color-border);
+}
+
+.md-preview :deep(img) {
+    max-width: 100%;
+    border-radius: 0.75rem;
+}
+
 .loading-overlay {
     position: absolute;
     inset: 0;
@@ -438,57 +1038,6 @@ defineExpose({
     font-size: 0.875rem;
 }
 
-.theme-dark .editor-toolbar {
-    border-color: var(--zx-color-border);
-    background-color: var(--zx-color-surface);
-}
-
-.theme-dark .dropdown-link,
-.theme-dark .toolbar-select {
-    color: var(--zx-color-text-muted);
-}
-
-.theme-dark .dropdown-link:hover,
-.theme-dark .toolbar-select:hover {
-    background-color: var(--zx-color-surface-muted);
-}
-
-.theme-dark .line-number-gutter {
-    border-color: var(--zx-color-border);
-    background-color: var(--zx-color-surface);
-    color: var(--zx-color-text-subtle);
-}
-
-.theme-dark .editor-textarea {
-    background-color: var(--zx-color-surface-muted);
-    color: var(--zx-color-text);
-}
-
-.theme-contrast .editor-toolbar,
-.theme-contrast .line-number-gutter {
-    border-color: var(--zx-slate-300);
-    background-color: var(--zx-slate-50);
-}
-
-.theme-contrast .dropdown-link,
-.theme-contrast .toolbar-select {
-    color: var(--zx-slate-900);
-}
-
-.theme-contrast .dropdown-link:hover,
-.theme-contrast .toolbar-select:hover {
-    background-color: var(--zx-slate-100);
-}
-
-.theme-contrast .line-number-gutter {
-    color: var(--zx-yellow-500);
-}
-
-.theme-contrast .editor-textarea {
-    background-color: var(--zx-slate-50);
-    color: var(--zx-slate-900);
-}
-
 @media (min-width: 640px) {
     .editor-toolbar {
         padding: 0.5rem 1rem;
@@ -499,10 +1048,10 @@ defineExpose({
         gap: 0.5rem;
     }
 
-    .dropdown-link,
-    .toolbar-select {
+    .toolbar-select,
+    .toolbar-chip {
         padding: 0 0.75rem;
-        font-size: 0.875rem;
+        font-size: 0.8125rem;
     }
 
     .editor-wrapper {
