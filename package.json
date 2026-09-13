@@ -1,22 +1,26 @@
 {
   "name": "zhenxun_new_webui",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build && vite build --config vite.config.debug.ts",
+    "build": "vue-tsc && vite build",
     "type-check": "vue-tsc --noEmit",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vueuse/core": "^14.4.0",
     "axios": "1.15.0",
     "chart.js": "^4.5.1",
     "element-plus": "^2.10.3",
     "gsap": "^3.13.0",
     "js-yaml": "^4.1.0",
     "lucide-vue-next": "^0.525.0",
+    "marked": "^18.0.12",
+    "monaco-editor": "^0.56.0",
     "pinia": "^3.0.3",
+    "shiki": "^4.4.3",
     "tailwindcss": "^4.1.11",
     "vite-plugin-compression2": "^2.5.3",
     "vue": "^3.5.17",
