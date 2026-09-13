@@ -12,7 +12,11 @@ const visible = ref(false);
 const urls = ref<string[]>([]);
 const index = ref(0);
 
-const scale = ref(1);
+/** fitScale：图片加载后计算的自适应比例（大图缩到视口内，小图保持原尺寸） */
+const fitScale = ref(1);
+/** zoomFactor：用户在自适应尺寸基础上的缩放倍数 */
+const zoomFactor = ref(1);
+const scale = computed(() => fitScale.value * zoomFactor.value);
 const rotation = ref(0);
 const offsetX = ref(0);
 const offsetY = ref(0);
@@ -20,9 +24,19 @@ const offsetY = ref(0);
 const current = computed(() => urls.value[index.value] ?? "");
 const scalePercent = computed(() => `${Math.round(scale.value * 100)}%`);
 
+/** 图片加载完成：按视口 90% 计算最合适的展示尺寸（只缩小不放大） */
+const onImgLoad = (event: Event) => {
+    const img = event.currentTarget as HTMLImageElement;
+    fitScale.value = Math.min(
+        1,
+        (window.innerWidth * 0.9) / img.naturalWidth,
+        (window.innerHeight * 0.9) / img.naturalHeight,
+    );
+};
+
 /** 复位缩放/平移；旋转归到最近的 360 倍数，配合过渡不会倒转一大圈 */
 const resetTransform = () => {
-    scale.value = 1;
+    zoomFactor.value = 1;
     rotation.value = Math.round(rotation.value / 360) * 360;
     offsetX.value = 0;
     offsetY.value = 0;
@@ -32,6 +46,7 @@ const open = (list: string | string[], initial = 0) => {
     urls.value = Array.isArray(list) ? list : [list];
     if (!urls.value.length) return;
     index.value = Math.max(0, Math.min(initial, urls.value.length - 1));
+    fitScale.value = 1;
     resetTransform();
     visible.value = true;
 };
@@ -44,11 +59,17 @@ const step = (delta: number) => {
     if (urls.value.length < 2) return;
     index.value =
         (index.value + delta + urls.value.length) % urls.value.length;
+    fitScale.value = 1;
     resetTransform();
 };
 
+/** 缩放钳制在「自适应尺寸」的 0.2x ~ 5x，且最终显示比例不超过 10x */
 const zoom = (factor: number) => {
-    scale.value = Math.min(5, Math.max(0.2, scale.value * factor));
+    const display = Math.min(
+        10,
+        Math.max(0.05, scale.value * factor),
+    );
+    zoomFactor.value = display / fitScale.value;
 };
 
 const onWheel = (event: WheelEvent) => {
@@ -63,7 +84,7 @@ let baseX = 0;
 let baseY = 0;
 
 const onPointerDown = (event: PointerEvent) => {
-    if (scale.value <= 1) return;
+    if (zoomFactor.value <= 1) return;
     dragging.value = true;
     startX = event.clientX;
     startY = event.clientY;
@@ -127,17 +148,18 @@ defineExpose({ open });
                     alt=""
                     draggable="false"
                     referrerpolicy="no-referrer"
-                    class="max-h-[90vh] max-w-[90vw] select-none"
+                    class="select-none"
                     :class="
                         dragging
                             ? 'cursor-grabbing'
-                            : scale > 1
+                            : zoomFactor > 1
                               ? 'cursor-grab'
                               : 'cursor-default'
                     "
                     :style="{
                         transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
                     }"
+                    @load="onImgLoad"
                     @pointerdown="onPointerDown"
                     @pointermove="onPointerMove"
                     @pointerup="onPointerUp"
