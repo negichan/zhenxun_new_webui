@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref } from "vue";
-import { Folder, Plus } from "lucide-vue-next";
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from "vue";
+import { Download, Package, Plus, Trash2, X } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { fileApi } from "@/utils/api-next";
-import type { FileItem } from "@/types/api-next.types";
+import type { ArchiveEntry, FileItem } from "@/types/api-next.types";
 import { ZXMessageBox, ZXNotification } from "@/services/ui";
 import { useFilesStore } from "@/store/files";
 import { useGlobalStore } from "@/store/global.ts";
@@ -15,6 +15,9 @@ import RenameDialog from "./RenameDialog.vue";
 
 const FileEditorModal = defineAsyncComponent(
     () => import("@/components/FileEditorModal"),
+);
+const ArchivePreviewModal = defineAsyncComponent(
+    () => import("./ArchivePreviewModal.vue"),
 );
 
 const fileStore = useFilesStore();
@@ -28,6 +31,80 @@ const fileList = ref<FileItem[]>([]);
 const loading = ref(false);
 const searchQuery = ref("");
 
+// ==================== 多选（资源管理器式） ====================
+const selectedPaths = ref<Set<string>>(new Set());
+let lastClickedIndex = -1;
+
+const clearSelection = () => {
+    selectedPaths.value = new Set();
+    lastClickedIndex = -1;
+};
+
+// 单击选中、Ctrl+单击切换、Shift+单击范围选择，双击打开
+const handleRowSelect = (file: FileItem, e: MouseEvent) => {
+    const items = sortedFileList.value;
+    const idx = items.findIndex((f) => f.path === file.path);
+
+    if (!file.path) {
+        clearSelection();
+        return;
+    }
+
+    if (e.shiftKey && lastClickedIndex >= 0 && idx >= 0) {
+        const [a, b] = [
+            Math.min(lastClickedIndex, idx),
+            Math.max(lastClickedIndex, idx),
+        ];
+        if (!e.ctrlKey && !e.metaKey) {
+            selectedPaths.value = new Set();
+        }
+        const next = new Set(selectedPaths.value);
+        for (let i = a; i <= b; i++) next.add(items[i].path);
+        selectedPaths.value = next;
+        return;
+    }
+
+    if (e.ctrlKey || e.metaKey) {
+        const next = new Set(selectedPaths.value);
+        if (next.has(file.path)) {
+            next.delete(file.path);
+        } else {
+            next.add(file.path);
+        }
+        selectedPaths.value = next;
+        lastClickedIndex = idx;
+        return;
+    }
+
+    selectedPaths.value = new Set([file.path]);
+    lastClickedIndex = idx;
+};
+
+const selectAll = () => {
+    selectedPaths.value = new Set(sortedFileList.value.map((f) => f.path));
+};
+
+const hasAnyModalOpen = () =>
+    showEditor.value ||
+    showImagePreview.value ||
+    showNewDialog.value ||
+    showRenameDialog.value ||
+    showArchivePreview.value;
+
+const handleKeydown = (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("input, textarea, select, [contenteditable]")) return;
+    if (hasAnyModalOpen()) return;
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        selectAll();
+    } else if (e.key === "Escape") {
+        clearSelection();
+    }
+};
+
+// ==================== 编辑器 / 图片预览 ====================
 const showEditor = ref(false);
 const editorInitialFile = ref<{
     path: string;
@@ -47,6 +124,18 @@ const showRenameDialog = ref(false);
 const renamingFile = ref<FileItem | null>(null);
 const newName = ref("");
 
+// ==================== 压缩包预览 ====================
+const showArchivePreview = ref(false);
+const archivePreviewLoading = ref(false);
+const archivePreviewData = ref<{
+    name: string;
+    type: string;
+    entries: ArchiveEntry[];
+    total: number;
+    truncated: boolean;
+    path: string;
+} | null>(null);
+
 const resolveFilePath = (file: FileItem) =>
     file.path ||
     (currentPath.value ? `${currentPath.value}/${file.name}` : file.name);
@@ -61,6 +150,7 @@ const loadFileList = async (path = "") => {
             fileList.value = res.data.files || [];
             pathSegments.value = res.data.path_segments || [];
             currentPath.value = res.data.current_path || path;
+            clearSelection();
         }
     } catch (error) {
         ZXNotification({
@@ -91,37 +181,53 @@ const goBack = () => {
     }
 };
 
-const handleDelete = async (file: FileItem) => {
+const handleDelete = async (files: FileItem[]) => {
+    if (files.length === 0) return;
+
+    const message =
+        files.length === 1
+            ? `确定要删除 "${files[0].name}" 吗？此操作不可恢复！`
+            : `确定要删除选中的 ${files.length} 项吗？此操作不可恢复！`;
+
     ZXMessageBox({
-        title: file.is_file ? "删除文件" : "删除文件夹",
-        message: `确定要删除 "${file.name}" 吗？此操作不可恢复！`,
+        title: files.length === 1 ? (files[0].is_file ? "删除文件" : "删除文件夹") : "批量删除",
+        message,
         cancelButtonText: "取消",
         confirmButtonText: "删除",
         type: "error",
         onConfirm: async () => {
-            try {
-                const fullPath = resolveFilePath(file);
-                const res = file.is_file
-                    ? await fileApi.deleteFile(fullPath)
-                    : await fileApi.deleteFolder(fullPath);
-
-                if (res?.success) {
-                    ZXNotification({
-                        title: "删除成功～",
-                        message: `"${file.name}" 已经删除成功啦！`,
-                        type: "👋",
-                        position: "top-right",
-                    });
-                    loadFileList(currentPath.value);
+            let failed = 0;
+            for (const file of files) {
+                try {
+                    const fullPath = resolveFilePath(file);
+                    const res = file.is_file
+                        ? await fileApi.deleteFile(fullPath)
+                        : await fileApi.deleteFolder(fullPath);
+                    if (!res?.success) failed++;
+                } catch {
+                    failed++;
                 }
-            } catch (error) {
+            }
+
+            if (failed === 0) {
+                ZXNotification({
+                    title: "删除成功～",
+                    message:
+                        files.length === 1
+                            ? `"${files[0].name}" 已经删除成功啦！`
+                            : `${files.length} 项已经全部删除啦！`,
+                    type: "👋",
+                    position: "top-right",
+                });
+            } else {
                 ZXNotification({
                     title: "删除失败",
-                    message: "删除操作失败了 (´；ω；`)",
+                    message: `有 ${failed} 项删除失败了 (´；ω；\`)`,
                     type: "😭",
                     position: "top-right",
                 });
             }
+            loadFileList(currentPath.value);
         },
     });
 };
@@ -279,6 +385,137 @@ const handleRename = async () => {
     }
 };
 
+// ==================== 下载 ====================
+const downloading = ref(false);
+
+const saveBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+};
+
+const handleDownload = async (files: FileItem[]) => {
+    if (files.length === 0 || downloading.value) return;
+    downloading.value = true;
+
+    try {
+        const { blob, filename } = await fileApi.downloadFiles(
+            files.map((f) => resolveFilePath(f)),
+        );
+        saveBlob(blob, filename || files[0].name);
+    } catch (error) {
+        ZXNotification({
+            title: "下载失败",
+            message:
+                (error as Error)?.message || "下载失败了 (´；ω；`)",
+            type: "😭",
+            position: "top-right",
+        });
+    } finally {
+        downloading.value = false;
+    }
+};
+
+// ==================== 压缩包 ====================
+const handlePreviewArchive = async (file: FileItem) => {
+    archivePreviewLoading.value = true;
+    showArchivePreview.value = true;
+    archivePreviewData.value = {
+        name: file.name,
+        type: "",
+        entries: [],
+        total: 0,
+        truncated: false,
+        path: resolveFilePath(file),
+    };
+
+    try {
+        const res = await fileApi.previewArchive(resolveFilePath(file));
+        if (res?.success && res?.data) {
+            archivePreviewData.value = {
+                name: file.name,
+                type: res.data.archive_type,
+                entries: res.data.entries,
+                total: res.data.total_count,
+                truncated: res.data.truncated,
+                path: resolveFilePath(file),
+            };
+        } else {
+            showArchivePreview.value = false;
+        }
+    } catch (error) {
+        showArchivePreview.value = false;
+        ZXNotification({
+            title: "预览失败",
+            message:
+                (error as any)?.response?.data?.message ||
+                "压缩包读取失败了 (´；ω；`)",
+            type: "😭",
+            position: "top-right",
+        });
+    } finally {
+        archivePreviewLoading.value = false;
+    }
+};
+
+const handleExtractArchive = async (file: FileItem) => {
+    try {
+        const res = await fileApi.extractArchive(resolveFilePath(file));
+        if (res?.success && res?.data) {
+            ZXNotification({
+                title: "解压成功～",
+                message: `已解压 ${res.data.file_count} 个文件到 "${res.data.dest_path.split(/[\\/]/).pop()}" ！`,
+                type: "🥳",
+                position: "top-right",
+            });
+            showArchivePreview.value = false;
+            loadFileList(currentPath.value);
+        }
+    } catch (error) {
+        ZXNotification({
+            title: "解压失败",
+            message:
+                (error as any)?.response?.data?.message ||
+                "解压操作失败了 (´；ω；`)",
+            type: "😭",
+            position: "top-right",
+        });
+    }
+};
+
+const handleCompress = async (files: FileItem[]) => {
+    if (files.length === 0) return;
+
+    try {
+        const res = await fileApi.compressFiles(
+            files.map((f) => resolveFilePath(f)),
+        );
+        if (res?.success && res?.data) {
+            ZXNotification({
+                title: "压缩成功～",
+                message: `已打包 ${res.data.file_count} 个文件到 "${res.data.dest_path.split(/[\\/]/).pop()}" ！`,
+                type: "🥳",
+                position: "top-right",
+            });
+            loadFileList(currentPath.value);
+        }
+    } catch (error) {
+        ZXNotification({
+            title: "压缩失败",
+            message:
+                (error as any)?.response?.data?.message ||
+                "压缩操作失败了 (´；ω；`)",
+            type: "😭",
+            position: "top-right",
+        });
+    }
+};
+
 const sortedFileList = computed(() => {
     const query = searchQuery.value.toLowerCase().trim();
     const files = query
@@ -297,22 +534,87 @@ const sortedFileList = computed(() => {
 
 onMounted(() => {
     loadFileList();
+    window.addEventListener("keydown", handleKeydown);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener("keydown", handleKeydown);
 });
 </script>
 
 <template>
     <div class="flex h-full w-full flex-col space-y-3 sm:space-y-4">
         <div
-            v-if="!globalStore.isDesktopMode"
-            class="flex items-center justify-end rounded-3xl border-1 border-slate-200 bg-white p-2 shadow-sm sm:p-3"
+            class="flex items-center justify-between rounded-3xl border-1 border-slate-200 bg-white p-2 shadow-sm sm:p-3"
         >
-            <button
-                class="btn-touch flex items-center space-x-2 rounded-2xl bg-zx-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zx-primary-hover"
-                @click="showNewDialog = true"
-            >
-                <Plus class="h-4 w-4" />
-                <span class="hidden sm:inline">新建</span>
-            </button>
+            <!-- 选中操作栏：有选中项时替换显示 -->
+            <template v-if="selectedPaths.size > 0">
+                <div class="flex flex-1 flex-wrap items-center gap-2">
+                    <span
+                        class="rounded-full bg-zx-primary-soft px-3 py-1.5 text-sm font-medium text-zx-primary"
+                    >
+                        已选中 {{ selectedPaths.size }} 项
+                    </span>
+                    <ZxButton
+                        size="sm"
+                        variant="primary"
+                        :disabled="downloading"
+                        @click="
+                            handleDownload(
+                                sortedFileList.filter((f) =>
+                                    selectedPaths.has(f.path),
+                                ),
+                            )
+                        "
+                    >
+                        <Download class="h-4 w-4" />
+                        下载
+                    </ZxButton>
+                    <ZxButton
+                        size="sm"
+                        variant="outline"
+                        @click="
+                            handleCompress(
+                                sortedFileList.filter((f) =>
+                                    selectedPaths.has(f.path),
+                                ),
+                            )
+                        "
+                    >
+                        <Package class="h-4 w-4" />
+                        压缩为 zip
+                    </ZxButton>
+                    <ZxButton
+                        size="sm"
+                        variant="danger"
+                        @click="
+                            handleDelete(
+                                sortedFileList.filter((f) =>
+                                    selectedPaths.has(f.path),
+                                ),
+                            )
+                        "
+                    >
+                        <Trash2 class="h-4 w-4" />
+                        删除
+                    </ZxButton>
+                    <ZxButton size="sm" variant="ghost" @click="clearSelection">
+                        <X class="h-4 w-4" />
+                        取消选择
+                    </ZxButton>
+                </div>
+            </template>
+            <template v-else>
+                <div></div>
+                <ZxButton
+                    v-if="!globalStore.isDesktopMode"
+                    variant="primary"
+                    @click="showNewDialog = true"
+                >
+                    <Plus class="h-4 w-4" />
+                    <span class="hidden sm:inline">新建</span>
+                </ZxButton>
+            </template>
         </div>
 
         <FileBreadcrumbBar
@@ -329,10 +631,17 @@ onMounted(() => {
             :is-empty="fileList.length === 0"
             :loading="loading"
             :search-query="searchQuery"
+            :selected-paths="selectedPaths"
+            @clear-selection="clearSelection"
+            @compress="handleCompress"
             @delete="handleDelete"
+            @download="handleDownload"
             @enter-folder="enterFolder"
+            @extract-archive="handleExtractArchive"
             @open="openEditor"
+            @preview-archive="handlePreviewArchive"
             @rename="openRenameDialog"
+            @select="handleRowSelect"
         />
 
         <NewItemDialog
@@ -360,6 +669,25 @@ onMounted(() => {
             :image-url="currentImageUrl"
             :loading="imageLoading"
             @loaded="imageLoading = false"
+        />
+
+        <ArchivePreviewModal
+            v-if="showArchivePreview && archivePreviewData"
+            :archive-name="archivePreviewData.name"
+            :archive-type="archivePreviewData.type"
+            :entries="archivePreviewData.entries"
+            :total-count="archivePreviewData.total"
+            :truncated="archivePreviewData.truncated"
+            :loading="archivePreviewLoading"
+            @close="showArchivePreview = false"
+            @extract="
+                handleExtractArchive({
+                    name: archivePreviewData.name,
+                    path: archivePreviewData.path,
+                    is_file: true,
+                    is_image: false,
+                })
+            "
         />
     </div>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { modalJelly } from "@/composables/useGsapTransition";
 defineProps<{
     modelValue: boolean;
     itemType: "file" | "folder";
@@ -14,7 +15,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <Transition name="modal-jelly" :duration="{ enter: 400, leave: 250 }">
+    <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
         <div
             v-if="modelValue"
             class="glass-overlay fixed inset-0 z-50 flex items-center justify-center p-4"

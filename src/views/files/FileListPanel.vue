@@ -1,26 +1,38 @@
 <script setup lang="ts">
 import {
+    Archive,
+    ArchiveRestore,
+    Download,
     Edit2,
     FileText,
     Folder,
     Image as ImageIcon,
+    Package,
     Search,
     Trash2,
 } from "lucide-vue-next";
 import type { FileItem } from "@/types/api-next.types";
+import { ZXContextMenu } from "@/components/zxcomponent/ContextMenu";
 
 const props = defineProps<{
     files: FileItem[];
     loading: boolean;
     isEmpty: boolean;
     searchQuery: string;
+    selectedPaths: Set<string>;
 }>();
 
 const emit = defineEmits<{
     open: [file: FileItem];
+    select: [file: FileItem, event: MouseEvent];
+    "clear-selection": [];
     "enter-folder": [file: FileItem];
     rename: [file: FileItem];
-    delete: [file: FileItem];
+    delete: [files: FileItem[]];
+    download: [files: FileItem[]];
+    "preview-archive": [file: FileItem];
+    "extract-archive": [file: FileItem];
+    compress: [files: FileItem[]];
 }>();
 
 const formatFileSize = (bytes: number | undefined | null, isFile = true) => {
@@ -70,6 +82,26 @@ const getFileIconStyle = (file: FileItem) => {
     return colorMap[ext || ""] || "text-slate-500";
 };
 
+const ZIP_EXTS = ["zip", "jar", "apk", "whl", "epub"];
+const TAR_SUFFIXES = [
+    ".tar.gz",
+    ".tgz",
+    ".tar.bz2",
+    ".tbz2",
+    ".tar.xz",
+    ".txz",
+    ".tar",
+];
+
+const isArchive = (file: FileItem) => {
+    if (!file.is_file) return false;
+    const name = file.name.toLowerCase();
+    return (
+        TAR_SUFFIXES.some((s) => name.endsWith(s)) ||
+        ZIP_EXTS.includes(name.split(".").pop() || "")
+    );
+};
+
 const handleOpen = (file: FileItem) => {
     if (file.is_file) {
         emit("open", file);
@@ -78,11 +110,98 @@ const handleOpen = (file: FileItem) => {
 
     emit("enter-folder", file);
 };
+
+const isSelected = (file: FileItem) => props.selectedPaths.has(file.path);
+
+/** 右键目标：命中已选中项时整个选区一起操作，否则只操作该文件 */
+const menuTargets = (file: FileItem): FileItem[] => {
+    if (isSelected(file)) {
+        return props.files.filter((f) => props.selectedPaths.has(f.path));
+    }
+    return [file];
+};
+
+// 右键文件/文件夹：打开、下载、压缩包操作、压缩、重命名（仅文件）、删除
+const openFileMenu = (e: MouseEvent, file: FileItem) => {
+    const targets = menuTargets(file);
+    const batch = targets.length > 1;
+    const single = targets[0] ?? file;
+
+    const menuItems: {
+        label: string;
+        icon: any;
+        action: () => void;
+        danger?: boolean;
+    }[] = [];
+
+    if (!batch) {
+        menuItems.push({
+            label: file.is_file ? "打开文件" : "打开文件夹",
+            icon: file.is_file ? FileText : Folder,
+            action: () => handleOpen(file),
+        });
+    }
+
+    menuItems.push({
+        label: batch ? `下载选中项 (${targets.length})` : "下载",
+        icon: Download,
+        action: () => emit("download", targets),
+    });
+
+    if (!batch && isArchive(file)) {
+        menuItems.push(
+            {
+                label: "预览压缩包内容",
+                icon: Archive,
+                action: () => emit("preview-archive", file),
+            },
+            {
+                label: "解压到新文件夹",
+                icon: ArchiveRestore,
+                action: () => emit("extract-archive", file),
+            },
+        );
+    }
+
+    menuItems.push(
+        {
+            label: batch ? "压缩选中项为 zip" : "压缩为 zip",
+            icon: Package,
+            action: () => emit("compress", targets),
+        },
+        ...(!batch && file.is_file
+            ? [
+                  {
+                      label: "重命名",
+                      icon: Edit2,
+                      action: () => emit("rename", file),
+                  },
+              ]
+            : []),
+        {
+            label: batch ? `删除选中项 (${targets.length})` : "删除",
+            icon: Trash2,
+            danger: true,
+            action: () => emit("delete", targets),
+        },
+    );
+
+    // 右键未选中项时，顺便把选中收敛到该项
+    if (!isSelected(file)) {
+        emit("select", file, e);
+    }
+
+    ZXContextMenu.show({
+        x: e.clientX,
+        y: e.clientY,
+        items: menuItems,
+    });
+};
 </script>
 
 <template>
     <div
-        class="flex-1 overflow-hidden rounded-3xl border-1 border-slate-200 bg-white shadow-sm"
+        class="flex-1 overflow-hidden rounded-3xl border-1 border-slate-200 bg-white shadow-sm select-none"
     >
         <div v-if="loading" class="flex h-full items-center justify-center">
             <div class="text-center text-gray-400">
@@ -101,7 +220,11 @@ const handleOpen = (file: FileItem) => {
             </div>
         </div>
 
-        <div v-else class="h-full overflow-x-hidden overflow-y-auto px-4">
+        <div
+            v-else
+            class="h-full overflow-x-hidden overflow-y-auto px-4"
+            @click.self="emit('clear-selection')"
+        >
             <table class="hidden w-full sm:table">
                 <thead class="sticky top-0 border-b-1 border-gray-200 bg-white">
                     <tr>
@@ -131,13 +254,14 @@ const handleOpen = (file: FileItem) => {
                     <tr
                         v-for="file in files"
                         :key="file.name"
-                        class="transition-colors hover:bg-gray-50"
+                        class="cursor-pointer transition-colors hover:bg-gray-50"
+                        :class="isSelected(file) && 'row-selected bg-zx-primary-soft'"
+                        @click="emit('select', file, $event)"
+                        @dblclick="handleOpen(file)"
+                        @contextmenu.prevent="openFileMenu($event, file)"
                     >
                         <td class="px-4 py-2">
-                            <div
-                                class="ml-2 flex cursor-pointer items-center space-x-3"
-                                @click="handleOpen(file)"
-                            >
+                            <div class="ml-2 flex items-center gap-3">
                                 <div
                                     :class="getFileIconStyle(file)"
                                     class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-2xl"
@@ -170,7 +294,8 @@ const handleOpen = (file: FileItem) => {
                         </td>
                         <td class="px-4 py-2">
                             <div
-                                class="flex items-center justify-end space-x-2"
+                                class="flex items-center justify-end gap-2"
+                                @click.stop
                             >
                                 <button
                                     v-if="file.is_file"
@@ -183,7 +308,7 @@ const handleOpen = (file: FileItem) => {
                                 <button
                                     class="btn-touch cursor-pointer rounded-2xl p-1.5 transition-colors hover:text-red-600"
                                     title="删除"
-                                    @click.stop="emit('delete', file)"
+                                    @click.stop="emit('delete', [file])"
                                 >
                                     <Trash2 class="h-4 w-4" />
                                 </button>
@@ -198,11 +323,10 @@ const handleOpen = (file: FileItem) => {
                     v-for="file in files"
                     :key="file.name"
                     class="p-3 transition-colors hover:bg-gray-50"
+                    :class="isSelected(file) && 'row-selected bg-zx-primary-soft'"
+                    @contextmenu.prevent="openFileMenu($event, file)"
                 >
-                    <div
-                        class="flex items-start space-x-3"
-                        @click="handleOpen(file)"
-                    >
+                    <div class="flex items-start gap-3" @click="handleOpen(file)">
                         <div
                             :class="getFileIconStyle(file)"
                             class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
@@ -234,7 +358,7 @@ const handleOpen = (file: FileItem) => {
                                 }}
                             </div>
                         </div>
-                        <div class="flex flex-shrink-0 items-center space-x-1">
+                        <div class="flex flex-shrink-0 items-center gap-1">
                             <button
                                 v-if="file.is_file"
                                 class="btn-touch rounded-2xl p-2 text-slate-600 transition-colors hover:bg-slate-100"
@@ -246,7 +370,7 @@ const handleOpen = (file: FileItem) => {
                             <button
                                 class="btn-touch rounded-2xl p-2 text-red-600 transition-colors hover:bg-red-50"
                                 title="删除"
-                                @click.stop="emit('delete', file)"
+                                @click.stop="emit('delete', [file])"
                             >
                                 <Trash2 class="h-4 w-4" />
                             </button>
@@ -267,3 +391,14 @@ const handleOpen = (file: FileItem) => {
         </div>
     </div>
 </template>
+
+<style scoped>
+/* 选中行 hover 时在选中色基础上向主色加深，避免被默认灰 hover 覆盖 */
+.row-selected:hover {
+    background-color: color-mix(
+        in srgb,
+        var(--zx-color-primary) 18%,
+        var(--zx-color-primary-soft)
+    );
+}
+</style>
