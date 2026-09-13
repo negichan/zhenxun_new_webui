@@ -23,6 +23,8 @@ export interface ActionContext {
         message: MessageSegment[] | string
         text: string
     }) => void
+    /** 身份池里的自定义头像（dataURL），供成员列表应答带给主站展示 */
+    getUserAvatar?: (userId: string) => string | undefined
 }
 
 /** 动作处理器：返回值即响应 data，抛错则响应该错误的 failed */
@@ -162,13 +164,18 @@ register(['get_group_info', 'get_group_info_ex'], (_ctx, p) => {
 
 register('get_group_list', () => simState.groups)
 
-register('get_group_member_info', (_ctx, p) => {
+register('get_group_member_info', (ctx, p) => {
     const member = findMember(p.group_id, p.user_id)
     if (!member) throw new Error(`群成员不存在: 群${p.group_id} 用户${p.user_id}`)
-    return member
+    return { ...member, avatar: ctx.getUserAvatar?.(String(member.user_id)) }
 })
 
-register('get_group_member_list', (_ctx, p) => simState.members[Number(p.group_id)] ?? [])
+register('get_group_member_list', (ctx, p) =>
+    (simState.members[Number(p.group_id)] ?? []).map(m => ({
+        ...m,
+        avatar: ctx.getUserAvatar?.(String(m.user_id)),
+    })),
+)
 
 register(['get_group_msg_history', 'get_friend_msg_history'], () => ({ messages: [] }))
 

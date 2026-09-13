@@ -13,7 +13,10 @@ export interface CachedBubble {
     /** 自增主键（IndexedDB 分配） */
     id?: number;
     conversationKey: string;
-    from: "user" | "bot";
+    from: "user" | "bot" | "peer";
+    /** peer 消息（其他模拟端发的）的发送者身份 */
+    senderId?: string;
+    senderName?: string;
     parts: { kind: string; text?: string; src?: string }[];
     time: string;
     ts: number;

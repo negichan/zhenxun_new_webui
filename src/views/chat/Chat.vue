@@ -38,8 +38,8 @@ const showDetailPanel = ref(false);
 const detailVisible = ref(false);
 const detailPanelRef = ref<HTMLElement | null>(null);
 
-const detailWidth = () =>
-    window.matchMedia("(min-width: 1536px)").matches ? 384 : 288;
+// 悬浮面板宽度（滑入动画的位移距离）
+const DETAIL_WIDTH = 440;
 
 // xl 及以上：gsap 驱动，整卡从视窗右侧滑入，宽度动画给左侧聊天区让位；
 // xl 以下（手机/平板/窄桌面）面板是全屏抽屉，直接显隐——gsap 写入的
@@ -57,9 +57,9 @@ watch(showDetailPanel, (open) => {
         nextTick(() => {
             gsap.fromTo(
                 el,
-                { width: 0, x: 384, autoAlpha: 0 },
+                { width: 0, x: DETAIL_WIDTH, autoAlpha: 0 },
                 {
-                    width: detailWidth(),
+                    width: DETAIL_WIDTH,
                     x: 0,
                     autoAlpha: 1,
                     duration: 0.32,
@@ -70,7 +70,7 @@ watch(showDetailPanel, (open) => {
     } else {
         gsap.to(el, {
             width: 0,
-            x: 384,
+            x: DETAIL_WIDTH,
             autoAlpha: 0,
             duration: 0.26,
             ease: "power2.in",
@@ -148,7 +148,7 @@ onBeforeUnmount(() => {
                 @toggle-detail="showDetailPanel = !showDetailPanel"
             />
 
-            <!-- 管理区域 - 类似 QQ 聊天右侧资料/管理栏；
+            <!-- 管理区域 - 类似 QQ 聊天右侧资料/管理栏，宽度动画给聊天区让位；
                  xl 以下为全屏抽屉：覆盖聊天区，点遮罩或面板内返回按钮关闭 -->
             <div
                 v-if="detailVisible"
@@ -158,13 +158,11 @@ onBeforeUnmount(() => {
             <aside
                 v-show="detailVisible"
                 ref="detailPanelRef"
-                class="flex h-full w-72 flex-shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm 2xl:w-96 max-xl:fixed max-xl:inset-0 max-xl:z-40 max-xl:w-full max-xl:rounded-none max-xl:border-0"
+                class="flex h-full w-[440px] flex-shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm max-xl:fixed max-xl:inset-0 max-xl:z-40 max-xl:w-full max-xl:rounded-none max-xl:border-0"
             >
                 <!-- 固定宽度的内容层：桌面端动画期间内容不随宽度重排；
                      手机/平板全屏铺开 -->
-                <div
-                    class="h-full w-72 shrink-0 2xl:w-96 max-xl:w-full"
-                >
+                <div class="h-full w-[440px] shrink-0 max-xl:w-full">
                     <ManageOverview
                         embedded
                         :target-id="manageTargetId"

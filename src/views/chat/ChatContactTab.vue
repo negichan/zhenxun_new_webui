@@ -9,6 +9,7 @@ import { ZXMessageBox, ZXNotification } from "@/services/ui";
 import { manageApi } from "@/utils/api-next";
 import ZXInput from "@/components/zxcomponent/ZXInput.vue";
 import { openContextMenu } from "@/components/zxcomponent/ContextMenu";
+import { useVirtualList } from "@/composables/useVirtualList";
 
 const chatStore = useChatStore();
 
@@ -23,6 +24,10 @@ const {
     loadingContacts,
 } = storeToRefs(chatStore);
 const { selectContact, clearSelection, loadContacts } = chatStore;
+
+// 联系人列表虚拟滚动：行高固定 48px（头像 32 + 上下内边距 16）
+const friendList = useVirtualList(() => friends.value.length, 48);
+const groupList = useVirtualList(() => groups.value.length, 48);
 
 onMounted(async () => {
     // 获取并保存当前 bot 信息
@@ -308,10 +313,10 @@ const doRemove = async () => {
                     <span class="truncate">好友</span>
                     <span
                         :class="[
-                            'min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] leading-none transition-colors',
+                            'text-[10px] leading-none transition-colors',
                             activeTab === 'friend'
-                                ? 'bg-zx-primary-soft text-zx-primary'
-                                : 'bg-white/70 text-slate-400',
+                                ? 'font-bold text-zx-primary'
+                                : 'text-slate-400',
                         ]"
                     >
                         {{ friends.length }}
@@ -338,10 +343,10 @@ const doRemove = async () => {
                     <span class="truncate">群聊</span>
                     <span
                         :class="[
-                            'min-w-5 rounded-full px-1.5 py-0.5 text-center text-[10px] leading-none transition-colors',
+                            'text-[10px] leading-none transition-colors',
                             activeTab === 'group'
-                                ? 'bg-zx-primary-soft text-zx-primary'
-                                : 'bg-white/70 text-slate-400',
+                                ? 'font-bold text-zx-primary'
+                                : 'text-slate-400',
                         ]"
                     >
                         {{ groups.length }}
@@ -350,49 +355,64 @@ const doRemove = async () => {
             </div>
         </div>
 
-        <!-- 好友列表 -->
+        <!-- 好友列表（虚拟滚动） -->
         <div
             v-show="activeTab === 'friend'"
-            class="min-h-0 flex-1 space-y-1 overflow-y-auto p-1.5 p-2"
+            :ref="friendList.container"
+            class="min-h-0 flex-1 overflow-y-auto p-2"
+            @scroll.passive="friendList.onScroll"
         >
             <div
-                v-for="friend in friends"
-                :key="friend.user_id"
-                @click="
-                    selectContact(
-                        'friend',
-                        friend.user_id,
-                        friend.remark || friend.nickname || '未知好友',
-                    )
-                "
-                @contextmenu.prevent.stop="openContactMenu($event, 'friend', friend)"
-                :class="
-                    selectedId === friend.user_id &&
-                    selectedContact === 'friend'
-                        ? 'bg-zx-primary-tint'
-                        : 'hover:bg-gray-100'
-                "
-                class="btn-touch flex cursor-pointer items-center gap-3 rounded-2xl p-2 transition-colors"
+                v-show="friends.length > 0"
+                class="relative"
+                :style="{ height: `${friendList.totalHeight.value}px` }"
             >
-                <img
-                    v-if="friend.ava_url"
-                    :src="friend.ava_url"
-                    referrerpolicy="no-referrer"
-                    class="h-8 w-8 flex-shrink-0 rounded-full object-cover"
-                    @error="friend.ava_url = ''"
-                />
                 <div
-                    v-else
-                    class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zx-primary-soft text-sm font-bold text-zx-primary"
+                    v-for="friend in friends.slice(
+                        friendList.startIndex.value,
+                        friendList.endIndex.value,
+                    )"
+                    :key="friend.user_id"
+                    :style="{
+                        top: `${(friends.indexOf(friend)) * 48}px`,
+                        height: '48px',
+                    }"
+                    @click="
+                        selectContact(
+                            'friend',
+                            friend.user_id,
+                            friend.remark || friend.nickname || '未知好友',
+                        )
+                    "
+                    @contextmenu.prevent.stop="openContactMenu($event, 'friend', friend)"
+                    :class="
+                        selectedId === friend.user_id &&
+                        selectedContact === 'friend'
+                            ? 'bg-zx-primary-tint'
+                            : 'hover:bg-gray-100'
+                    "
+                    class="absolute left-0 right-0 btn-touch flex cursor-pointer items-center gap-3 rounded-2xl p-2 transition-colors"
                 >
-                    {{ (friend.remark || friend.nickname || "友").charAt(0) }}
-                </div>
-                <span class="min-w-0 flex-1 truncate text-sm text-gray-700"
-                    >{{ friend.remark || friend.nickname || "未知好友" }}
-                    <span class="text-xs text-gray-500"
-                        >({{ friend.user_id }})</span
+                    <img
+                        v-if="friend.ava_url"
+                        :src="friend.ava_url"
+                        referrerpolicy="no-referrer"
+                        class="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+                        @error="friend.ava_url = ''"
+                    />
+                    <div
+                        v-else
+                        class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zx-primary-soft text-sm font-bold text-zx-primary"
                     >
-                </span>
+                        {{ (friend.remark || friend.nickname || "友").charAt(0) }}
+                    </div>
+                    <span class="min-w-0 flex-1 truncate text-sm text-gray-700"
+                        >{{ friend.remark || friend.nickname || "未知好友" }}
+                        <span class="text-xs text-gray-500"
+                            >({{ friend.user_id }})</span
+                        >
+                    </span>
+                </div>
             </div>
             <div
                 v-if="loadingContacts"
@@ -404,46 +424,61 @@ const doRemove = async () => {
                 v-if="!loadingContacts && friends.length === 0"
                 class="py-2 text-center text-xs text-gray-400"
             >
-                暂无好友
+                {{ botStore.selectedBot ? "暂无好友" : "Bot 未接入，暂无好友" }}
             </div>
         </div>
 
-        <!-- 群组列表 -->
+        <!-- 群组列表（虚拟滚动） -->
         <div
             v-show="activeTab === 'group'"
-            class="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-1.5 sm:space-y-1 sm:p-2"
+            :ref="groupList.container"
+            class="min-h-0 flex-1 overflow-y-auto p-2"
+            @scroll.passive="groupList.onScroll"
         >
             <div
-                v-for="group in groups"
-                :key="group.group_id"
-                @click="selectContact('group', group.group_id, group.group_name)"
-                @contextmenu.prevent.stop="openContactMenu($event, 'group', group)"
-                :class="
-                    selectedId === group.group_id && selectedContact === 'group'
-                        ? 'bg-zx-primary-tint'
-                        : 'hover:bg-gray-100'
-                "
-                class="btn-touch flex cursor-pointer items-center gap-3 rounded-2xl p-2 transition-colors"
+                v-show="groups.length > 0"
+                class="relative"
+                :style="{ height: `${groupList.totalHeight.value}px` }"
             >
-                <img
-                    v-if="group.ava_url"
-                    :src="group.ava_url"
-                    referrerpolicy="no-referrer"
-                    class="h-8 w-8 flex-shrink-0 rounded-full object-cover"
-                    @error="group.ava_url = ''"
-                />
                 <div
-                    v-else
-                    class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zx-primary-soft text-sm font-bold text-zx-primary"
+                    v-for="group in groups.slice(
+                        groupList.startIndex.value,
+                        groupList.endIndex.value,
+                    )"
+                    :key="group.group_id"
+                    :style="{
+                        top: `${groups.indexOf(group) * 48}px`,
+                        height: '48px',
+                    }"
+                    @click="selectContact('group', group.group_id, group.group_name)"
+                    @contextmenu.prevent.stop="openContactMenu($event, 'group', group)"
+                    :class="
+                        selectedId === group.group_id && selectedContact === 'group'
+                            ? 'bg-zx-primary-tint'
+                            : 'hover:bg-gray-100'
+                    "
+                    class="absolute left-0 right-0 btn-touch flex cursor-pointer items-center gap-3 rounded-2xl p-2 transition-colors"
                 >
-                    {{ group.group_name.charAt(0) }}
-                </div>
-                <span class="min-w-0 flex-1 truncate text-sm text-gray-700"
-                    >{{ group.group_name }}
-                    <span class="text-xs text-gray-500"
-                        >({{ group.group_id }})</span
+                    <img
+                        v-if="group.ava_url"
+                        :src="group.ava_url"
+                        referrerpolicy="no-referrer"
+                        class="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+                        @error="group.ava_url = ''"
+                    />
+                    <div
+                        v-else
+                        class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zx-primary-soft text-sm font-bold text-zx-primary"
                     >
-                </span>
+                        {{ group.group_name.charAt(0) }}
+                    </div>
+                    <span class="min-w-0 flex-1 truncate text-sm text-gray-700"
+                        >{{ group.group_name }}
+                        <span class="text-xs text-gray-500"
+                            >({{ group.group_id }})</span
+                        >
+                    </span>
+                </div>
             </div>
             <div
                 v-if="loadingContacts"
@@ -455,7 +490,7 @@ const doRemove = async () => {
                 v-if="!loadingContacts && groups.length === 0"
                 class="py-2 text-center text-xs text-gray-400"
             >
-                暂无群组
+                {{ botStore.selectedBot ? "暂无群组" : "Bot 未接入，暂无群组" }}
             </div>
         </div>
 

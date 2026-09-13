@@ -5,13 +5,9 @@ import { systemApi } from "@/utils/api-next";
 
 import avatar from "@/assets/img/avatar.jpg";
 import { useBotStore } from "@/store/bot.ts";
-import { openDebugClient } from "@/config/menu";
-import { Bug, Power } from "lucide-vue-next";
+import { Power } from "lucide-vue-next";
 
 const botStore = useBotStore();
-
-// 是否有协议端（OneBot 客户端）接入
-const hasBots = computed(() => botStore.botList.length > 0);
 
 const avatarUrl = computed(() => {
     return botStore.selectedBot?.ava_url || avatar;
@@ -81,7 +77,7 @@ const handleRestart = async () => {
                         <h2
                             class="truncate text-base font-bold text-zx-user-card-text sm:text-3xl"
                         >
-                            {{ botStore.selectedBot?.nickname ?? "" }}
+                            {{ botStore.selectedBot?.nickname || "等待接入协议端" }}
                         </h2>
                         <div
                             class="relative flex h-2 w-2 shrink-0 sm:h-2.5 sm:w-2.5"
@@ -116,7 +112,6 @@ const handleRestart = async () => {
                 <div
                     class="flex shrink-0 items-center justify-center overflow-hidden"
                 >
-                    <!--                        <Bot class="h-5 w-5 text-blue-600 sm:h-10 sm:w-10" />-->
                     <img :src="avatarUrl" alt="" class="size-24 rounded-full" />
                 </div>
             </div>
@@ -137,15 +132,6 @@ const handleRestart = async () => {
                 </div>
             </div>
             <div class="flex justify-between space-x-2 font-bold">
-                <button
-                    v-if="!hasBots"
-                    class="btn-touch flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-white/20 bg-zx-user-card-chip px-4 py-1 pl-3 text-zx-user-card-chip-text shadow-sm backdrop-blur-sm transition-colors hover:bg-zx-primary hover:text-white"
-                    title="打开 OneBot 调试客户端（独立窗口）"
-                    @click="openDebugClient"
-                >
-                    <Bug class="h-5 w-5" />
-                    <span class=""> 打开调试客户端 </span>
-                </button>
                 <div
                     class="flex h-8 items-center justify-center rounded-full border border-white/20 bg-zx-user-card-chip px-4 py-1 pl-3 text-zx-user-card-chip-text shadow-sm backdrop-blur-sm"
                 >
@@ -174,25 +160,6 @@ const handleRestart = async () => {
                 </div>
             </div>
         </div>
-
-        <!--            <div-->
-        <!--                class="flex w-full items-center justify-end space-x-2 sm:w-auto sm:space-x-3"-->
-        <!--            >-->
-        <!--                <button-->
-        <!--                    class="btn-touch shrink-0 rounded-2xl bg-red-100 p-2 transition-colors hover:bg-red-200"-->
-        <!--                    title="重启 Bot"-->
-        <!--                    @click="handleRestart"-->
-        <!--                >-->
-        <!--                    <Power class="h-5 w-5 text-red-600" />-->
-        <!--                </button>-->
-        <!--                <button-->
-        <!--                    class="btn-touch shrink-0 rounded-2xl bg-gray-100 p-2 transition-colors hover:bg-gray-200"-->
-        <!--                    title="刷新数据"-->
-        <!--                    @click="systemStore.fetchAllStatistics()"-->
-        <!--                >-->
-        <!--                    <RefreshCw class="h-5 w-5 text-gray-600" />-->
-        <!--                </button>-->
-        <!--            </div>-->
     </div>
 </template>
 

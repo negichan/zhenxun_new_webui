@@ -8,6 +8,7 @@ import type { BotInfo } from "@/types/api-next.types";
 /**
  * 比对刷新前后的机器人列表，谁上线/下线了就弹通知
  * （此前列表为空说明是首次加载，只建立基线不弹，避免整表都算"上线"）
+ * 连接记录由后端落库，这里只负责通知
  */
 function notifyBotChanges(prev: BotInfo[], next: BotInfo[]) {
     if (prev.length === 0) return;
@@ -92,6 +93,8 @@ export const useBotStore = defineStore("bot", () => {
                 const prevDisplayed = selectedBot.value?.self_id ?? null;
                 const prevList = botList.value;
                 botList.value = res.data;
+                // 同步真实在线状态：无协议端接入时 UserCard 状态点置灰
+                setOnlineStatus(res.data.length > 0);
                 // bot 上下线通知：与刷新前列表比对，有进出就弹
                 notifyBotChanges(prevList, res.data);
 

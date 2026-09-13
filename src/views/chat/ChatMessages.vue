@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {
+    ArrowDown,
     ArrowLeft,
+    Clock,
     FileText,
     ImageIcon,
     Link2,
@@ -14,10 +16,11 @@ import {
 } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { useChatStore } from "@/store/chat.ts";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { ZXNotification } from "@/services/ui";
 import { sendMessage as sendWsMessage } from "@/utils/api-next/websocket-chat";
 import { useBotStore } from "@/store/bot.ts";
+import ChatHistoryModal from "@/views/chat/ChatHistoryModal.vue";
 import { useVoiceRecorder } from "@/composables/useVoiceRecorder";
 import { useCustomCaret } from "@/composables/useCustomCaret";
 import type { ChatMessage, ChatMessagePart } from "@/types";
@@ -41,6 +44,47 @@ const { appendCurrentMessage, removeCurrentMessage, createMessageId } =
 
 // 消息容器 ref
 const messagesContainer = ref<HTMLElement | null>(null);
+
+// ==================== Telegram 式消息窗口 ====================
+// 大会话只渲染底部窗口内的气泡，往上翻按需扩窗并锚定滚动位置，
+// 避免上千条消息全量渲染；贴近底部时新消息才自动滚底
+const RENDER_STEP = 80;
+const renderCount = ref(60);
+
+const visibleMessages = computed(() =>
+    messages.value.slice(
+        Math.max(0, messages.value.length - renderCount.value),
+    ),
+);
+
+const hiddenCount = computed(
+    () => messages.value.length - visibleMessages.value.length,
+);
+
+const isNearBottom = () => {
+    const el = messagesContainer.value;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+};
+
+const loadOlderMessages = async () => {
+    const el = messagesContainer.value;
+    const prevHeight = el?.scrollHeight ?? 0;
+    const prevTop = el?.scrollTop ?? 0;
+    renderCount.value += RENDER_STEP;
+    await nextTick();
+    // 锚定：扩窗后保持视口内的内容不动
+    if (el) el.scrollTop = prevTop + (el.scrollHeight - prevHeight);
+};
+
+const showScrollBottom = ref(false);
+
+// 历史记录弹窗
+const historyOpen = ref(false);
+
+const onMessagesScroll = () => {
+    showScrollBottom.value = !isNearBottom();
+};
 
 // 文件输入 ref
 const imageInput = ref<HTMLInputElement | null>(null);
@@ -324,7 +368,12 @@ const buildOutgoingParts = (): OutgoingPart[] => {
 };
 
 // 发送消息（编辑器文字 + 内联图片 + 语音合为一条消息）
+// 移动端软键盘/触摸可能把同一次发送重复触发（连着两条一样的消息），
+// 600ms 内的重入直接忽略；正常手动连发的间隔远大于这个值
+let lastSendAt = 0;
+
 const handleSendMessage = async () => {
+    if (Date.now() - lastSendAt < 600) return;
     const parts = buildOutgoingParts();
     const hasContent = parts.some(
         (part) => part.type !== "text" || part.content.trim(),
@@ -359,6 +408,7 @@ const handleSendMessage = async () => {
         });
         return;
     }
+    lastSendAt = Date.now();
 
     // 单段沿用旧格式（纯文本/base64 图片/base64 语音），混合走 zxmsg:// JSON
     const single = parts.length === 1 ? parts[0] : null;
@@ -448,16 +498,13 @@ const triggerImageUpload = () => {
     imageInput.value?.click();
 };
 
-// 滚动到底部
+// 滚动到底部：瞬时定位，进入/切换会话直接钉在底部，不做平滑滚动
 const scrollToBottom = () => {
-    if (messagesContainer.value) {
-        setTimeout(() => {
-            messagesContainer.value?.scrollTo({
-                top: messagesContainer.value.scrollHeight,
-                behavior: "smooth",
-            });
-        }, 100);
-    }
+    setTimeout(() => {
+        messagesContainer.value?.scrollTo({
+            top: messagesContainer.value.scrollHeight,
+        });
+    }, 0);
 };
 
 // JSON 字符串尽量格式化展示，失败原样返回
@@ -469,13 +516,19 @@ const formatStructured = (raw: string) => {
     }
 };
 
-// 监听消息变化，自动滚动
+// 监听消息变化，贴近底部时自动滚底（翻历史时不打断阅读）
 watch(
     () => messages.value.length,
     () => {
-        scrollToBottom();
+        if (isNearBottom()) scrollToBottom();
     },
 );
+
+// 切换会话/联系人：重置窗口并直接钉在底部
+watch([selectedContact, selectedId], () => {
+    renderCount.value = 60;
+    nextTick(() => scrollToBottom());
+});
 
 onMounted(async () => {
     scrollToBottom();
@@ -485,7 +538,7 @@ onMounted(async () => {
 <template>
     <div
         :class="[
-            'flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm',
+            'relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm',
             selectedContact ? 'flex' : 'hidden sm:flex',
         ]"
     >
@@ -548,8 +601,17 @@ onMounted(async () => {
         <!-- 消息列表 -->
         <div
             ref="messagesContainer"
-            class="flex-1 space-y-3 overflow-y-auto p-3 sm:space-y-4 sm:p-4"
+            class="relative flex-1 space-y-3 overflow-y-auto p-3 sm:space-y-4 sm:p-4"
+            @scroll.passive="onMessagesScroll"
         >
+            <button
+                v-if="hiddenCount > 0"
+                class="mx-auto mb-2 block cursor-pointer rounded-full px-4 py-1.5 text-xs text-slate-500 transition-colors hover:bg-slate-100 hover:text-zx-primary"
+                type="button"
+                @click="loadOlderMessages"
+            >
+                查看更早的消息（还有 {{ hiddenCount }} 条）
+            </button>
             <div
                 v-if="messages.length === 0"
                 class="flex h-full items-center justify-center text-gray-400"
@@ -566,9 +628,8 @@ onMounted(async () => {
             </div>
 
             <div
-                v-for="message in messages"
+                v-for="message in visibleMessages"
                 :key="message.id"
-                :class="message.is_self ? 'justify-end' : 'justify-start'"
                 class="flex items-start space-x-2 sm:space-x-3"
             >
                 <!-- 头像 -->
@@ -588,8 +649,13 @@ onMounted(async () => {
                     }}</span>
                 </div>
 
-                <!-- 消息内容：图片不带气泡直接展示，其余用气泡 -->
-                <div class="min-w-0">
+                <!-- 消息内容列：flex-1 占满行内剩余宽度，气泡的百分比
+                     max-width 才有确定基准（宽度随内容收缩的包裹层会让
+                     70% 这类百分比陷入循环解析，塌陷成最小内容宽） -->
+                <div
+                    class="flex min-w-0 flex-1 flex-col"
+                    :class="message.is_self ? 'items-end' : 'items-start'"
+                >
                     <p
                         class="mb-1 text-xs text-gray-600"
                         v-if="!message.is_self && message.group_id"
@@ -605,7 +671,7 @@ onMounted(async () => {
                                 ? 'bg-zx-primary text-white rounded-br-xs'
                                 : 'bg-gray-200 text-gray-800 rounded-bl-xs'
                         "
-                        class="max-w-[70%] overflow-hidden rounded-2xl sm:max-w-md"
+                        class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl"
                     >
                         <div class="flex flex-col gap-1 px-3 py-2">
                             <template
@@ -614,8 +680,9 @@ onMounted(async () => {
                             >
                                 <img
                                     v-if="part.type === 'image'"
+                                    v-image-viewer:chat
                                     :src="part.content"
-                                    class="max-h-48 max-w-full cursor-pointer rounded-lg object-contain"
+                                    class="max-h-48 max-w-full rounded-lg object-contain"
                                     referrerpolicy="no-referrer"
                                 />
                                 <audio
@@ -635,14 +702,13 @@ onMounted(async () => {
                     <!-- 图片消息 -->
                     <div
                         v-else-if="message.message_type === 'image'"
-                        class="max-w-[70%] overflow-hidden rounded-xl sm:max-w-xs"
+                        class="max-w-[min(70%,20rem)] overflow-hidden rounded-xl"
                     >
                         <el-image
+                            v-image-viewer:chat
                             :src="message.message"
-                            class="max-w-full cursor-pointer align-top"
-                            :preview-src-list="[message.message]"
+                            class="max-w-full align-top"
                             referrerpolicy="no-referrer"
-                            hide-on-click-modal
                         >
                             <template #placeholder>
                                 <div
@@ -672,7 +738,7 @@ onMounted(async () => {
                     <div
                         v-else-if="message.message_type === 'record'"
                         :class="message.is_self ? 'bg-zx-primary text-white' : 'bg-gray-200 text-gray-800'"
-                        class="max-w-[70%] overflow-hidden rounded-2xl sm:max-w-md"
+                        class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl"
                     >
                         <div class="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm">
                             <Mic class="h-4 w-4 shrink-0" />
@@ -689,7 +755,7 @@ onMounted(async () => {
                     <!-- 视频消息 -->
                     <div
                         v-else-if="message.message_type === 'video'"
-                        class="max-w-[70%] overflow-hidden rounded-xl sm:max-w-md"
+                        class="max-w-[min(70%,28rem)] overflow-hidden rounded-xl"
                     >
                         <video
                             v-if="message.message"
@@ -713,7 +779,7 @@ onMounted(async () => {
                             message.message_type === 'json' ||
                             message.message_type === 'xml'
                         "
-                        class="max-w-[70%] overflow-hidden rounded-2xl sm:max-w-md"
+                        class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl"
                     >
                         <div class="flex items-center gap-2 px-3 pt-2 text-xs text-gray-500">
                             <FileText class="h-3.5 w-3.5 shrink-0" />
@@ -734,7 +800,7 @@ onMounted(async () => {
                             message.message_type === 'location' ||
                             message.message_type === 'forward'
                         "
-                        class="max-w-[70%] overflow-hidden rounded-2xl bg-gray-200 text-gray-800 sm:max-w-md"
+                        class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl bg-gray-200 text-gray-800"
                     >
                         <div class="flex items-start gap-2 px-3 py-2">
                             <Link2
@@ -770,7 +836,7 @@ onMounted(async () => {
                     <div
                         v-else-if="message.message_type === 'face'"
                         :class="message.is_self ? 'bg-zx-primary text-white' : 'bg-gray-200 text-gray-800'"
-                        class="max-w-[70%] overflow-hidden rounded-2xl sm:max-w-md"
+                        class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl"
                     >
                         <p class="px-3 py-2 text-xs sm:text-sm">
                             [表情 {{ message.message }}]
@@ -785,7 +851,7 @@ onMounted(async () => {
                                 ? 'bg-zx-primary text-white rounded-br-xs'
                                 : 'bg-gray-200 text-gray-800 rounded-bl-xs',
                         ]"
-                        class="max-w-[70%] overflow-hidden rounded-2xl sm:max-w-md"
+                        class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl"
                     >
                         <p class="px-3 py-2 text-xs break-words sm:text-sm">
                             {{ message.message }}
@@ -819,9 +885,20 @@ onMounted(async () => {
             </div>
         </div>
 
+        <!-- 回到底部：翻历史时出现 -->
+        <button
+            v-if="showScrollBottom"
+            class="btn-touch absolute right-5 bottom-24 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-500 shadow-md backdrop-blur-sm transition-colors hover:text-zx-primary"
+            type="button"
+            title="回到底部"
+            @click="scrollToBottom()"
+        >
+            <ArrowDown class="h-4 w-4" />
+        </button>
+
         <!-- 输入框区域 -->
         <div
-            class="relative border-t border-gray-100 bg-white p-3"
+            class="relative bg-white p-3"
             v-if="selectedContact"
             @dragenter.prevent="handleDragEnter"
             @dragover.prevent
@@ -868,14 +945,15 @@ onMounted(async () => {
 
             <!-- 工具栏（输入框上方） -->
             <div class="mb-1.5 flex items-center gap-0.5 px-0.5">
-                <button
-                    type="button"
-                    @click="triggerImageUpload"
-                    class="btn-touch flex h-8 w-8 flex-shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                <ZxButton
+                    variant="ghost"
+                    circle
+                    size="sm"
                     title="插入图片"
+                    @click="triggerImageUpload"
                 >
                     <ImageIcon class="h-4 w-4" />
-                </button>
+                </ZxButton>
                 <!-- 隐藏的图片输入（可多选） -->
                 <input
                     ref="imageInput"
@@ -907,6 +985,18 @@ onMounted(async () => {
                         class="h-4 w-4"
                     />
                 </button>
+
+                <!-- 历史记录 -->
+                <ZxButton
+                    variant="ghost"
+                    circle
+                    size="sm"
+                    class="ml-auto"
+                    title="历史记录"
+                    @click="historyOpen = true"
+                >
+                    <Clock class="h-4 w-4" />
+                </ZxButton>
             </div>
 
             <!-- 拖拽提示遮罩 -->
@@ -923,20 +1013,30 @@ onMounted(async () => {
                     ref="editorRef"
                     contenteditable="true"
                     data-placeholder="输入消息，按 Enter 发送"
-                    class="rich-editor max-h-32 min-h-11 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 pr-14 text-sm leading-5 text-slate-700 focus:outline-none"
+                    class="rich-editor max-h-32 min-h-12 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3 pr-14 text-sm leading-5 text-slate-700 focus:outline-none"
                     @keydown.enter.exact.prevent="handleSendMessage"
                     @paste="handlePaste"
                 ></div>
-                <button
-                    type="button"
-                    @click="handleSendMessage"
-                    class="btn-touch absolute bottom-1.5 right-1.5 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-zx-primary text-white shadow-sm transition-colors hover:bg-zx-primary-hover"
+                <ZxButton
+                    circle
+                    size="sm"
+                    class="absolute bottom-1.5 right-1.5 shadow-sm"
                     title="发送"
+                    @click="handleSendMessage"
                 >
                     <Send class="h-4 w-4" />
-                </button>
+                </ZxButton>
             </div>
         </div>
+
+        <!-- 历史记录弹窗 -->
+        <ChatHistoryModal
+            :visible="historyOpen"
+            :contact-type="selectedContact"
+            :contact-id="selectedId"
+            :contact-name="currentContactInfo?.name ?? ''"
+            @close="historyOpen = false"
+        />
     </div>
 </template>
 

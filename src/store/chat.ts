@@ -11,6 +11,7 @@ import type { ChatMessage as WsChatMessage } from "@/types/api-next.types";
 import { useBotStore } from "@/store/bot.ts";
 import { ZXNotification } from "@/services/ui";
 import { addMessageCallback } from "@/utils/api-next/websocket-chat";
+import { idbGet, idbSet } from "@/utils/idb-cache";
 import { chatApi } from "@/utils/api-next";
 import {
     cacheMessage,
@@ -80,6 +81,16 @@ export const useChatStore = defineStore("chat", () => {
                 });
                 return;
             }
+            // 先用 IndexedDB 缓存立即渲染，网络回来后再覆盖
+            const cacheKey = `contacts:${botId}`;
+            const cached = await idbGet<{
+                friends: Friend[];
+                groups: GroupType[];
+            }>(cacheKey);
+            if (cached) {
+                friends.value = cached.friends || [];
+                groups.value = cached.groups || [];
+            }
             const friendRes = await chatApi.getFriendList(botId);
             if (friendRes?.success && friendRes?.data) {
                 friends.value = friendRes.data;
@@ -88,6 +99,11 @@ export const useChatStore = defineStore("chat", () => {
             if (groupRes?.success && groupRes?.data) {
                 groups.value = groupRes.data;
             }
+
+            idbSet(cacheKey, {
+                friends: friends.value,
+                groups: groups.value,
+            });
 
             // 列表变化后（bot 下线、好友被删等）校验当前选中是否仍存在，
             // 不存在则清空，右侧聊天区与详情面板回到空状态，
@@ -374,6 +390,7 @@ export const useChatStore = defineStore("chat", () => {
         friends,
         groups,
         loadingContacts,
+        messagesByConversation,
         selectedId,
         messages,
         loadContacts,

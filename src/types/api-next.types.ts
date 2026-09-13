@@ -68,6 +68,15 @@ export interface BotStatus {
     start_time: string;
 }
 
+export interface ConnectionLogInfo {
+    id: number;
+    bot_id: string;
+    platform: string | null;
+    /** 1: 连接, 0: 断开 */
+    type: number;
+    connect_time: string;
+}
+
 export interface BotInfo {
     // 基础信息
     self_id: string | null;
@@ -242,6 +251,26 @@ export interface FileContent {
     path: string
     content: string
     encoding: string
+}
+
+export interface ArchiveEntry {
+    name: string
+    is_dir: boolean
+    size?: number | null
+    size_formatted?: string | null
+}
+
+export interface ArchivePreviewResult {
+    path: string
+    archive_type: string
+    entries: ArchiveEntry[]
+    total_count: number
+    truncated: boolean
+}
+
+export interface ArchiveExtractResult {
+    dest_path: string
+    file_count: number
 }
 
 // ==================== 配置相关 ====================

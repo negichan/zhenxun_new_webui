@@ -2,7 +2,6 @@ import { defineStore } from "pinia";
 import { computed, reactive, ref, watch } from "vue";
 import { dashboardApi, mainApi } from "@/utils/api-next";
 import { useWebSocketStore } from "@/store/websocket";
-import { useBotStore } from "@/store/bot";
 import { createPolling } from "@/composables/usePolling";
 import type {
     SystemCount,
@@ -110,11 +109,11 @@ export const useSystemStore = defineStore("system", () => {
      */
     async function fetchPollingData() {
         try {
-            // 按当前选中的 bot 统计；后端字段是 all/day，映射到 store 的口径
-            const botId = useBotStore().getSelectedBotId() ?? undefined;
+            // 统计口径为所有 bot 的合计：不传 bot_id 后端即查全量，
+            // 管理员视角（无协议端接入）下也有数据可看
             const [chatRes, pluginRes] = await Promise.all([
-                mainApi.getChatStatistics(botId),
-                mainApi.getPluginStatistics(botId),
+                mainApi.getChatStatistics(),
+                mainApi.getPluginStatistics(),
             ]);
             if (chatRes?.success && chatRes?.data) {
                 count.chat_num = chatRes.data.all ?? count.chat_num;

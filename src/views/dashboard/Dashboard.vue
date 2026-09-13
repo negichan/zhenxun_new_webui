@@ -7,6 +7,7 @@ import {
 } from "vue";
 import UserCard from "@/views/dashboard/UserCard.vue";
 import CommitTimeline from "@/views/dashboard/CommitTimeline.vue";
+import ConnectionLog from "@/views/dashboard/ConnectionLog.vue";
 import LogCard from "@/views/dashboard/LogCard.vue";
 import SystemInfoCard from "@/views/dashboard/SystemInfoCard.vue";
 import DashboardStatsGrid from "@/views/dashboard/DashboardStatsGrid.vue";
@@ -59,7 +60,12 @@ onBeforeUnmount(() => {
                 class="col-span-1 flex min-h-0 flex-col gap-4 max-2xl:order-last lg:col-span-2 2xl:col-span-1 2xl:col-start-3 2xl:row-span-3 2xl:row-start-1 2xl:h-full"
             >
                 <CommitTimeline
-                    class="min-h-0 flex-1 max-2xl:max-h-96 max-lg:max-h-64"
+                    class="min-h-0 flex-1 max-2xl:max-h-96 max-lg:max-h-80"
+                />
+
+                <!-- 连接日志：记录 bot 上下线（本地持久化，最多 100 条） -->
+                <ConnectionLog
+                    class="max-h-72 shrink-0 max-lg:max-h-56"
                 />
 
             <SystemInfoCard
@@ -79,7 +85,7 @@ onBeforeUnmount(() => {
             />
 
             <LogCard
-                class="col-span-1 max-2xl:max-h-96 max-lg:max-h-64 lg:col-span-2 2xl:col-span-2 2xl:row-start-3 2xl:h-full 2xl:min-h-0"
+                class="col-span-1 max-2xl:max-h-96 max-lg:max-h-80 lg:col-span-2 2xl:col-span-2 2xl:row-start-3 2xl:h-full 2xl:min-h-0"
             />
         </div>
     </div>

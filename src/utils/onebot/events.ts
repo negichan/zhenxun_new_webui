@@ -125,3 +125,23 @@ export const buildGroupDecreaseEvent = (options: GroupDecreaseOptions): OneBotEv
     operator_id: Number(options.operatorId ?? options.userId),
     ...baseFields(options.selfId),
 })
+
+export interface GroupIncreaseOptions {
+    selfId: string
+    groupId: string
+    /** 新加入的成员 */
+    userId: string
+    /** 同意入群的操作者，入群时就是本人 */
+    operatorId?: string
+    subType?: 'approve' | 'invite'
+}
+
+export const buildGroupIncreaseEvent = (options: GroupIncreaseOptions): OneBotEvent => ({
+    post_type: 'notice',
+    notice_type: 'group_increase',
+    sub_type: options.subType ?? 'approve',
+    group_id: Number(options.groupId),
+    user_id: Number(options.userId),
+    operator_id: Number(options.operatorId ?? options.userId),
+    ...baseFields(options.selfId),
+})

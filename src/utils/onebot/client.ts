@@ -25,6 +25,8 @@ export interface SimulatorConfig {
     autoReconnect?: boolean
     /** 重连间隔（秒），默认 3 */
     reconnectInterval?: number
+    /** 查询身份的自定义头像（dataURL），群成员列表应答会带给主站 */
+    getUserAvatar?: (userId: string) => string | undefined
 }
 
 export interface SimulatorCallbacks {
@@ -44,6 +46,10 @@ export interface SimulatorCallbacks {
     onError?: (message: string) => void
     /** 后端桥接推送的真实 bot 信息（昵称/头像），刷新界面展示用 */
     onBotInfo?: (bots: { user_id: string; nickname: string; ava_url: string }[]) => void
+    /** 其他模拟端发出的消息事件（多端统一状态：每端都能看到彼此的消息） */
+    onPeerMessage?: (event: OneBotEvent) => void
+    /** 后端推送的最新模拟世界状态（多端状态实时同步） */
+    onStateUpdate?: (state: Record<string, any>) => void
 }
 
 export class OneBotV11Simulator {
@@ -162,6 +168,14 @@ export class OneBotV11Simulator {
             )
             return
         }
+        if (packet.type === 'bridge_peer_message') {
+            this.callbacks.onPeerMessage?.(packet.event)
+            return
+        }
+        if (packet.type === 'bridge_state') {
+            this.callbacks.onStateUpdate?.(packet.state)
+            return
+        }
 
         const request = packet as ActionRequest
         // 心跳相关的动作请求没有 action 字段（是事件），忽略非动作包
@@ -203,6 +217,7 @@ export class OneBotV11Simulator {
     private handleAction(request: ActionRequest): ActionResponse {
         return handleAction(request, {
             selfId: this.config.selfId,
+            getUserAvatar: this.config.getUserAvatar,
             onBotMessage: info => this.callbacks.onBotMessage?.(info),
         })
     }

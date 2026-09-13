@@ -3,7 +3,12 @@
  */
 
 import { api } from "./client";
-import type { APIResponse, BotInfo, BotStatus } from "@/types/api-next.types";
+import type {
+    APIResponse,
+    BotInfo,
+    BotStatus,
+    ConnectionLogInfo,
+} from "@/types/api-next.types";
 
 export const mainApi = {
     /**
@@ -15,6 +20,17 @@ export const mainApi = {
 
     getBotList(): Promise<APIResponse<[BotInfo]>> {
         return api.get<[BotInfo]>("/main/bot-list");
+    },
+
+    /**
+     * 获取 Bot 连接日志（按时间倒序）
+     */
+    getConnectionLogs(
+        limit = 500,
+    ): Promise<APIResponse<ConnectionLogInfo[]>> {
+        return api.get<ConnectionLogInfo[]>("/main/connection-log", {
+            limit,
+        });
     },
 
     /**

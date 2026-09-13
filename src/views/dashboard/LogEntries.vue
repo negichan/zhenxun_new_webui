@@ -41,9 +41,18 @@ const onScroll = () => {
     scrollTop.value = container.value?.scrollTop ?? 0;
 };
 
+// 跟随滚动按帧合并：日志高频推送时每条都会触发滚动，逐条瞬跳会让
+// 整块可视区域持续抖动（抽搐）。合并到 rAF 后一帧至多滚一次，
+// 多条推送在同一帧内折叠为一次跟随
+let scrollRaf = 0;
+
 const scrollToBottom = () => {
-    const el = container.value;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (scrollRaf) return;
+    scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = 0;
+        const el = container.value;
+        if (el) el.scrollTop = el.scrollHeight;
+    });
 };
 
 onMounted(() => {
@@ -59,6 +68,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    if (scrollRaf) cancelAnimationFrame(scrollRaf);
+    scrollRaf = 0;
     resizeObserver?.disconnect();
     resizeObserver = null;
 });
@@ -105,9 +116,11 @@ const levelClass = (level: LogEntry["level"]) => {
 <template>
     <div
         ref="container"
-        class="h-full min-h-0 flex-1 overflow-y-auto pr-2 font-mono text-xs sm:pr-5"
+        class="h-full min-h-0 flex-1 overflow-x-auto overflow-y-auto pr-2 font-mono text-xs sm:pr-5"
         @scroll.passive="onScroll"
     >
+        <!-- 内容按真实宽度展开，日志长消息可横向滚动（虚拟滚动的总高/偏移
+             按行高计算，与横向宽度无关，不受影响） -->
         <div
             v-if="logs.length === 0"
             class="flex h-full items-center justify-center text-gray-400"
@@ -117,6 +130,7 @@ const levelClass = (level: LogEntry["level"]) => {
 
         <div
             v-else
+            class="w-fit min-w-full"
             :style="{
                 height: `${totalHeight}px`,
                 paddingTop: `${startIndex * ROW_HEIGHT}px`,
@@ -125,7 +139,7 @@ const levelClass = (level: LogEntry["level"]) => {
             <div
                 v-for="(log, i) in visibleLogs"
                 :key="log.seq ?? startIndex + i"
-                class="grid h-6 grid-cols-[2.5rem_2.6rem_minmax(0,1fr)] items-center gap-1 rounded-lg px-1 text-slate-700 transition-colors hover:bg-slate-200/70 sm:grid-cols-[3rem_3rem_minmax(0,1fr)] sm:gap-1.5 sm:px-2"
+                class="grid h-6 w-fit min-w-full grid-cols-[2.5rem_2.6rem_minmax(0,max-content)] items-center gap-1 rounded-lg px-1 text-slate-700 transition-colors hover:bg-slate-200/70 sm:grid-cols-[3rem_3rem_minmax(0,max-content)] sm:gap-1.5 sm:px-2"
             >
                 <span class="text-[10px] text-slate-400 tabular-nums">
                     {{ formatTimestamp(log.timestamp) }}
@@ -137,7 +151,7 @@ const levelClass = (level: LogEntry["level"]) => {
                     {{ log.level }}
                 </span>
 
-                <div class="flex min-w-0 items-center leading-5">
+                <div class="flex w-fit min-w-full items-center whitespace-nowrap leading-5">
                     <span
                         v-if="log.module"
                         :title="log.module"
@@ -147,7 +161,7 @@ const levelClass = (level: LogEntry["level"]) => {
                     </span>
                     <span
                         :title="log.message"
-                        class="min-w-0 flex-1 truncate text-slate-700 select-text"
+                        class="w-fit whitespace-nowrap text-slate-700 select-text"
                     >
                         {{ log.message }}
                     </span>
