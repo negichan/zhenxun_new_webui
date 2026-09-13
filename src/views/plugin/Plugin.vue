@@ -4,10 +4,14 @@ import { useRoute, useRouter } from "vue-router";
 import {
     Anchor,
     Blocks,
+    Download,
     ChevronLeft,
     ChevronRight,
+    LayoutGrid,
+    List,
     Package,
     Pin,
+    RotateCw,
     PinOff,
     Search,
     SlidersHorizontal,
@@ -16,9 +20,8 @@ import {
 import { storeToRefs } from "pinia";
 import type { PluginInfo } from "@/types/api-next.types";
 import type { NbStorePlugin, StorePlugin } from "@/types/store.types";
-import PluginCard from "@/components/zxcomponent/PluginCard/PluginCard.vue";
-import PluginConfigModal from "@/components/zxcomponent/PluginConfigModal/PluginConfigModal.vue";
-import StoreCard from "@/components/zxcomponent/StoreCard/StoreCard.vue";
+import PluginCard from "@/views/plugin/components/PluginCard/PluginCard.vue";
+import PluginConfigModal from "@/views/plugin/components/PluginConfigModal/PluginConfigModal.vue";
 import { ZXMessageBox, ZXNotification } from "@/services/ui";
 import { ZXDropdown } from "@/components/zxcomponent/ZXDropdown";
 import type { ZXDropdownOption } from "@/components/zxcomponent/ZXDropdown";
@@ -104,6 +107,27 @@ const openPluginMenu = (e: MouseEvent, plugin: PluginInfo) => {
                 icon: Anchor,
                 action: () => toggleResident(plugin.module),
             },
+        ],
+    });
+};
+
+// 右键市场卡：安装 / 更新
+const openStoreMenu = (e: MouseEvent, plugin: StorePlugin) => {
+    ZXContextMenu.show({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+            plugin.is_installed
+                ? {
+                      label: "更新插件",
+                      icon: RotateCw,
+                      action: () => handleUpdate(plugin),
+                  }
+                : {
+                      label: "安装插件",
+                      icon: Download,
+                      action: () => handleInstall(plugin),
+                  },
         ],
     });
 };
@@ -195,7 +219,7 @@ const filteredStorePlugins = computed(() => {
     return result;
 });
 
-// NB 标签品牌色：标签名 -> 背景色（文字黑白由 StoreCard 按亮度计算）
+// NB 标签品牌色：标签名 -> 背景色（对比文字由 ZxTag 处理）
 const nbTagColors = computed<Record<string, string> | undefined>(() => {
     if (storeSource.value !== "nonebot") return undefined;
     const map: Record<string, string> = {};
@@ -207,7 +231,7 @@ const nbTagColors = computed<Record<string, string> | undefined>(() => {
     return map;
 });
 
-// 市场视图统一卡片数据（NoneBot 源映射为 StoreCard 的字段）
+// 市场视图统一卡片数据（NoneBot 源映射为统一卡片的字段）
 const marketCards = computed<StorePlugin[]>(() => {
     if (storeSource.value === "nonebot") {
         return filteredNbPlugins.value.map((p) => ({
@@ -220,6 +244,7 @@ const marketCards = computed<StorePlugin[]>(() => {
                 p.has_update && p.local_version
                     ? `${p.version}（当前 v${p.local_version}）`
                     : p.version,
+
             plugin_type: p.is_official ? "官方" : "",
             is_installed: p.installed,
             has_update: p.has_update,
@@ -229,6 +254,54 @@ const marketCards = computed<StorePlugin[]>(() => {
     }
     return filteredStorePlugins.value;
 });
+
+// ==================== 卡片元信息标签（本地/市场统一结构） ====================
+type CardMetaTag = {
+    text: string;
+    variant?: "neutral"
+        | "primary"
+        | "success"
+        | "warning"
+        | "danger"
+        | "info"
+        | "purple"
+        | "cyan";
+    color?: string;
+};
+
+const typeBgOf = (type: string) =>
+    type === "NORMAL" || type === "官方"
+        ? "#16a34a"
+        : type === "ADMIN"
+          ? "#ef4444"
+          : "#71717a";
+
+const localMetaTags = (plugin: PluginInfo): CardMetaTag[] => {
+    const tags: CardMetaTag[] = [
+        { text: `v${plugin.version || "1.0.0"}`, variant: "info" },
+        {
+            text: plugin.is_builtin ? "内置" : "三方",
+            variant: plugin.is_builtin ? "purple" : "warning",
+        },
+    ];
+    if (residentModules.value.includes(plugin.module)) {
+        tags.push({ text: "常驻", variant: "warning" });
+    }
+    return tags;
+};
+
+const marketMetaTags = (plugin: StorePlugin): CardMetaTag[] => {
+    const tags: CardMetaTag[] = [
+        { text: `v${plugin.version || "1.0.0"}`, variant: "info" },
+    ];
+    if (plugin.plugin_type) {
+        tags.push({ text: plugin.plugin_type, color: typeBgOf(plugin.plugin_type) });
+    }
+    for (const t of (plugin.tags || []).slice(0, 2)) {
+        tags.push({ text: t, color: nbTagColors.value?.[t] });
+    }
+    return tags;
+};
 
 // ==================== 市场分页（真寻源 / NoneBot 源共用） ====================
 const MARKET_PAGE_SIZE = 20;
@@ -242,15 +315,17 @@ const pagedMarketCards = computed(() =>
         marketPage.value * MARKET_PAGE_SIZE,
     ),
 );
-// 页码窗口：总数超过 7 时以当前页居中滑动
-const marketPageList = computed(() => {
-    const total = marketPageTotal.value;
+// 页码窗口：总数超过 7 时以当前页居中滑动（本地/市场共用）
+const pageWindow = (page: number, total: number) => {
     if (total <= 7) {
         return Array.from({ length: total }, (_, i) => i + 1);
     }
-    const start = Math.max(1, Math.min(marketPage.value - 3, total - 6));
+    const start = Math.max(1, Math.min(page - 3, total - 6));
     return Array.from({ length: 7 }, (_, i) => start + i);
-});
+};
+const marketPageList = computed(() =>
+    pageWindow(marketPage.value, marketPageTotal.value),
+);
 
 const setMarketPage = (page: number) => {
     if (
@@ -269,6 +344,66 @@ const setMarketPage = (page: number) => {
 watch([storeSearchKeyword, storeFilterType], () => {
     marketPage.value = 1;
 });
+
+// ==================== 本地插件分页 ====================
+const LOCAL_PAGE_SIZE = 20;
+const localPage = ref(1);
+const localPageTotal = computed(() =>
+    Math.max(
+        1,
+        Math.ceil(filteredLocalPlugins.value.length / LOCAL_PAGE_SIZE),
+    ),
+);
+const pagedLocalPlugins = computed(() =>
+    filteredLocalPlugins.value.slice(
+        (localPage.value - 1) * LOCAL_PAGE_SIZE,
+        localPage.value * LOCAL_PAGE_SIZE,
+    ),
+);
+const localPageList = computed(() =>
+    pageWindow(localPage.value, localPageTotal.value),
+);
+
+const setLocalPage = (page: number) => {
+    if (
+        page < 1 ||
+        page > localPageTotal.value ||
+        page === localPage.value
+    ) {
+        return;
+    }
+    localPage.value = page;
+    contentRef.value?.scrollTo({ top: 0 });
+    nextTick(animateCardsIn);
+};
+
+// 搜索 / 状态 / 类型筛选变化时回到第一页；列表缩短时收拢当前页
+watch([searchKeyword, statusFilter, showBuiltin, showThird], () => {
+    localPage.value = 1;
+});
+watch(localPageTotal, (total) => {
+    if (localPage.value > total) localPage.value = total;
+});
+
+// 当前视图的分页状态桥接：底部分页条按视图取对应数据源
+const currentPage = computed(() =>
+    activeView.value === "market" ? marketPage.value : localPage.value,
+);
+const currentPageTotal = computed(() =>
+    activeView.value === "market"
+        ? marketPageTotal.value
+        : localPageTotal.value,
+);
+const currentPageList = computed(() =>
+    activeView.value === "market" ? marketPageList.value : localPageList.value,
+);
+const setCurrentPage = (page: number) => {
+    if (activeView.value === "market") {
+        setMarketPage(page);
+    } else {
+        setLocalPage(page);
+    }
+};
 
 // 统计信息
 const pluginStats = computed(() => {
@@ -441,6 +576,17 @@ const onViewLeave = (el: Element, done: () => void) => {
         onComplete: done,
         onInterrupt: () => done(),
     });
+};
+
+// 视图密度：网格（卡片）/列表（单行紧凑），本地与市场共用，localStorage 持久化
+const VIEW_MODE_KEY = "pluginViewMode";
+const viewMode = ref<"grid" | "list">(
+    localStorage.getItem(VIEW_MODE_KEY) === "list" ? "list" : "grid",
+);
+
+const toggleViewMode = () => {
+    viewMode.value = viewMode.value === "grid" ? "list" : "grid";
+    localStorage.setItem(VIEW_MODE_KEY, viewMode.value);
 };
 
 const switchView = (view: "local" | "market") => {
@@ -864,12 +1010,23 @@ onMounted(() => {
                     未安装
                 </button>
             </div>
+
+            <!-- 网格/列表切换（本地与市场共用，放工具栏最后） -->
+            <button
+                class="btn-touch flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700"
+                :title="viewMode === 'grid' ? '切换列表视图' : '切换网格视图'"
+                type="button"
+                @click="toggleViewMode"
+            >
+                <List v-if="viewMode === 'grid'" class="h-4 w-4" />
+                <LayoutGrid v-else class="h-4 w-4" />
+            </button>
         </div>
 
         <!-- 插件网格 -->
         <div
             ref="contentRef"
-            class="relative flex-1 overflow-x-hidden overflow-y-auto px-1"
+            class="relative flex-1 overflow-x-hidden overflow-y-auto px-1 pt-1"
             @mouseover="onMarketOver"
             @mouseleave="onMarketLeave"
         >
@@ -914,17 +1071,29 @@ onMounted(() => {
                 <div
                     v-if="activeView === 'local'"
                     key="local"
-                    class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                    :class="
+                        viewMode === 'grid'
+                            ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+                            : 'flex flex-col gap-2'
+                    "
                 >
                     <PluginCard
-                        v-for="plugin in filteredLocalPlugins"
+                        v-for="plugin in pagedLocalPlugins"
                         :key="plugin.module"
-                        :plugin="plugin"
+                        :layout="viewMode"
+                        type="local"
+                        :name="plugin.name"
+                        :module="plugin.module"
+                        :description="plugin.description"
                         :pinned="pinnedModules.includes(plugin.module)"
-                        :resident="residentModules.includes(plugin.module)"
+                        :meta-tags="localMetaTags(plugin)"
+                        :author="plugin.author"
+                        :enabled="plugin.is_enabled"
+                        :allow-switch="plugin.allow_switch"
+                        :allow-setting="plugin.allow_setting"
                         @contextmenu.prevent="openPluginMenu($event, plugin)"
-                        @status-change="handleStatusChange"
-                        @open-config="handleOpenConfig"
+                        @toggle="newStatus => handleStatusChange(plugin.module, newStatus)"
+                        @config="handleOpenConfig(plugin)"
                     />
                 </div>
 
@@ -932,15 +1101,29 @@ onMounted(() => {
                 <div
                     v-else
                     key="market"
-                    class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                    :class="
+                        viewMode === 'grid'
+                            ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+                            : 'flex flex-col gap-2'
+                    "
                 >
-                    <StoreCard
+                    <PluginCard
                         v-for="plugin in pagedMarketCards"
                         :key="plugin.module"
-                        :plugin="plugin"
-                        :tag-colors="nbTagColors"
-                        @install="handleInstall"
-                        @update="handleUpdate"
+                        :layout="viewMode"
+                        type="market"
+                        class="market-card"
+                        :name="plugin.name"
+                        :module="plugin.module"
+                        :description="plugin.description"
+                        :meta-tags="marketMetaTags(plugin)"
+                        :author="plugin.author"
+                        :is-installed="plugin.is_installed"
+                        :has-update="plugin.has_update"
+                        :homepage="plugin.homepage"
+                        @contextmenu.prevent="openStoreMenu($event, plugin)"
+                        @install="handleInstall(plugin)"
+                        @update="handleUpdate(plugin)"
                     />
                 </div>
             </Transition>
@@ -948,52 +1131,48 @@ onMounted(() => {
             <!-- 游离四角取景框：瞬移到悬停的市场卡片 -->
             <CornerFrame ref="frameRef" />
 
-            <!-- 分页（市场两个源共用） -->
+            <!-- 分页（本地插件与市场共用，页码取当前视图的分页状态） -->
             <div
-                v-if="
-                    !currentLoading &&
-                    marketCards.length > 0 &&
-                    marketPageTotal > 1
-                "
+                v-if="!currentLoading && currentCount > 0 && currentPageTotal > 1"
                 class="flex items-center justify-center gap-1 pb-1 pt-4"
             >
                 <button
                     class="btn-touch flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                     :class="
-                        marketPage === 1
+                        currentPage === 1
                             ? 'text-gray-300'
                             : 'text-gray-500 hover:bg-gray-100'
                     "
-                    :disabled="marketPage === 1"
+                    :disabled="currentPage === 1"
                     type="button"
-                    @click="setMarketPage(marketPage - 1)"
+                    @click="setCurrentPage(currentPage - 1)"
                 >
                     <ChevronLeft class="h-4 w-4" />
                 </button>
                 <button
-                    v-for="page in marketPageList"
+                    v-for="page in currentPageList"
                     :key="page"
                     class="btn-touch h-8 min-w-8 cursor-pointer rounded-full px-2 text-sm transition-colors"
                     :class="
-                        page === marketPage
+                        page === currentPage
                             ? 'bg-zx-primary font-medium text-white'
                             : 'text-gray-500 hover:bg-gray-100'
                     "
                     type="button"
-                    @click="setMarketPage(page)"
+                    @click="setCurrentPage(page)"
                 >
                     {{ page }}
                 </button>
                 <button
                     class="btn-touch flex h-8 w-8 cursor-pointer items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                     :class="
-                        marketPage === marketPageTotal
+                        currentPage === currentPageTotal
                             ? 'text-gray-300'
                             : 'text-gray-500 hover:bg-gray-100'
                     "
-                    :disabled="marketPage === marketPageTotal"
+                    :disabled="currentPage === currentPageTotal"
                     type="button"
-                    @click="setMarketPage(marketPage + 1)"
+                    @click="setCurrentPage(currentPage + 1)"
                 >
                     <ChevronRight class="h-4 w-4" />
                 </button>

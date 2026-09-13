@@ -21,12 +21,12 @@ import {
     Group,
     MessageSquare,
     Search,
-    Settings,
     TrendingUp,
     Users,
     X,
     Zap,
 } from "lucide-vue-next";
+import { ZXDropdown } from "@/components/zxcomponent/ZXDropdown";
 import { ZXMessageBox, ZXNotification } from "@/services/ui";
 import { manageApi } from "@/utils/api-next";
 import type {
@@ -748,37 +748,6 @@ const toggleGroupStatus = async (group: GroupType) => {
     }
 };
 
-const leaveGroup = async (group: GroupType) => {
-    try {
-        await ZXMessageBox({
-            title: "退群确认",
-            message: `确定要退出群组"${group.group_name}"吗？此操作不可恢复。`,
-            cancelButtonText: "取消",
-            confirmButtonText: "确定",
-            type: "warning",
-            onConfirm: async () => {
-                const res = await manageApi.leaveGroup({
-                    bot_id: "",
-                    group_id: group.group_id,
-                });
-                if (res.success) {
-                    groups.value = groups.value.filter(
-                        (g) => g.group_id !== group.group_id,
-                    );
-                    ZXNotification({
-                        title: "成功~",
-                        message: "已退出群组",
-                        type: "🥳",
-                        position: "top-right",
-                    });
-                }
-            },
-        });
-    } catch {
-        return;
-    }
-};
-
 // 好友操作
 const sendMessage = (friend: Friend) => {
     currentFriend.value = friend;
@@ -848,10 +817,14 @@ const deleteFriend = async (friend: Friend) => {
     }
 };
 
-//群聊等级逻辑
-const open = ref(false);
-
+// 群权限（群等级）逻辑
 const levels = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+// 群权限下拉选项（样式参考插件设置·权限设置的群权限下拉）
+const groupLevelOptions = levels.map(l => ({
+    label: `等级 ${l}`,
+    value: String(l),
+}));
 
 const selectedLevel = computed(() => groupDetail.value!.level);
 
@@ -880,8 +853,6 @@ const chooseLevel = async (level: number, group: GroupType) => {
             position: "top-right",
         });
     }
-
-    open.value = false;
 };
 
 watch(
@@ -1148,8 +1119,8 @@ onMounted(async () => {
                         class="flex h-full flex-col overflow-hidden"
                     >
                         <!-- 详情头部 -->
-                        <div class="border-b border-gray-100 p-6 pb-4">
-                            <div class="flex items-center gap-2 sm:gap-4">
+                        <div class="border-b border-gray-100 p-4 pb-3 sm:p-6 sm:pb-4">
+                            <div class="flex flex-wrap items-center gap-2 sm:gap-4">
                                 <!-- 移动端返回按钮 -->
                                 <button
                                     v-if="!embedded"
@@ -1162,7 +1133,7 @@ onMounted(async () => {
                                 </button>
                                 <img
                                     :src="groupDetail.ava_url"
-                                    class="h-18 w-18 flex-shrink-0 rounded-full object-cover shadow-md"
+                                    class="h-12 w-12 flex-shrink-0 rounded-full object-cover shadow-md sm:h-18 sm:w-18"
                                 />
                                 <div class="min-w-0 flex-1">
                                     <h2
@@ -1180,7 +1151,7 @@ onMounted(async () => {
                                     >
                                         <span
                                             :class="[
-                                                'rounded-full px-3 py-1 text-sm',
+                                                'whitespace-nowrap rounded-full px-2.5 py-1 text-xs sm:px-3 sm:text-sm',
                                                 groupDetail.status
                                                     ? 'bg-zx-primary-soft text-zx-primary'
                                                     : 'bg-gray-100 text-gray-500',
@@ -1210,41 +1181,6 @@ onMounted(async () => {
                                         @click="emit('close')"
                                     >
                                         <X class="h-4 w-4" />
-                                    </button>
-                                    <button
-                                        @click="
-                                            toggleGroupStatus(
-                                                groups.find(
-                                                    (g) =>
-                                                        g.group_id ===
-                                                        selectedGroupId,
-                                                )!,
-                                            )
-                                        "
-                                        :class="[
-                                            'cursor-pointer rounded-full px-5 py-1.5 text-xs font-medium transition-all sm:text-sm',
-                                            groupDetail.status
-                                                ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                                : 'bg-zx-primary text-white hover:bg-zx-primary-hover',
-                                        ]"
-                                    >
-                                        {{
-                                            groupDetail.status ? "禁用" : "启用"
-                                        }}
-                                    </button>
-                                    <button
-                                        @click="
-                                            leaveGroup(
-                                                groups.find(
-                                                    (g) =>
-                                                        g.group_id ===
-                                                        selectedGroupId,
-                                                )!,
-                                            )
-                                        "
-                                        class="cursor-pointer rounded-2xl bg-red-50 px-5 py-1.5 text-xs font-medium text-red-600 transition-all hover:bg-red-100 sm:text-sm"
-                                    >
-                                        退出
                                     </button>
                                 </div>
                             </div>
@@ -1293,66 +1229,88 @@ onMounted(async () => {
                                     <h3
                                         class="flex items-center gap-1 text-xs font-semibold text-gray-700 sm:gap-2 sm:text-sm"
                                     >
-                                        <Settings
-                                            class="h-3 w-3 sm:h-4 sm:w-4"
-                                        />
                                         群聊设置
                                     </h3>
                                 </div>
-                                <div class="p-3 select-none">
+                                <div
+                                    class="grid grid-cols-1 gap-2 select-none sm:grid-cols-2 sm:gap-3"
+                                >
+                                    <!-- 群权限（填写样式参考插件设置·权限设置的群权限） -->
                                     <div
-                                        class="relative flex w-fit items-center justify-center gap-2 rounded-full border border-slate-200 px-4 py-1.5 shadow-sm"
+                                        class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:gap-3"
                                     >
-                                        <div class="text-sm">群等级</div>
-                                        <div
-                                            class="h-3.5 w-[1px] bg-black/30"
-                                        ></div>
-                                        <div
-                                            @click="open = !open"
-                                            class="flex cursor-pointer items-center space-x-1 font-medium text-zx-primary hover:text-zx-primary-hover"
-                                        >
-                                            <span>{{ selectedLevel }}</span>
-
-                                            <ChevronDown
-                                                class="h-3 w-3 transition"
-                                                :class="open && 'rotate-180'"
-                                            />
-                                        </div>
-                                        <!-- 展开选择器 -->
-                                        <transition
-                                            enter-active-class="transition duration-200"
-                                            leave-active-class="transition duration-150"
-                                            enter-from-class="opacity-0 scale-95 -translate-y-2"
-                                            leave-to-class="opacity-0 scale-95 -translate-y-2"
-                                        >
-                                            <div
-                                                v-show="open"
-                                                class="absolute top-full right-0 z-50 mt-1 min-w-12 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+                                        <div class="min-w-0 flex-1">
+                                            <p
+                                                class="text-xs font-bold text-slate-700 sm:text-sm"
                                             >
-                                                <button
-                                                    v-for="level in levels"
-                                                    :key="level"
-                                                    @click="
-                                                        chooseLevel(
-                                                            level,
-                                                            groups.find(
-                                                                (g) =>
-                                                                    g.group_id ===
-                                                                    selectedGroupId,
-                                                            )!,
-                                                        )
-                                                    "
-                                                    class="flex w-full items-center justify-between justify-center py-1 text-center text-sm transition hover:bg-slate-100"
+                                                群权限
+                                            </p>
+                                        </div>
+                                        <ZXDropdown
+                                            :model-value="String(selectedLevel)"
+                                            :options="groupLevelOptions"
+                                            trigger-class="flex h-8 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-xs text-slate-700 transition-colors hover:text-zx-primary sm:h-9 sm:gap-1.5 sm:px-3.5 sm:text-sm"
+                                            @update:model-value="
+                                                chooseLevel(
+                                                    Number($event),
+                                                    groups.find(
+                                                        (g) =>
+                                                            g.group_id ===
+                                                            selectedGroupId,
+                                                    )!,
+                                                )
+                                            "
+                                        >
+                                            <template
+                                                #trigger="{ label, open }"
+                                            >
+                                                <span class="font-semibold">{{
+                                                    label
+                                                }}</span>
+                                                <ChevronDown
+                                                    class="h-3 w-3 shrink-0 text-slate-400 transition-transform"
                                                     :class="
-                                                        selectedLevel ===
-                                                            level &&
-                                                        'bg-zx-primary-tint text-zx-primary'
+                                                        open
+                                                            ? 'rotate-180'
+                                                            : ''
                                                     "
-                                                >
-                                                    <span>{{ level }}</span>
-                                                </button>
-                                            </div>
-                                        </transition>
+                                                />
+                                            </template>
+                                        </ZXDropdown>
+                                    </div>
+
+                                    <!-- 群开关：真寻在本群的总开关 -->
+                                    <div
+                                        class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:gap-3"
+                                    >
+                                        <div class="min-w-0 flex-1">
+                                            <p
+                                                class="text-xs font-bold text-slate-700 sm:text-sm"
+                                            >
+                                                群开关
+                                            </p>
+                                        </div>
+                                        <label
+                                            class="relative inline-flex shrink-0 cursor-pointer items-center"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                class="sr-only peer"
+                                                :checked="groupDetail.status"
+                                                @change="
+                                                    toggleGroupStatus(
+                                                        groups.find(
+                                                            (g) =>
+                                                                g.group_id ===
+                                                                selectedGroupId,
+                                                        )!,
+                                                    )
+                                                "
+                                            >
+                                            <div
+                                                class="h-5 w-9 rounded-full bg-slate-200 transition-colors after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-zx-primary peer-checked:after:translate-x-full sm:h-6 sm:w-11 sm:after:h-5 sm:after:w-5"
+                                            ></div>
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -1445,12 +1403,16 @@ onMounted(async () => {
                                     class="max-h-64 overflow-y-auto rounded-2xl bg-gray-50 p-2 sm:p-3"
                                 >
                                     <div
-                                        class="grid grid-cols-2 gap-1.5 min-[950px]:grid-cols-3 min-[1150px]:grid-cols-4 sm:gap-2"
+                                        :class="
+                                            embedded
+                                                ? 'grid grid-cols-2 gap-2'
+                                                : 'grid grid-cols-2 gap-1.5 min-[950px]:grid-cols-3 min-[1150px]:grid-cols-4 sm:gap-2'
+                                        "
                                     >
                                         <div
                                             v-for="plugin in filteredPlugins"
                                             :key="plugin.module"
-                                            class="flex flex-col justify-center rounded-2xl border border-gray-100 bg-white p-1.5 transition-all hover:border-slate-300 sm:p-2"
+                                            class="flex flex-col justify-center rounded-2xl border border-slate-200 bg-white p-1.5 transition-all sm:p-2"
                                         >
                                             <div
                                                 class="flex min-w-0 items-center gap-1 sm:gap-2"
@@ -1504,7 +1466,8 @@ onMounted(async () => {
                                     群成员列表 ({{ groupMembers.length }})
                                 </h3>
                                 <div
-                                    class="min-w-[800px] overflow-hidden rounded-2xl bg-gray-50"
+                                    class="overflow-hidden rounded-2xl bg-gray-50"
+                                    :class="!embedded && 'min-w-[800px]'"
                                 >
                                     <table class="w-full">
                                         <thead class="bg-gray-100">
@@ -1515,26 +1478,30 @@ onMounted(async () => {
                                                     成员
                                                 </th>
                                                 <th
-                                                    class="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
+                                                    class="px-2 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase sm:px-4"
                                                 >
                                                     角色
                                                 </th>
                                                 <th
+                                                    v-if="!embedded"
                                                     class="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
                                                 >
                                                     金币
                                                 </th>
                                                 <th
+                                                    v-if="!embedded"
                                                     class="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
                                                 >
                                                     好感度
                                                 </th>
                                                 <th
+                                                    v-if="!embedded"
                                                     class="px-4 py-3 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
                                                 >
                                                     状态
                                                 </th>
                                                 <th
+                                                    v-if="!embedded"
                                                     class="px-4 py-3 text-right text-xs font-medium tracking-wider text-gray-500 uppercase"
                                                 >
                                                     操作
@@ -1548,6 +1515,11 @@ onMounted(async () => {
                                                 v-for="member in paginatedMembers"
                                                 :key="member.user_id"
                                                 class="transition-colors hover:bg-gray-50"
+                                                :class="embedded && 'cursor-pointer'"
+                                                @click="
+                                                    embedded &&
+                                                        openMemberEdit(member)
+                                                "
                                             >
                                                 <td class="px-4 py-3">
                                                     <div
@@ -1584,11 +1556,11 @@ onMounted(async () => {
                                                             'rounded-full px-4 py-1 text-xs',
                                                             member.role ===
                                                             'owner'
-                                                                ? 'bg-red-100 text-red-600'
+                                                                ? 'bg-red-500 text-white'
                                                                 : member.role ===
                                                                     'administrator'
-                                                                  ? 'bg-zx-primary-soft text-zx-primary'
-                                                                  : 'bg-gray-100 text-gray-500',
+                                                                  ? 'bg-blue-500 text-white'
+                                                                  : 'bg-gray-200 text-gray-500',
                                                         ]"
                                                     >
                                                         {{
@@ -1602,7 +1574,10 @@ onMounted(async () => {
                                                         }}
                                                     </span>
                                                 </td>
-                                                <td class="px-4 py-3">
+                                                <td
+                                                    v-if="!embedded"
+                                                    class="px-4 py-3"
+                                                >
                                                     <div
                                                         class="flex items-center gap-1 text-sm text-gray-600"
                                                     >
@@ -1611,7 +1586,10 @@ onMounted(async () => {
                                                         }}</span>
                                                     </div>
                                                 </td>
-                                                <td class="px-4 py-3">
+                                                <td
+                                                    v-if="!embedded"
+                                                    class="px-4 py-3"
+                                                >
                                                     <div
                                                         class="flex items-center gap-1 text-sm text-gray-600"
                                                     >
@@ -1621,7 +1599,10 @@ onMounted(async () => {
                                                         }}</span>
                                                     </div>
                                                 </td>
-                                                <td class="px-4 py-3">
+                                                <td
+                                                    v-if="!embedded"
+                                                    class="px-4 py-3"
+                                                >
                                                     <span
                                                         v-if="member.is_banned"
                                                         class="rounded-full bg-red-100 px-4 py-1 text-xs text-red-600"
@@ -1636,6 +1617,7 @@ onMounted(async () => {
                                                     </span>
                                                 </td>
                                                 <td
+                                                    v-if="!embedded"
                                                     class="px-4 py-3 text-right"
                                                 >
                                                     <div

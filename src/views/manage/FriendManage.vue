@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { modalJelly } from "@/composables/useGsapTransition";
 import { computed, onMounted, ref } from "vue";
 import { Search, UserCircle, Users } from "lucide-vue-next";
 import { ZXMessageBox, ZXNotification } from "@/services/ui";
 import { manageApi } from "@/utils/api-next";
 import { useBotStore } from "@/store/bot";
 import type { Friend, FriendDetail } from "@/types/manage.types";
-import FriendCard from "@/components/zxcomponent/FriendCard/FriendCard.vue";
+import FriendCard from "@/views/manage/components/FriendCard/FriendCard.vue";
 import FriendDetailInfo from "@/components/manage/FriendDetailInfo.vue";
 import FriendTrendChart from "@/components/manage/FriendTrendChart.vue";
 
@@ -276,7 +277,7 @@ onMounted(() => {
 
         <!-- 发送消息对话框 -->
         <Teleport to="body">
-            <Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+            <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
                 <div v-if="sendMessageDialogOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <!-- 背景遮罩 -->
                     <div class="fixed inset-0 glass-overlay" @click="sendMessageDialogOpen = false"></div>

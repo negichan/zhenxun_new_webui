@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { modalJelly } from "@/composables/useGsapTransition";
 import { ref, computed, onMounted, watch } from 'vue'
 import {
     Info,
@@ -15,7 +16,7 @@ import { ZXNotification } from '@/services/ui'
 import { manageApi } from '@/utils/api-next'
 import { useBotStore } from '@/store/bot'
 import type { GroupDetailNew, GroupPlugin, GroupMember, MemberDetail, AnyMember } from '@/types/manage.types'
-import MemberCard from '@/components/zxcomponent/MemberCard/MemberCard.vue'
+import MemberCard from '@/views/manage/components/MemberCard/MemberCard.vue'
 
 const props = defineProps<{
     groupId: string
@@ -474,7 +475,7 @@ onMounted(() => {
 
         <!-- 成员详情对话框 -->
         <Teleport to="body">
-            <Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+            <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
                 <div v-if="memberDetailDialogOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <!-- 背景遮罩 -->
                     <div class="fixed inset-0 glass-overlay" @click="memberDetailDialogOpen = false"></div>

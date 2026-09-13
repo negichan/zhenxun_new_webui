@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { modalJelly } from "@/composables/useGsapTransition";
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { X, Save, RotateCcw, Search, Settings, Plus, Minus, Shield, SlidersHorizontal, ChevronDown, GripVertical } from 'lucide-vue-next'
 import { gsap } from 'gsap'
@@ -55,21 +56,21 @@ const levelOptions = Array.from({ length: 10 }, (_, i) => ({
 
 // 类型徽标：柔和着色胶囊，与插件卡的版本/内置徽标同语言
 const typeBadges: Record<string, { label: string; cls: string }> = {
-    int: { label: 'INTEGER', cls: 'bg-purple-100 text-purple-600' },
-    float: { label: 'FLOAT', cls: 'bg-blue-100 text-blue-600' },
-    bool: { label: 'BOOL', cls: 'bg-green-100 text-green-600' },
-    boolean: { label: 'BOOL', cls: 'bg-green-100 text-green-600' },
-    str: { label: 'STRING', cls: 'bg-gray-100 text-gray-500' },
-    string: { label: 'STRING', cls: 'bg-gray-100 text-gray-500' },
-    list: { label: 'LIST', cls: 'bg-orange-100 text-orange-600' },
-    dict: { label: 'DICT', cls: 'bg-cyan-100 text-cyan-600' },
-    json: { label: 'JSON', cls: 'bg-cyan-100 text-cyan-600' }
+    int: { label: 'INTEGER', cls: 'bg-purple-500 text-white' },
+    float: { label: 'FLOAT', cls: 'bg-blue-500 text-white' },
+    bool: { label: 'BOOL', cls: 'bg-green-500 text-white' },
+    boolean: { label: 'BOOL', cls: 'bg-green-500 text-white' },
+    str: { label: 'STRING', cls: 'bg-gray-400 text-white' },
+    string: { label: 'STRING', cls: 'bg-gray-400 text-white' },
+    list: { label: 'LIST', cls: 'bg-orange-500 text-white' },
+    dict: { label: 'DICT', cls: 'bg-cyan-500 text-white' },
+    json: { label: 'JSON', cls: 'bg-cyan-500 text-white' }
 }
 
 const typeBadge = (type?: string | null) =>
     typeBadges[(type || '').toLowerCase()] || {
         label: (type || 'ANY').toUpperCase(),
-        cls: 'bg-gray-100 text-gray-500'
+        cls: 'bg-gray-400 text-white'
     }
 
 // 搜索框快捷键（Ctrl/Cmd + K）
@@ -415,7 +416,7 @@ const getPlaceholder = (config: PluginDetailConfig) => {
 
 <template>
     <Teleport to="body">
-        <Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+        <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
             <div
                 v-if="internalVisible"
                 class="fixed inset-0 z-50 flex items-center justify-center"

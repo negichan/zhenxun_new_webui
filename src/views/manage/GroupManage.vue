@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { modalJelly } from "@/composables/useGsapTransition";
 import { ref, computed, onMounted } from 'vue'
 import { Search, Group } from 'lucide-vue-next'
 import { ZXNotification, ZXMessageBox } from '@/services/ui'
 import { manageApi } from '@/utils/api-next'
 import { useBotStore } from '@/store/bot'
 import type { Group as GroupType } from '@/types/manage.types'
-import GroupCard from '@/components/zxcomponent/GroupCard/GroupCard.vue'
+import GroupCard from '@/views/manage/components/GroupCard/GroupCard.vue'
 import GroupDetailModal from './GroupDetailModal.vue'
 
 const botStore = useBotStore()
@@ -208,7 +209,7 @@ onMounted(() => {
 
         <!-- 群组详情对话框 -->
         <Teleport to="body">
-            <Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+            <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
                 <div v-if="detailDialogOpen" class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
                     <!-- 背景遮罩 -->
                     <div class="fixed inset-0 glass-overlay" @click="detailDialogOpen = false"></div>
