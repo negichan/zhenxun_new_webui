@@ -181,6 +181,61 @@ export function useCustomCaret(editorRef: Ref<HTMLElement | null>) {
 
     const onBlur = () => hide();
 
+    /** Chrome 聚焦空 contenteditable 时会自动补一个 <br>：
+     *  编辑器被撑高一行、:empty 的占位符也会失效——聚焦瞬间移除它 */
+    const onEditorFocus = () => {
+        if (editor && editor.childNodes.length === 1) {
+            const first = editor.firstChild;
+            if (
+                first &&
+                first.nodeType === Node.ELEMENT_NODE &&
+                (first as HTMLElement).tagName === "BR"
+            ) {
+                first.remove();
+            }
+        }
+        update();
+    };
+
+    /** 内容是否还有东西：非空文本节点 / 图片算有，
+     *  占位 <br> 和空行块（<div><br></div>）不算 */
+    const hasContent = (node: Node): boolean => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            return (node.textContent ?? "").length > 0;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return false;
+        const el = node as HTMLElement;
+        if (el.tagName === "BR") return false;
+        if (el.tagName === "IMG") return true;
+        return Array.from(el.childNodes).some(hasContent);
+    };
+
+    /** 输入后把内容删空时，Chrome 会残留占位 <br> 或空行块，
+     *  编辑器空出一行、:empty 占位符失效——清成真空并复位光标 */
+    const normalizeEmpty = () => {
+        if (!editor) return;
+        if (
+            !editor.childNodes.length ||
+            Array.from(editor.childNodes).some(hasContent)
+        ) {
+            return;
+        }
+        editor.innerHTML = "";
+        const sel = window.getSelection();
+        if (sel && document.activeElement === editor) {
+            const range = document.createRange();
+            range.setStart(editor, 0);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+    };
+
+    const onInput = () => {
+        normalizeEmpty();
+        update();
+    };
+
     /** 编辑器元素可能随 v-if 出现/销毁，绑定与解绑都走这里 */
     const setup = (el: HTMLElement) => {
         editor = el;
@@ -211,8 +266,8 @@ export function useCustomCaret(editorRef: Ref<HTMLElement | null>) {
         document.addEventListener("selectionchange", update);
         window.addEventListener("resize", update);
         el.addEventListener("scroll", applyPosition);
-        el.addEventListener("input", update);
-        el.addEventListener("focus", update);
+        el.addEventListener("input", onInput);
+        el.addEventListener("focus", onEditorFocus);
         el.addEventListener("blur", onBlur);
         el.addEventListener("compositionstart", onCompositionStart);
         el.addEventListener("compositionend", onCompositionEnd);
@@ -223,8 +278,8 @@ export function useCustomCaret(editorRef: Ref<HTMLElement | null>) {
         window.removeEventListener("resize", update);
         if (editor) {
             editor.removeEventListener("scroll", applyPosition);
-            editor.removeEventListener("input", update);
-            editor.removeEventListener("focus", update);
+            editor.removeEventListener("input", onInput);
+            editor.removeEventListener("focus", onEditorFocus);
             editor.removeEventListener("blur", onBlur);
             editor.removeEventListener(
                 "compositionstart",

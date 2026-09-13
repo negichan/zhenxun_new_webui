@@ -13,6 +13,9 @@ import { themeApi, type ThemeConfig } from "@/utils/api-next";
 
 const THEME_STORAGE_KEY = "zhenxun-theme";
 const CUSTOM_COLOR_KEY = "zhenxun-custom-color";
+// 模式（light/dark/system）单独持久化：首次访问默认跟随系统，
+// 之后用户手动选了主题就由用户的选择接管
+const MODE_STORAGE_KEY = "zhenxun-theme-mode";
 // 多端统一开关跟随云端配置（本地缓存用于首屏），任意一端拨动都会同步到所有端
 const SYNC_ENABLED_KEY = "zhenxun-theme-sync";
 
@@ -51,12 +54,19 @@ export const useThemeStore = defineStore("theme", () => {
         () => customTheme.value || presets.value[activeThemeName.value],
     );
 
-    // 跟随系统：系统深浅切换时实时重应用当前自定义色
+    // 跟随系统：系统深浅切换时实时跟随（自定义色重生成，预设主题切换预设）
     systemDarkQuery?.addEventListener("change", (e) => {
         systemDark.value = e.matches;
-        if (customMode.value === "system" && customColor.value) {
+        if (customMode.value !== "system") return;
+        if (customColor.value) {
             applyCustomColorTheme(customColor.value, "system", true);
+            return;
         }
+        const name = systemDark.value ? "zhenxun-dark" : "zhenxun-light";
+        setTheme(name);
+        // setTheme 内会把模式按预设固定成 light/dark，拉回跟随系统
+        customMode.value = "system";
+        localStorage.setItem(MODE_STORAGE_KEY, "system");
     });
 
     function setTheme(name: ThemePresetName) {
@@ -68,6 +78,7 @@ export const useThemeStore = defineStore("theme", () => {
         // effectiveMode 依赖它，不同步会导致深色预设下仍按浅色计算
         customMode.value = name === "zhenxun-dark" ? "dark" : "light";
         localStorage.setItem(THEME_STORAGE_KEY, name);
+        localStorage.setItem(MODE_STORAGE_KEY, customMode.value);
         localStorage.removeItem(CUSTOM_COLOR_KEY);
     }
 
@@ -98,6 +109,7 @@ export const useThemeStore = defineStore("theme", () => {
                 JSON.stringify({ primary, mode }),
             );
         }
+        localStorage.setItem(MODE_STORAGE_KEY, mode);
     }
 
     function resetTheme() {
@@ -193,6 +205,7 @@ export const useThemeStore = defineStore("theme", () => {
     function initTheme() {
         const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
         const storedColor = localStorage.getItem(CUSTOM_COLOR_KEY);
+        const storedMode = localStorage.getItem(MODE_STORAGE_KEY);
 
         if (storedColor) {
             try {
@@ -204,8 +217,18 @@ export const useThemeStore = defineStore("theme", () => {
             }
         } else if (storedTheme && isThemePresetName(storedTheme)) {
             setTheme(storedTheme);
+            // 恢复"跟随系统"：按当前系统偏好落到对应预设，并保持 system 模式
+            if (storedMode === "system") {
+                const name = systemDark.value ? "zhenxun-dark" : "zhenxun-light";
+                applyThemePreset(name);
+                activeThemeName.value = name;
+                customMode.value = "system";
+            }
         } else {
-            setTheme(defaultTheme.name);
+            // 首次访问（无任何本地主题记录）：默认跟随系统设置
+            setTheme(systemDark.value ? "zhenxun-dark" : "zhenxun-light");
+            customMode.value = "system";
+            localStorage.setItem(MODE_STORAGE_KEY, "system");
         }
 
         // 开关状态与主题以云端为准（其他端操作过也能对齐）

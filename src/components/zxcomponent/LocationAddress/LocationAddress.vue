@@ -1,6 +1,6 @@
 <template>
     <Teleport to="body">
-        <Transition appear name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+        <Transition appear :css="false" @appear="modalJelly.onEnter" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
             <div v-if="visible" class="LocationAddress fixed inset-0 flex items-center justify-center z-50">
                 <div v-if="bg_visible" ref="bgRef" class="bg glass-overlay w-full h-full absolute -z-1"
                      @click="onCancel"></div>
@@ -100,6 +100,7 @@
 </template>
 
 <script setup>
+import { modalJelly } from "@/composables/useGsapTransition";
 import { ref, watch, computed } from "vue";
 import { getWsBaseUrl, updateApiBaseUrl, getPort, getBaseUrl, setBaseApiUrl, setPort } from "@/utils/api-next/client";
 import ZXNotification from "components/zxcomponent/Notification";

@@ -92,3 +92,16 @@ body {
 }
 
 
+
+/* ==================== 全局动画开关（低性能设备适配） ==================== */
+/* html.zx-no-anim 时压平所有 CSS 过渡/动画。duration 用 0.01ms 而非 none，
+   保证 transitionend/animationend 事件照常触发，Vue Transition 不会卡壳 */
+.zx-no-anim *,
+.zx-no-anim *::before,
+.zx-no-anim *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+}

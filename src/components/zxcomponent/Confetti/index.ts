@@ -1,5 +1,6 @@
 import { createVNode, render, ComponentInternalInstance } from 'vue'
 import { ZXConfettiExposed, ZXConfettiOptions, ZXConfettiFn } from './types'
+import { animationsEnabled } from '@/store/global'
 
 
 
@@ -46,6 +47,8 @@ function baseConfetti(options: ZXConfettiOptions = {}) {
 
 
 const ZXConfetti = ((options?: ZXConfettiOptions) => {
+    // 动画开关关闭（低性能设备适配）：不撒彩带
+    if (!animationsEnabled()) return;
     baseConfetti(options ?? {})
 }) as ZXConfettiFn
 

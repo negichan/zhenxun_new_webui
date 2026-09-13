@@ -161,6 +161,18 @@ export function generateThemeFromColors(
         "--zx-color-danger-soft": isDark ? "#7f1d1d" : "#fee2e2",
         "--zx-color-info": isDark ? "#22d3ee" : "#06b6d4",
         "--zx-color-info-soft": isDark ? "#164e63" : "#cffafe",
+        "--zx-color-purple": isDark ? "#a78bfa" : "#8b5cf6",
+        "--zx-color-purple-soft": isDark ? "#2e1065" : "#ede9fe",
+        "--zx-color-cyan": isDark ? "#22d3ee" : "#06b6d4",
+        "--zx-color-cyan-soft": isDark ? "#164e63" : "#cffafe",
+        "--zx-color-on-success": isDark ? "#27272a" : "#ffffff",
+        "--zx-color-on-warning": isDark ? "#27272a" : "#ffffff",
+        "--zx-color-on-danger": isDark ? "#27272a" : "#ffffff",
+        "--zx-color-on-info": isDark ? "#27272a" : "#ffffff",
+        "--zx-color-on-purple": isDark ? "#27272a" : "#ffffff",
+        "--zx-color-on-cyan": isDark ? "#27272a" : "#ffffff",
+        "--zx-color-neutral": isDark ? "#4b5563" : "#9ca3af",
+        "--zx-color-on-neutral": isDark ? "#f8fafc" : "#333333",
 
         // UI Chrome - 根据主色亮度自动计算对比色
         "--zx-color-active": isDark ? "#ffffff" : "#000000",

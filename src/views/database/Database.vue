@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { modalJelly } from "@/composables/useGsapTransition";
 import { computed, onMounted, ref } from "vue";
 import {
     CheckCircle,
@@ -703,7 +704,7 @@ onMounted(() => {
             </section>
         </div>
 
-        <Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">
+        <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
             <div
                 v-if="showSqlLog"
                 class="glass-overlay fixed inset-0 z-50 flex items-center justify-center p-4"

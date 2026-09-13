@@ -36,6 +36,8 @@ const isActive = computed(
 
 const startAnim = () => {
     if (!iconRef.value) return;
+    // 动画开关关闭：不播放呼吸/箭头动画
+    if (!globalStore.animationsEnabled) return;
     if (globalStore.activeMenuKey) {
         stopAnim();
     }
@@ -163,7 +165,7 @@ onUnmounted(() => stopAnim());
     <div class="snap-start">
         <div
             v-tile-glow
-            class="menus-item group flex cursor-pointer items-center rounded-full border transition-[transform,border-color,box-shadow,height,width,padding] duration-[400ms] ease-in-out"
+            class="menus-item group flex cursor-pointer items-center rounded-full border transition-[transform,box-shadow,height,width,padding] duration-[400ms] ease-in-out"
             :class="{
                 'h-12 w-12 justify-center p-0': globalStore.navMini,
                 'h-14 w-full p-1': !globalStore.navMini,
@@ -189,7 +191,7 @@ onUnmounted(() => stopAnim());
                         : 'border border-transparent',
                     globalStore.navMini ? 'h-12 w-12 p-0' : 'p-3.5',
                 ]"
-                class="icon flex items-center justify-center rounded-full transition-[width,height,padding,background-color,color,border-color,box-shadow] duration-[400ms] ease-in-out group-hover:bg-zx-nav-icon-hover group-hover:text-[color:var(--zx-nav-icon-hover-text)]"
+                class="icon flex items-center justify-center rounded-full transition-[width,height,padding,box-shadow] duration-[400ms] ease-in-out group-hover:bg-zx-nav-icon-hover group-hover:text-[color:var(--zx-nav-icon-hover-text)]"
             >
                 <component :is="item.icon" class="h-5 w-5" />
             </div>
@@ -248,7 +250,7 @@ onUnmounted(() => stopAnim());
                         v-for="child in item.children"
                         :key="child.key"
                         :title="child.name"
-                        class="group/child flex cursor-pointer items-center rounded-full border transition-all duration-300 ease-in-out"
+                        class="group/child flex cursor-pointer items-center rounded-full border transition-[box-shadow] duration-300 ease-in-out"
                         :class="[
                             globalStore.navMini
                                 ? 'h-10 w-10 justify-center'
@@ -260,7 +262,7 @@ onUnmounted(() => stopAnim());
                         @click.stop="handleChildClick(child)"
                     >
                         <div
-                            class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors duration-300"
+                            class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
                             :class="
                                 child.key === globalStore.activeMenuKey
                                     ? 'bg-zx-nav-icon-hover text-[color:var(--zx-nav-icon-hover-text)]'

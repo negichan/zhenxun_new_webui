@@ -9,7 +9,9 @@ import "element-plus/es/components/loading/style/css.mjs";
 import { registerEvent } from "@/events";
 import { vOdometer } from "@/directives/odometer.ts";
 import { initTileGlowAuto, vTileGlow } from "@/directives/tileGlow";
+import { vImageViewer } from "@/directives/imageViewer";
 import { useThemeStore } from "@/store/theme";
+import { useGlobalStore } from "@/store/global.ts";
 
 const app = createApp(App);
 const pinia = createPinia();
@@ -19,9 +21,13 @@ app.use(pinia);
 app.use(ElLoading);
 
 useThemeStore(pinia).initTheme();
+// 提前实例化 global store：动画开关的 html class 同步要在登录页等
+// 尚无人使用该 store 的页面也生效
+useGlobalStore(pinia);
 
 app.directive("odometer", vOdometer);
 app.directive("tile-glow", vTileGlow);
+app.directive("image-viewer", vImageViewer);
 
 app.mount("#app");
 

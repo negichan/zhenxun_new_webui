@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { zxDDPop } from "@/composables/useGsapTransition";
 /**
  * ZXDropdown - 轻量下拉选择
  *
@@ -118,7 +119,7 @@ onUnmounted(() => {
     </button>
 
     <Teleport to="body">
-        <Transition name="zx-dd-pop">
+        <Transition :css="false" @enter="zxDDPop.onEnter" @leave="zxDDPop.onLeave">
             <div
                 v-if="open"
                 ref="panelRef"
@@ -150,16 +151,5 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.zx-dd-pop-enter-active,
-.zx-dd-pop-leave-active {
-    transition:
-        opacity 0.12s ease,
-        transform 0.12s ease;
-}
 
-.zx-dd-pop-enter-from,
-.zx-dd-pop-leave-to {
-    opacity: 0;
-    transform: scale(0.92) translateY(-4px);
-}
 </style>

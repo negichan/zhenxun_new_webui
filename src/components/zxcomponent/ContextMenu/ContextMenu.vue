@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ctxPop } from "@/composables/useGsapTransition";
 /**
  * 全局右键菜单面板（单例，由 index.ts 挂载并驱动 state）
  * 位置自动防溢出；点击菜单外 / Escape / 滚动 / 窗口缩放时关闭
@@ -75,7 +76,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <Transition name="ctx-pop">
+    <Transition :css="false" @enter="ctxPop.onEnter" @leave="ctxPop.onLeave">
         <div
             v-if="state.visible"
             ref="menuRef"
@@ -104,16 +105,5 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.ctx-pop-enter-active,
-.ctx-pop-leave-active {
-    transition:
-        opacity 0.12s ease,
-        transform 0.12s ease;
-}
 
-.ctx-pop-enter-from,
-.ctx-pop-leave-to {
-    opacity: 0;
-    transform: scale(0.92) translateY(-4px);
-}
 </style>
