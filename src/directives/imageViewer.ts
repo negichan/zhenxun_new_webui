@@ -41,6 +41,13 @@ function resolveSrc(el: HTMLElement): string {
     return img ? img.currentSrc || img.src : "";
 }
 
+/** 命令式打开全局查看器（无对应 DOM 元素时使用，如文件页的 base64 图片） */
+export function openImageViewer(urls: string | string[], initial = 0) {
+    ensure();
+    if (!vm) return;
+    vm.open(urls, initial);
+}
+
 function openFrom(el: HTMLElement, value: string | undefined) {
     ensure();
     if (!vm) return;

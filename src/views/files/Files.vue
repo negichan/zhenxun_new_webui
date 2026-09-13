@@ -9,7 +9,7 @@ import { useFilesStore } from "@/store/files";
 import { useGlobalStore } from "@/store/global.ts";
 import FileBreadcrumbBar from "./FileBreadcrumbBar.vue";
 import FileListPanel from "./FileListPanel.vue";
-import ImagePreviewModal from "./ImagePreviewModal.vue";
+import { openImageViewer } from "@/directives/imageViewer";
 import NewItemDialog from "./NewItemDialog.vue";
 import RenameDialog from "./RenameDialog.vue";
 
@@ -86,7 +86,6 @@ const selectAll = () => {
 
 const hasAnyModalOpen = () =>
     showEditor.value ||
-    showImagePreview.value ||
     showNewDialog.value ||
     showRenameDialog.value ||
     showArchivePreview.value;
@@ -111,11 +110,6 @@ const editorInitialFile = ref<{
     name: string;
     content?: string;
 } | null>(null);
-
-const showImagePreview = ref(false);
-const currentImageUrl = ref("");
-const currentImageName = ref("");
-const imageLoading = ref(false);
 
 const newItemType = ref<"file" | "folder">("file");
 const newItemName = ref("");
@@ -238,18 +232,15 @@ const openEditor = async (file: FileItem) => {
     const fullPath = resolveFilePath(file);
 
     if (file.is_image) {
-        imageLoading.value = true;
-
         try {
             const res = await fileApi.readFile(fullPath, {
                 skipInterceptor: true,
                 as_image: true,
             });
 
-            if (res?.success && res?.data) {
-                currentImageUrl.value = res.data.content || "";
-                currentImageName.value = file.name;
-                showImagePreview.value = true;
+            if (res?.success && res?.data && res.data.content) {
+                // 复用聊天界面的全局图片查看器（缩放/旋转/左右翻页）
+                openImageViewer([res.data.content]);
             }
         } catch (error) {
             ZXNotification({
@@ -258,8 +249,6 @@ const openEditor = async (file: FileItem) => {
                 type: "😭",
                 position: "top-right",
             });
-        } finally {
-            imageLoading.value = false;
         }
 
         return;
@@ -661,14 +650,6 @@ onBeforeUnmount(() => {
             v-if="showEditor"
             :initial-file="editorInitialFile"
             @close="showEditor = false"
-        />
-
-        <ImagePreviewModal
-            v-model="showImagePreview"
-            :image-name="currentImageName"
-            :image-url="currentImageUrl"
-            :loading="imageLoading"
-            @loaded="imageLoading = false"
         />
 
         <ArchivePreviewModal
