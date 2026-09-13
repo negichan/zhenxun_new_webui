@@ -301,11 +301,7 @@ onMounted(() => {
                     >
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-medium text-gray-600">群状态</span>
-                            <el-switch
-                                v-model="groupDetail.status"
-                                @change="updateGroupStatus"
-                                size="small"
-                            />
+                            <ZxSwitch v-model="groupDetail.status" @change="updateGroupStatus" />
                         </div>
                         <p class="text-xs" :class="groupDetail.status ? 'text-green-600' : 'text-gray-400'">
                             {{ groupDetail.status ? '已启用' : '已禁用' }}
@@ -320,11 +316,7 @@ onMounted(() => {
                     >
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-medium text-gray-600">超级用户指定</span>
-                            <el-switch
-                                v-model="groupDetail.is_super"
-                                @change="updateGroupStatus"
-                                size="small"
-                            />
+                            <ZxSwitch v-model="groupDetail.is_super" @change="updateGroupStatus" />
                         </div>
                         <p class="text-xs" :class="groupDetail.is_super ? 'text-purple-600' : 'text-gray-400'">
                             {{ groupDetail.is_super ? '已开启' : '已关闭' }}
@@ -339,11 +331,7 @@ onMounted(() => {
                     >
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-medium text-gray-600">被动任务</span>
-                            <el-switch
-                                v-model="groupDetail.block_task"
-                                @change="updateGroupStatus"
-                                size="small"
-                            />
+                            <ZxSwitch v-model="groupDetail.block_task" @change="updateGroupStatus" />
                         </div>
                         <p class="text-xs" :class="groupDetail.block_task ? 'text-gray-400' : 'text-blue-600'">
                             {{ groupDetail.block_task ? '已禁用' : '已启用' }}
@@ -358,11 +346,7 @@ onMounted(() => {
                     >
                         <div class="flex items-center justify-between mb-2">
                             <span class="text-xs font-medium text-gray-600">插件功能</span>
-                            <el-switch
-                                v-model="groupDetail.block_plugin"
-                                @change="updateGroupStatus"
-                                size="small"
-                            />
+                            <ZxSwitch v-model="groupDetail.block_plugin" @change="updateGroupStatus" />
                         </div>
                         <p class="text-xs" :class="groupDetail.block_plugin ? 'text-gray-400' : 'text-orange-600'">
                             {{ groupDetail.block_plugin ? '已禁用' : '已启用' }}
@@ -384,7 +368,10 @@ onMounted(() => {
                         <span class="text-xs text-gray-500">被动：<span class="font-medium text-slate-600">{{ taskCount }}</span></span>
                     </div>
                 </div>
-                <div class="plugin-list min-h-[120px] max-h-80 overflow-y-auto rounded-2xl border border-gray-100 bg-gray-50 p-2" v-loading="pluginsLoading">
+                <div class="plugin-list relative min-h-[120px] max-h-80 overflow-y-auto rounded-2xl border border-gray-100 bg-gray-50 p-2">
+                    <div v-if="pluginsLoading" class="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/60">
+                        <span class="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-zx-primary"></span>
+                    </div>
                     <template v-if="plugins.length > 0">
                         <div
                             v-for="plugin in plugins"
@@ -420,11 +407,10 @@ onMounted(() => {
                                     <span class="text-xs text-gray-400 font-mono">{{ plugin.module }}</span>
                                 </div>
                             </div>
-                            <el-switch
+                            <ZxSwitch
                                 v-model="plugin.is_blocked"
                                 :disabled="!plugin.module"
-                                @change="togglePlugin"
-                                size="small"
+                                @change="() => togglePlugin(plugin)"
                             />
                         </div>
                     </template>
@@ -455,7 +441,10 @@ onMounted(() => {
                     />
                 </div>
 
-                <div class="member-list min-h-[120px] max-h-80 overflow-y-auto rounded-2xl border border-gray-100 bg-gray-50 p-2" v-loading="membersLoading">
+                <div class="member-list relative min-h-[120px] max-h-80 overflow-y-auto rounded-2xl border border-gray-100 bg-gray-50 p-2">
+                    <div v-if="membersLoading" class="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/60">
+                        <span class="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-zx-primary"></span>
+                    </div>
                     <template v-if="filteredMembers.length > 0">
                         <div class="space-y-2">
                             <MemberCard
@@ -512,12 +501,11 @@ onMounted(() => {
                                             <Coins class="w-4 h-4 text-zx-primary" />
                                             <span class="text-xs font-medium text-gray-600">金币数量</span>
                                         </div>
-                                        <el-input-number
+                                        <ZxInputNumber
                                             v-model="memberForm.gold"
                                             :min="0"
-                                            size="small"
-                                            controls-position="right"
-                                            class="bg-white rounded-2xl"
+                                            :step="100"
+                                            class="bg-white"
                                         />
                                     </div>
                                 </div>
@@ -529,12 +517,11 @@ onMounted(() => {
                                             <Heart class="w-4 h-4 text-zx-primary" />
                                             <span class="text-xs font-medium text-gray-600">好感度/权限等级</span>
                                         </div>
-                                        <el-input-number
+                                        <ZxInputNumber
                                             v-model="memberForm.favorability"
                                             :min="0"
-                                            size="small"
-                                            controls-position="right"
-                                            class="bg-white rounded-2xl"
+                                            :step="10"
+                                            class="bg-white"
                                         />
                                     </div>
                                 </div>
@@ -544,8 +531,8 @@ onMounted(() => {
 
                     <!-- 底部操作栏 -->
                     <div class="flex items-center justify-end gap-2 px-6 py-4 bg-gray-50 border-t border-gray-100">
-                        <el-button @click="memberDetailDialogOpen = false" round>取消</el-button>
-                        <el-button @click="saveMemberData" type="primary" round>保存</el-button>
+                        <ZxButton variant="ghost" @click="memberDetailDialogOpen = false">取消</ZxButton>
+                        <ZxButton @click="saveMemberData">保存</ZxButton>
                     </div>
                 </div>
             </Transition>
@@ -630,16 +617,5 @@ onMounted(() => {
     margin: 2px 0 0;
     font-size: 11px;
     color: #9ca3af;
-}
-
-:deep(.el-input-number__decrease),
-:deep(.el-input-number__increase) {
-    background: #f9fafb;
-    border-color: var(--zx-color-border);
-}
-
-:deep(.el-input-number__decrease:hover),
-:deep(.el-input-number__increase:hover) {
-    background: #f3f4f6;
 }
 </style>

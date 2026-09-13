@@ -128,6 +128,15 @@ const members = computed(() => {
     });
 });
 
+// 发送人筛选下拉选项："" 表示全部（替代原 el-select 的 clearable 语义）
+const memberFilterOptions = computed(() => [
+    { label: "全部发送人", value: "" },
+    ...members.value.map((member) => ({
+        label: member.name,
+        value: member.id,
+    })),
+]);
+
 const hasMedia = (m: ChatMessage) =>
     m.message_type === "image" ||
     m.message_type === "video" ||
@@ -519,19 +528,21 @@ watch(
                                     发送人
                                 </p>
                                 <div class="flex items-center gap-1.5">
-                                    <el-select
+                                    <ZXDropdown
                                         v-model="filterMember"
+                                        :options="memberFilterOptions"
                                         placeholder="选择发送人"
-                                        clearable
-                                        filterable
-                                        size="small"
-                                        class="min-w-0 flex-1"
+                                        trigger-class="min-w-0 flex-1 justify-between gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 transition-colors hover:border-slate-300 focus-within:bg-white"
                                     >
-                                        <el-option
-                                            v-for="member in members"
-                                            :key="member.id"
-                                            :label="member.name"
-                                            :value="member.id"
+                                        <template
+                                            #option="{
+                                                option,
+                                            }: {
+                                                option: {
+                                                    label: string;
+                                                    value: string;
+                                                };
+                                            }"
                                         >
                                             <span
                                                 class="flex items-center gap-1.5"
@@ -539,17 +550,17 @@ watch(
                                                 <Pin
                                                     v-if="
                                                         pinnedMembers.includes(
-                                                            member.id,
+                                                            option.value,
                                                         )
                                                     "
                                                     class="h-3 w-3 shrink-0 text-zx-primary"
                                                 />
                                                 <span class="truncate">{{
-                                                    member.name
+                                                    option.label
                                                 }}</span>
                                             </span>
-                                        </el-option>
-                                    </el-select>
+                                        </template>
+                                    </ZXDropdown>
                                     <button
                                         v-if="filterMember"
                                         class="btn-touch flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100"

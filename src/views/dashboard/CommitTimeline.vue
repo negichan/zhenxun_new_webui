@@ -66,33 +66,30 @@ function formatTime(dateStr: string) {
         </div>
 
         <div class="min-h-0 flex-1 overflow-hidden">
-            <el-skeleton :loading="loading" animated :count="10">
-                <template #template>
-                    <div class="mb-6 flex gap-3">
-                        <div class="flex flex-col items-center">
-                            <el-skeleton-item
-                                variant="circle"
-                                style="width: 12px; height: 12px"
-                            />
-                            <div class="mt-1 h-12 w-px bg-slate-100"></div>
-                        </div>
-                        <div class="flex-1">
-                            <el-skeleton-item
-                                variant="text"
-                                style="width: 80%; margin-bottom: 8px"
-                            />
-                            <el-skeleton-item
-                                variant="text"
-                                style="width: 40%"
-                            />
-                        </div>
+            <!-- 加载骨架屏（替代 el-skeleton） -->
+            <div v-if="loading" class="pt-2 pr-2">
+                <div v-for="i in 10" :key="i" class="mb-6 flex gap-3">
+                    <div class="flex flex-col items-center">
+                        <span
+                            class="h-3 w-3 animate-pulse rounded-full bg-slate-200"
+                        ></span>
+                        <div class="mt-1 h-12 w-px bg-slate-100"></div>
                     </div>
-                </template>
+                    <div class="flex-1">
+                        <div
+                            class="mb-2 h-3 w-4/5 animate-pulse rounded bg-slate-200"
+                        ></div>
+                        <div
+                            class="h-3 w-2/5 animate-pulse rounded bg-slate-200"
+                        ></div>
+                    </div>
+                </div>
+            </div>
 
-                <template #default>
-                    <ul
-                        class="custom-scrollbar h-full space-y-3 overflow-y-auto pt-2 pr-2"
-                    >
+            <ul
+                v-else
+                class="custom-scrollbar h-full space-y-3 overflow-y-auto pt-2 pr-2"
+            >
                         <li
                             v-for="(item, index) in list"
                             :key="index"
@@ -128,17 +125,9 @@ function formatTime(dateStr: string) {
                                         v-if="!avatarLoadedMap[index]"
                                         class="mr-1 h-4 w-4"
                                     >
-                                        <el-skeleton animated>
-                                            <template #template>
-                                                <el-skeleton-item
-                                                    variant="circle"
-                                                    style="
-                                                        width: 16px;
-                                                        height: 16px;
-                                                    "
-                                                />
-                                            </template>
-                                        </el-skeleton>
+                                        <span
+                                            class="block h-4 w-4 animate-pulse rounded-full bg-slate-200"
+                                        ></span>
                                     </div>
 
                                     <img
@@ -157,8 +146,6 @@ function formatTime(dateStr: string) {
                             </div>
                         </li>
                     </ul>
-                </template>
-            </el-skeleton>
         </div>
     </div>
 </template>

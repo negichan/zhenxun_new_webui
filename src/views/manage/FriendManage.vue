@@ -304,17 +304,15 @@ onMounted(() => {
                                     <span class="message-target-id">{{ currentFriend.user_id }}</span>
                                 </div>
                             </div>
-                            <el-input
+                            <textarea
                                 v-model="messageContent"
-                                type="textarea"
+                                rows="6"
                                 placeholder="输入消息内容..."
-                                :rows="6"
-                                resize="vertical"
-                                class="message-input"
-                            />
+                                class="message-input w-full resize-y rounded-2xl border bg-white px-3 py-2 text-sm text-gray-700 transition-all placeholder:text-gray-400 focus:outline-none"
+                            ></textarea>
                             <div class="dialog-actions">
-                                <el-button @click="sendMessageDialogOpen = false" round>取消</el-button>
-                                <el-button @click="confirmSendMessage" type="primary" round>发送</el-button>
+                                <ZxButton variant="ghost" @click="sendMessageDialogOpen = false">取消</ZxButton>
+                                <ZxButton @click="confirmSendMessage">发送</ZxButton>
                             </div>
                         </div>
                     </div>
@@ -359,12 +357,11 @@ onMounted(() => {
     font-family: monospace;
 }
 
-.message-input :deep(.el-textarea__inner) {
-    border-radius: 12px;
+.message-input {
     border-color: var(--zx-color-border);
 }
 
-.message-input :deep(.el-textarea__inner:focus) {
+.message-input:focus {
     border-color: var(--zx-color-primary);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--zx-color-primary) 16%, transparent);
 }

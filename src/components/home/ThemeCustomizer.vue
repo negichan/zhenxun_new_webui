@@ -288,11 +288,9 @@ function onSyncToggle(value: string | number | boolean) {
                     </div>
                 </div>
             </div>
-            <el-switch
+            <ZxSwitch
                 :model-value="themeStore.syncEnabled"
-                size="small"
-                style="--el-switch-on-color: var(--zx-color-primary); --el-switch-off-color: var(--zx-color-border)"
-                @change="onSyncToggle"
+                @update:model-value="onSyncToggle"
             />
         </div>
 

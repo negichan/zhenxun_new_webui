@@ -348,6 +348,22 @@ const setDefaultTimeRange = (hours: number = 30 * 24) => {
     endTime.value = formatToISOString(end);
 };
 
+// 原生 datetime-local 绑定（替代 el-date-picker）：值格式与
+// formatToISOString 一致（YYYY-MM-DDTHH:mm:ss），浏览器省略秒时补 :00
+const startTimeLocal = computed({
+    get: () => (startTime.value || "").slice(0, 19),
+    set: (v: string) => {
+        startTime.value = v ? (v.length === 16 ? `${v}:00` : v) : "";
+    },
+});
+
+const endTimeLocal = computed({
+    get: () => (endTime.value || "").slice(0, 19),
+    set: (v: string) => {
+        endTime.value = v ? (v.length === 16 ? `${v}:00` : v) : "";
+    },
+});
+
 /**
  * 根据时间范围自动计算合适的时间粒度
  */
@@ -774,25 +790,23 @@ onMounted(() => {
                 <div class="flex items-center space-x-2">
                     <Clock class="h-4 w-4 text-gray-500" />
                     <label class="text-sm text-gray-600">起始时间:</label>
-                    <el-date-picker
-                        v-model="startTime"
-                        type="datetime"
+                    <input
+                        v-model="startTimeLocal"
+                        type="datetime-local"
+                        step="1"
                         placeholder="选择起始时间"
-                        format="YYYY-MM-DD HH:mm:ss"
-                        value-format="YYYY-MM-DDTHH:mm:ss"
-                        class="w-[200px]"
+                        class="w-[200px] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-gray-700 transition-colors focus:bg-white focus:outline-none"
                     />
                 </div>
                 <div class="flex items-center space-x-2">
                     <Calendar class="h-4 w-4 text-gray-500" />
                     <label class="text-sm text-gray-600">结束时间:</label>
-                    <el-date-picker
-                        v-model="endTime"
-                        type="datetime"
+                    <input
+                        v-model="endTimeLocal"
+                        type="datetime-local"
+                        step="1"
                         placeholder="选择结束时间"
-                        format="YYYY-MM-DD HH:mm:ss"
-                        value-format="YYYY-MM-DDTHH:mm:ss"
-                        class="w-[200px]"
+                        class="w-[200px] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-gray-700 transition-colors focus:bg-white focus:outline-none"
                     />
                 </div>
                 <button

@@ -6,7 +6,6 @@ import { fileURLToPath, URL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
-import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 // import minipic from "vite-plugin-minipic";
 import compression from "vite-plugin-compression2";
 
@@ -136,9 +135,7 @@ export default defineConfig(({ command }) =>({
             imports: ["vue", "vue-router", "pinia"],
             dts: true,
         }),
-        Components({
-            resolvers: [ElementPlusResolver()],
-        }),
+        Components(),
         // minipic(), // 图片压缩插件
         compression({
             threshold: 2000, // 只有大于 2kb 的文件才压缩
@@ -151,48 +148,42 @@ export default defineConfig(({ command }) =>({
     ],
     base: command === "build" ? "/next/" : "/",
     build: {
-        minify: "terser",
-        terserOptions: {
-            compress: {
-                drop_console: true, // 移除 console.*
-                drop_debugger: true, // 移除 debugger;
-            },
-        },
-        rollupOptions: {
+        // 压缩走 Rolldown 内置 Oxc Minifier（build.minify 默认 'oxc'），
+        // 细粒度选项写在 rolldownOptions.output.minify，用户配置会覆盖内部默认值
+        rolldownOptions: {
             output: {
-                manualChunks(id) {
-                    if (!id.includes("node_modules")) return;
-
-                    if (
-                        id.includes("chart.js") ||
-                        id.includes("vue-chartjs")
-                    ) {
-                        return "vendor_charts";
-                    }
-
-                    if (id.includes("element-plus")) {
-                        return "vendor_element";
-                    }
-
-                    if (
-                        id.includes("/vue/") ||
-                        id.includes("vue-router") ||
-                        id.includes("pinia")
-                    ) {
-                        return "vendor_vue";
-                    }
-
-                    if (id.includes("gsap")) {
-                        return "vendor_animation";
-                    }
-
-                    if (id.includes("lucide-vue-next")) {
-                        return "vendor_icons";
-                    }
-
-                    if (id.includes("axios") || id.includes("js-yaml")) {
-                        return "vendor_utils";
-                    }
+                minify: {
+                    compress: {
+                        dropConsole: true, // 移除 console.*
+                        dropDebugger: true, // 移除 debugger;
+                    },
+                    mangle: true,
+                    codegen: true,
+                },
+                // 原 manualChunks 的分组语义原样迁移（Rolldown 已不支持 manualChunks）
+                codeSplitting: {
+                    groups: [
+                        {
+                            name: "vendor_charts",
+                            test: /node_modules[\\/](chart\.js|vue-chartjs)/,
+                        },
+                        {
+                            name: "vendor_vue",
+                            test: /node_modules[\\/](vue[\\/]|vue-router|pinia)/,
+                        },
+                        {
+                            name: "vendor_animation",
+                            test: /node_modules[\\/]gsap/,
+                        },
+                        {
+                            name: "vendor_icons",
+                            test: /node_modules[\\/]lucide-vue-next/,
+                        },
+                        {
+                            name: "vendor_utils",
+                            test: /node_modules[\\/](axios|js-yaml)/,
+                        },
+                    ],
                 },
             },
         },

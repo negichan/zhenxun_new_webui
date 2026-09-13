@@ -74,11 +74,13 @@
 
 ## 表单控件
 
-- 输入框：`ZXInput`（方框）或富文本 `rich-editor`（聊天输入）；
-- 下拉：`ZXDropdown`（`@/components/zxcomponent/ZXDropdown`，支持 `trigger-class`、`slots.trigger`）；
-- 开关：Element Plus `el-switch`（`--el-switch-on-color: var(--zx-color-primary)`）或纯 Tailwind peer 写法（`peer-checked:bg-zx-primary`）；
-- 日期选择：自制 `MiniDatePicker.vue`（不使用 el-date-picker 新增依赖面）；
+- 输入框：`ZXInput`（方框）、`ZxInputNumber`（数字步进器）或富文本 `rich-editor`（聊天输入）；
+- 下拉：`ZXDropdown`（`@/components/zxcomponent/ZXDropdown`，支持 `trigger-class`、`slots.trigger`、`slots.option`）；
+- 开关：`ZxSwitch`（`src/components/zxcomponent/ZxSwitch.vue`，`v-model` + `@change`）；页内一次性开关也可用纯 Tailwind peer 写法（`peer-checked:bg-zx-primary`）；
+- 日期选择：自制 `MiniDatePicker.vue`（日期）；精确到时分秒的范围筛选用原生 `<input type="datetime-local" step="1">`；
 - 代码编辑器：`ZXTextEditor`（monaco 引擎，CDN 优先 npmmirror→jsdelivr、失败回退本地打包；markdown 文件内置"编辑/预览"分段切换）。主题用 `zx-light`/`zx-dark`（defineTheme 读 `--zx-color-*`），跟随应用深浅色。`monacoLoader.ts` 的 `MONACO_VERSION` 必须与 package.json 版本同步。
+
+> 项目已移除 Element Plus 依赖，禁止再引入任何 `el-*` 组件；加载态用 `animate-spin` 圆环遮罩，骨架屏用 `animate-pulse` 色块，图片加载失败/占位态手写（配合 `v-image-viewer` 双击查看）。
 
 ## 列表性能（UI 层约定）
 

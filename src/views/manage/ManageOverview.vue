@@ -287,10 +287,7 @@ const switchTab = (tab: TabType) => {
     loadData();
 };
 
-// el-tabs 切换回调
-const onTabChange = (name: TabType) => {
-    switchTab(name);
-};
+// 标签页切换回调直接用 switchTab（模板里 onClick 调用）
 
 // 选中群组
 const selectGroup = async (group: GroupType) => {
@@ -902,34 +899,34 @@ onMounted(async () => {
                 ]"
             >
                 <!-- 标签页切换 -->
-                <el-tabs
-                    v-model="activeTab"
-                    class="manage-tabs"
-                    @tab-change="onTabChange"
-                >
-                    <el-tab-pane name="groups">
-                        <template #label>
-                            <span class="tab-label">
-                                <Group class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                <span class="text-xs sm:text-sm">群组</span>
-                                <span class="tab-count">{{
-                                    groupStats.total
-                                }}</span>
-                            </span>
-                        </template>
-                    </el-tab-pane>
-                    <el-tab-pane name="friends">
-                        <template #label>
-                            <span class="tab-label">
-                                <Users class="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                <span class="text-xs sm:text-sm">好友</span>
-                                <span class="tab-count">{{
-                                    friendStats.total
-                                }}</span>
-                            </span>
-                        </template>
-                    </el-tab-pane>
-                </el-tabs>
+                <div class="manage-tabs flex px-2 sm:px-3">
+                    <button
+                        v-for="tab in [
+                            { name: 'groups' as TabType, icon: Group, label: '群组', count: groupStats.total },
+                            { name: 'friends' as TabType, icon: Users, label: '好友', count: friendStats.total },
+                        ]"
+                        :key="tab.name"
+                        type="button"
+                        class="tab-item relative flex-1 cursor-pointer py-2.5 sm:py-3"
+                        :class="activeTab === tab.name ? 'is-active' : ''"
+                        @click="switchTab(tab.name)"
+                    >
+                        <span class="tab-label">
+                            <component
+                                :is="tab.icon"
+                                class="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                            />
+                            <span class="text-xs sm:text-sm">{{
+                                tab.label
+                            }}</span>
+                            <span class="tab-count">{{ tab.count }}</span>
+                        </span>
+                        <span
+                            v-if="activeTab === tab.name"
+                            class="tab-bar"
+                        ></span>
+                    </button>
+                </div>
 
                 <!-- 搜索栏 -->
                 <div class="border-b border-gray-100 p-1.5 sm:p-2">
@@ -1436,12 +1433,12 @@ onMounted(async () => {
                                             <div
                                                 class="mt-1 flex items-center justify-end"
                                             >
-                                                <el-switch
+                                                <ZxSwitch
                                                     :model-value="
                                                         !plugin.is_blocked
                                                     "
                                                     @update:model-value="
-                                                        (val: any) => {
+                                                        (val: boolean) => {
                                                             plugin.is_blocked =
                                                                 !val;
                                                             togglePlugin(
@@ -1449,7 +1446,6 @@ onMounted(async () => {
                                                             );
                                                         }
                                                     "
-                                                    size="small"
                                                 />
                                             </div>
                                         </div>
@@ -1670,21 +1666,22 @@ onMounted(async () => {
                                         {{ groupMembers.length }} 人
                                     </span>
                                     <div class="flex items-center gap-2">
-                                        <el-button
-                                            size="small"
+                                        <ZxButton
+                                            variant="outline"
+                                            size="sm"
                                             :disabled="memberCurrentPage === 1"
                                             @click="
                                                 changeMemberPage(
                                                     memberCurrentPage - 1,
                                                 )
                                             "
-                                            class="flex items-center gap-1"
                                         >
                                             <ChevronLeft class="h-4 w-4" />
                                             上一页
-                                        </el-button>
-                                        <el-button
-                                            size="small"
+                                        </ZxButton>
+                                        <ZxButton
+                                            variant="outline"
+                                            size="sm"
                                             :disabled="
                                                 memberCurrentPage ===
                                                 memberTotalPages
@@ -1694,11 +1691,10 @@ onMounted(async () => {
                                                     memberCurrentPage + 1,
                                                 )
                                             "
-                                            class="flex items-center gap-1"
                                         >
                                             下一页
                                             <ChevronRight class="h-4 w-4" />
-                                        </el-button>
+                                        </ZxButton>
                                     </div>
                                 </div>
                             </div>
@@ -2032,25 +2028,20 @@ onMounted(async () => {
                                         }}</span>
                                     </div>
                                 </div>
-                                <el-input
+                                <textarea
                                     v-model="messageContent"
-                                    type="textarea"
+                                    rows="6"
                                     placeholder="输入消息内容..."
-                                    :rows="6"
-                                    resize="vertical"
-                                    class="message-input"
-                                />
+                                    class="message-input w-full resize-y rounded-2xl border bg-white px-3 py-2 text-sm text-gray-700 transition-all placeholder:text-gray-400 focus:outline-none"
+                                ></textarea>
                                 <div class="dialog-actions">
-                                    <el-button
+                                    <ZxButton
+                                        variant="ghost"
                                         @click="sendMessageDialogOpen = false"
-                                        round
-                                        >取消</el-button
+                                        >取消</ZxButton
                                     >
-                                    <el-button
-                                        @click="confirmSendMessage"
-                                        type="primary"
-                                        round
-                                        >发送</el-button
+                                    <ZxButton @click="confirmSendMessage"
+                                        >发送</ZxButton
                                     >
                                 </div>
                             </div>
@@ -2129,13 +2120,12 @@ onMounted(async () => {
                                         class="mb-2 block text-sm font-medium text-gray-700"
                                         >金币数量</label
                                     >
-                                    <el-input-number
+                                    <ZxInputNumber
                                         v-model="editGold"
                                         :min="0"
                                         :max="999999"
                                         :step="100"
                                         class="w-full"
-                                        controls-position="right"
                                     />
                                 </div>
 
@@ -2145,13 +2135,12 @@ onMounted(async () => {
                                         class="mb-2 block text-sm font-medium text-gray-700"
                                         >好感度</label
                                     >
-                                    <el-input-number
+                                    <ZxInputNumber
                                         v-model="editFavorability"
                                         :min="0"
                                         :max="99999"
                                         :step="10"
                                         class="w-full"
-                                        controls-position="right"
                                     />
                                 </div>
 
@@ -2166,7 +2155,7 @@ onMounted(async () => {
                                 <!--                                                >封禁状态</span-->
                                 <!--                                            >-->
                                 <!--                                        </div>-->
-                                <!--                                        <el-switch-->
+                                <!--                                        <ZxSwitch-->
                                 <!--                                            v-model="editIsBanned"-->
                                 <!--                                            size="large"-->
                                 <!--                                            :active-text="-->
@@ -2181,16 +2170,13 @@ onMounted(async () => {
                             class="border-t border-gray-100 bg-gray-50 px-6 py-4"
                         >
                             <div class="flex justify-end gap-2">
-                                <el-button
+                                <ZxButton
+                                    variant="ghost"
                                     @click="memberEditDialogOpen = false"
-                                    round
-                                    >取消</el-button
+                                    >取消</ZxButton
                                 >
-                                <el-button
-                                    @click="saveMemberEdit"
-                                    type="primary"
-                                    round
-                                    >保存</el-button
+                                <ZxButton @click="saveMemberEdit"
+                                    >保存</ZxButton
                                 >
                             </div>
                         </div>
@@ -2254,7 +2240,7 @@ onMounted(async () => {
                                             : "好感度"
                                     }}
                                 </label>
-                                <el-input-number
+                                <ZxInputNumber
                                     v-model="friendEditValue"
                                     :min="0"
                                     :max="
@@ -2269,22 +2255,24 @@ onMounted(async () => {
                                             : 0
                                     "
                                     class="w-full"
-                                    controls-position="right"
                                 />
                             </div>
                             <div class="flex justify-end gap-2">
-                                <el-button
+                                <ZxButton
+                                    variant="ghost"
                                     @click="friendEditDialogOpen = false"
-                                    round
-                                    >取消</el-button
+                                    >取消</ZxButton
                                 >
-                                <el-button
+                                <ZxButton
+                                    :disabled="friendEditSaving"
                                     @click="saveFriendEdit"
-                                    type="primary"
-                                    :loading="friendEditSaving"
-                                    round
-                                    >保存</el-button
                                 >
+                                    <span
+                                        v-if="friendEditSaving"
+                                        class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent text-[color:var(--zx-color-on-primary)]"
+                                    ></span>
+                                    保存
+                                </ZxButton>
                             </div>
                         </div>
                     </div>
@@ -2328,12 +2316,11 @@ onMounted(async () => {
     font-family: monospace;
 }
 
-.message-input :deep(.el-textarea__inner) {
-    border-radius: 12px;
-    border-color: #e5e7eb;
+.message-input {
+    border-color: var(--zx-color-border);
 }
 
-.message-input :deep(.el-textarea__inner:focus) {
+.message-input:focus {
     border-color: var(--zx-color-primary);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--zx-color-primary) 16%, transparent);
 }
@@ -2345,28 +2332,12 @@ onMounted(async () => {
     margin-top: 16px;
 }
 
-/* 标签页样式 */
-.manage-tabs :deep(.el-tabs__header) {
-    margin: 0;
-    padding: 0 8px;
+/* 标签页样式（替代 el-tabs 的下划线式标签栏） */
+.manage-tabs {
     border-bottom: 1px solid var(--zx-color-border-soft);
 }
 
-@media (min-width: 640px) {
-    .manage-tabs :deep(.el-tabs__header) {
-        padding: 0 12px;
-    }
-}
-
-.manage-tabs :deep(.el-tabs__nav) {
-    display: flex;
-    width: 100%;
-}
-
-.manage-tabs :deep(.el-tabs__item) {
-    flex: 1;
-    text-align: center;
-    padding: 10px 6px !important;
+.tab-item {
     font-size: 12px;
     font-weight: 500;
     color: var(--zx-color-text-muted);
@@ -2374,25 +2345,28 @@ onMounted(async () => {
 }
 
 @media (min-width: 640px) {
-    .manage-tabs :deep(.el-tabs__item) {
-        padding: 12px 8px !important;
+    .tab-item {
         font-size: 13px;
     }
 }
 
-.manage-tabs :deep(.el-tabs__item:hover) {
+.tab-item:hover {
     color: var(--zx-color-primary);
 }
 
-.manage-tabs :deep(.el-tabs__item.is-active) {
+.tab-item.is-active {
     color: var(--zx-color-primary);
     font-weight: 600;
 }
 
-.manage-tabs :deep(.el-tabs__active-bar) {
-    background: linear-gradient(90deg, var(--zx-color-primary), var(--zx-blue-400));
+.tab-bar {
+    position: absolute;
+    bottom: 0;
+    left: 8px;
+    right: 8px;
     height: 3px;
     border-radius: 3px 3px 0 0;
+    background: linear-gradient(90deg, var(--zx-color-primary), var(--zx-blue-400));
 }
 
 .tab-label {

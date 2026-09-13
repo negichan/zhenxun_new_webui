@@ -33,42 +33,7 @@ body {
     }
 }
 
-/* 防止 Element Plus 下拉菜单滚动穿透 */
-.el-dropdown__popper .el-dropdown-menu,
-.el-select-dropdown,
-.el-cascader-menu {
-    max-height: 300px;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-}
-
 /* 自定义滚动条样式 */
-.el-dropdown__popper .el-dropdown-menu::-webkit-scrollbar,
-.el-select-dropdown::-webkit-scrollbar,
-.el-cascader-menu::-webkit-scrollbar {
-    width: 6px;
-}
-
-.el-dropdown__popper .el-dropdown-menu::-webkit-scrollbar-track,
-.el-select-dropdown::-webkit-scrollbar-track,
-.el-cascader-menu::-webkit-scrollbar-track {
-    background: var(--zx-color-border-soft);
-    border-radius: 3px;
-}
-
-.el-dropdown__popper .el-dropdown-menu::-webkit-scrollbar-thumb,
-.el-select-dropdown::-webkit-scrollbar-thumb,
-.el-cascader-menu::-webkit-scrollbar-thumb {
-    background: var(--zx-color-border);
-    border-radius: 3px;
-}
-
-.el-dropdown__popper .el-dropdown-menu::-webkit-scrollbar-thumb:hover,
-.el-select-dropdown::-webkit-scrollbar-thumb:hover,
-.el-cascader-menu::-webkit-scrollbar-thumb:hover {
-    background: var(--zx-color-text-subtle);
-}
-
 ::-webkit-scrollbar {
     width: 4px;
     height: 1px;

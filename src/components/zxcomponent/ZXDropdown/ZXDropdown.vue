@@ -123,7 +123,7 @@ onUnmounted(() => {
             <div
                 v-if="open"
                 ref="panelRef"
-                class="fixed z-9999 min-w-28 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+                class="fixed z-9999 max-h-[300px] min-w-28 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
                 :style="{ left: `${pos.x}px`, top: `${pos.y}px` }"
             >
                 <button
@@ -139,7 +139,9 @@ onUnmounted(() => {
                     type="button"
                     @click="select(opt)"
                 >
-                    <span>{{ opt.label }}</span>
+                    <slot name="option" :option="opt">
+                        <span>{{ opt.label }}</span>
+                    </slot>
                     <Check
                         v-if="opt.value === modelValue"
                         class="h-3.5 w-3.5 shrink-0"

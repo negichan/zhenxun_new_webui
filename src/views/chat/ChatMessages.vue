@@ -16,7 +16,7 @@ import {
 } from "lucide-vue-next";
 import { storeToRefs } from "pinia";
 import { useChatStore } from "@/store/chat.ts";
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { ZXNotification } from "@/services/ui";
 import { sendMessage as sendWsMessage } from "@/utils/api-next/websocket-chat";
 import { useBotStore } from "@/store/bot.ts";
@@ -44,6 +44,10 @@ const { appendCurrentMessage, removeCurrentMessage, createMessageId } =
 
 // 消息容器 ref
 const messagesContainer = ref<HTMLElement | null>(null);
+
+// 图片消息加载态（替代 el-image 的 placeholder/error 插槽）：
+// undefined = 加载中，loaded / error 见名
+const imageState = reactive<Record<string, "loaded" | "error">>({});
 
 // ==================== Telegram 式消息窗口 ====================
 // 大会话只渲染底部窗口内的气泡，往上翻按需扩窗并锚定滚动位置，
@@ -702,36 +706,32 @@ onMounted(async () => {
                     <!-- 图片消息 -->
                     <div
                         v-else-if="message.message_type === 'image'"
-                        class="max-w-[min(70%,20rem)] overflow-hidden rounded-xl"
+                        class="image-message max-w-[min(70%,20rem)] overflow-hidden rounded-xl"
+                        v-image-viewer:chat
                     >
-                        <el-image
-                            v-image-viewer:chat
+                        <img
+                            v-show="imageState[message.id] === 'loaded'"
                             :src="message.message"
                             class="max-w-full align-top"
                             referrerpolicy="no-referrer"
+                            @load="imageState[message.id] = 'loaded'"
+                            @error="imageState[message.id] = 'error'"
+                        />
+                        <div
+                            v-if="imageState[message.id] === 'error'"
+                            class="flex h-32 w-48 items-center justify-center rounded-xl bg-gray-100"
                         >
-                            <template #placeholder>
-                                <div
-                                    class="flex h-32 w-48 items-center justify-center rounded-xl bg-gray-100"
-                                >
-                                    <div class="text-xs text-gray-400">
-                                        加载中...
-                                    </div>
-                                </div>
-                            </template>
-                            <template #error>
-                                <div
-                                    class="flex h-32 w-48 items-center justify-center rounded-xl bg-gray-100"
-                                >
-                                    <div class="text-center text-gray-400">
-                                        <div class="mb-1 text-2xl">⚠️</div>
-                                        <span class="text-xs"
-                                            >图片加载失败</span
-                                        >
-                                    </div>
-                                </div>
-                            </template>
-                        </el-image>
+                            <div class="text-center text-gray-400">
+                                <div class="mb-1 text-2xl">⚠️</div>
+                                <span class="text-xs">图片加载失败</span>
+                            </div>
+                        </div>
+                        <div
+                            v-else-if="imageState[message.id] !== 'loaded'"
+                            class="flex h-32 w-48 items-center justify-center rounded-xl bg-gray-100"
+                        >
+                            <div class="text-xs text-gray-400">加载中...</div>
+                        </div>
                     </div>
 
                     <!-- 语音消息 -->
@@ -1063,9 +1063,8 @@ onMounted(async () => {
     pointer-events: none;
 }
 
-/* 图片按原始比例完整显示，只限制最大尺寸；
-   el-image 内层默认铺满容器 + cover 会把图裁掉 */
-:deep(.el-image__inner) {
+/* 图片按原始比例完整显示，只限制最大尺寸 */
+.image-message img {
     width: auto;
     height: auto;
     max-width: 100%;
