@@ -11,6 +11,12 @@ declare module 'virtual:mock-api' {
     export const mockAdapter: AxiosAdapter | undefined
 }
 
+// 白屏开关，由 vite.config.ts 的 alias 指向
+// WhiteScreen/flag-on.ts / flag-off.ts
+declare module 'virtual:white-screen' {
+    export const WHITE_SCREEN_ENABLED: boolean
+}
+
 declare module '*.vue' {
     import type { DefineComponent } from 'vue'
     const component: DefineComponent<{}, {}, any>

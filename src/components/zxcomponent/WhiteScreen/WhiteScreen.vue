@@ -16,9 +16,17 @@
                     <div
                         class="btn btn-primary"
                         :class="{ 'is-disabled': enabling }"
-                        @click="handleStartDebugClient"
+                        @click="handleStartBotClient"
                     >
-                        {{ enabling ? "等待模拟端上线..." : enableFailed ? "重试" : "启动调试客户端" }}
+                        {{ enabling ? "等待模拟端上线..." : enableFailed ? "重试" : "启动 Bot 端" }}
+                    </div>
+                    <div
+                        class="btn btn-force"
+                        title="跳过协议端检查直接进入主站"
+                        @click="handleForceEnter"
+                    >
+                        <span class="force-default">强制访问</span>
+                        <span class="force-hover">不要！</span>
                     </div>
                     <div class="btn" @click="handleGiveUp">返回</div>
                 </div>
@@ -31,14 +39,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { onUnmounted, ref, watch } from "vue";
 import { gsap } from "gsap";
 import { getActivePinia } from "pinia";
 import { router } from "@/router";
 import { api } from "@/utils/api-next/client";
 import { auth } from "@/utils/auth";
 import { useBotStore } from "@/store/bot";
-import { openDebugClient } from "@/config/menu";
+import { animationsEnabled } from "@/store/global";
+import { openBotClient } from "@/config/menu";
 
 const visible = ref(false);
 const bgColor = ref("#fff");
@@ -50,44 +59,50 @@ const enableFailed = ref(false);
 const failReason = ref("");
 let cancelled = false;
 
-// 启动调试客户端：打开独立的 OneBot 模拟客户端窗口（autoConnect 会自动
+// 启动 Bot 端：打开独立的 OneBot 模拟端窗口（autoConnect 会自动
 // 接入后端桥接），轮询 bot 列表，协议端上线后自动进入首页
-const handleStartDebugClient = async () => {
+const handleStartBotClient = async () => {
     if (enabling.value) return;
     enabling.value = true;
     enableFailed.value = false;
     failReason.value = "";
     cancelled = false;
     try {
-        if (!openDebugClient()) {
+        if (!openBotClient()) {
             failReason.value =
-                "调试客户端窗口被浏览器拦截，请允许本站弹出窗口后重试";
+                "Bot 端窗口被浏览器拦截，请允许本站弹出窗口后重试";
             enableFailed.value = true;
             return;
         }
         const online = await waitSimulatorOnline();
         if (cancelled) return;
         if (!online) {
-            failReason.value = "等待超时，请在调试客户端里连接后再重试";
+            failReason.value = "等待超时，请在 Bot 端里连接后再重试";
             enableFailed.value = true;
             return;
         }
         await enterApp();
     } catch (error) {
-        console.error("启动调试客户端失败:", error);
+        console.error("启动 Bot 端失败:", error);
         enableFailed.value = true;
     } finally {
         enabling.value = false;
     }
 };
 
-/** 轮询后端 bot 列表，等调试客户端的模拟端上线（约 60 秒超时） */
+/** 轮询后端 bot 列表，等 Bot 端的模拟端上线（约 60 秒超时） */
 const waitSimulatorOnline = async () => {
     const deadline = Date.now() + 60000;
     while (Date.now() < deadline) {
         if (cancelled) return false;
         try {
-            const res = (await api.get("/main/bot-list")) as any;
+            const res = (await api.get(
+                "/main/bot-list",
+                undefined,
+                // 红屏场景的轮询跳过拦截器：token 失效时不弹 401 通知、
+                // 不触发跳转（循环自身在取消条件里收尾）
+                { skipInterceptor: true },
+            )) as any;
             if ((res?.data ?? []).length > 0) {
                 return true;
             }
@@ -101,7 +116,20 @@ const waitSimulatorOnline = async () => {
 
 // 模拟端已上线：登录流程来的走白屏过渡进首页；
 // 应用内协议端掉线来的揭开红屏并刷新 bot 列表
+let enteringApp = false;
 const enterApp = async () => {
+    if (enteringApp) return;
+    enteringApp = true;
+    try {
+        await doEnterApp();
+    } finally {
+        enteringApp = false;
+    }
+};
+
+const doEnterApp = async () => {
+    // 离开红屏拦截态：恢复守卫对"已登录去登录页"的正常拦截
+    auth.clearWhiteGate();
     const botStore = useBotStore(getActivePinia());
     await botStore.getBotList();
     if (!auth.getAuthState()) {
@@ -118,6 +146,15 @@ const enterApp = async () => {
     }
 };
 
+// 强制访问：跳过协议端检查直接进入主站（无 bot 时各页面已有空态占位）；
+// 标记存入本标签页会话，刷新页面不再重复弹红屏（登出后失效）。
+// 若调试客户端正在等待上线，一并取消等待
+const handleForceEnter = async () => {
+    cancelled = true;
+    auth.setForceEnter();
+    await enterApp();
+};
+
 // 返回：放弃接入，退出登录回登录页
 const handleGiveUp = async () => {
     cancelled = true;
@@ -125,6 +162,55 @@ const handleGiveUp = async () => {
     await hide();
     await router.push("/login");
 };
+
+// 红屏期间的自动轮询：协议端（真实协议端或模拟端）自己上线时
+// 不用用户点按钮，自动揭开红屏进入应用。
+// 手动"启动 Bot 端"流程有自己的等待循环，这里让路避免重复进入
+let autoPollTimer: ReturnType<typeof setTimeout> | null = null;
+
+const stopAutoPoll = () => {
+    if (autoPollTimer) {
+        clearTimeout(autoPollTimer);
+        autoPollTimer = null;
+    }
+};
+
+const startAutoPoll = () => {
+    stopAutoPoll();
+    const loop = async () => {
+        autoPollTimer = null;
+        if (!visible.value || mode.value !== "error") return;
+        if (!enabling.value) {
+            try {
+                const res = (await api.get(
+                    "/main/bot-list",
+                    undefined,
+                    // 同上：跳过 401 拦截器，避免通知轰炸
+                    { skipInterceptor: true },
+                )) as any;
+                if ((res?.data ?? []).length > 0) {
+                    cancelled = true; // 手动等待若还在跑，一并停掉
+                    await enterApp();
+                    return;
+                }
+            } catch {
+                /* 后端暂时不可达，下轮再试 */
+            }
+        }
+        autoPollTimer = setTimeout(loop, 1000);
+    };
+    loop();
+};
+
+watch(
+    () => visible.value && mode.value === "error",
+    (active) => {
+        if (active) startAutoPoll();
+        else stopAutoPoll();
+    },
+);
+
+onUnmounted(stopAutoPoll);
 
 let resolveFn: (() => void) | null = null;
 
@@ -146,14 +232,14 @@ const show = (
     return new Promise<void>((resolve) => {
         resolveFn = resolve;
 
-        // 🟢 普通模式：右 → 左
+        // 🟢 普通模式：右 → 左（动画开关关闭时瞬时完成）
         if (m === "normal") {
             gsap.fromTo(
                 ".ws-root",
                 { x: "100%" },
                 {
                     x: "0%",
-                    duration: 0.45,
+                    duration: animationsEnabled() ? 0.45 : 0.01,
                     ease: "power4.inOut",
                     onComplete: resolve,
                 },
@@ -171,7 +257,7 @@ const hide = () => {
     return new Promise<void>((resolve) => {
         gsap.to(".ws-root", {
             x: "-100%",
-            duration: 0.6,
+            duration: animationsEnabled() ? 0.6 : 0.01,
             ease: "power3.inOut",
             onComplete: () => {
                 visible.value = false;
@@ -308,6 +394,37 @@ defineExpose({
 
 .btn-primary:hover {
     background: rgba(255, 255, 255, 0.85);
+}
+
+/* 强制访问：悬浮时变成与左侧主按钮一致的白底实心，文字换成"不要！"。
+   两层文本叠放在同一网格单元里，宽度取较宽者，悬浮切换不抖动；
+   继承自 .btn 的过渡去掉，样式与文字瞬时切换 */
+.btn-force {
+    display: inline-grid;
+    place-items: center;
+    transition: none;
+}
+
+.btn-force span {
+    grid-area: 1 / 1;
+}
+
+.btn-force .force-hover {
+    visibility: hidden;
+}
+
+.btn-force:hover {
+    background: #fff;
+    color: #d1383b;
+    border-color: #fff;
+}
+
+.btn-force:hover .force-default {
+    visibility: hidden;
+}
+
+.btn-force:hover .force-hover {
+    visibility: visible;
 }
 
 .btn.is-disabled {

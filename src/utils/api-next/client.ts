@@ -54,6 +54,10 @@ apiClient.interceptors.request.use(config => {
 
 apiClient.interceptors.response.use(
     response => {
+        // 二进制响应（文件下载）原样返回完整 response，调用方自取 blob 和响应头
+        if (response.config.responseType === 'blob') {
+            return response
+        }
         // 后端不可用时请求可能落到前端自身的 index.html（返回 HTML），
         // 统一按失败处理，避免把 HTML 字符串当业务数据传给调用方
         const contentType = String(response.headers?.['content-type'] ?? '')
@@ -76,8 +80,7 @@ apiClient.interceptors.response.use(
             showNotification("哇啊啊啊", "小真寻被超时了இ௰இ", '😭')
         } else if (error.response?.status === 401) {
             showNotification("状态失效", "验证状态失效啦~返回登录 (っ °Д °;) っ", '🥲')
-            auth.setAuthState(false)
-            auth.deleteAuthToken()
+            auth.logout()
             await navigateTo({ name: 'Login' })
         } else if (error.response?.status === 400) {
             const errorMsg = error.response?.data?.message || error.response?.data?.info || '请求失败'
@@ -116,6 +119,15 @@ export const getWsBaseUrl = () => {
     host = host.replace(/^https?:\/\//, '')
     const protocol = localStorage.getItem('url')?.startsWith('https://') || window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     return `${protocol}//${host}:${port}/zhenxun/ws/v1`
+}
+
+/**
+ * WebSocket 握手鉴权参数：浏览器原生 WS 带不了 Authorization 头，
+ * 后端从 query 参数读取 token 校验（未登录时返回空串，后端拒绝握手）
+ */
+export const getWsTokenQuery = () => {
+    const token = auth.getAuthToken()?.replace(/^Bearer\s+/i, '') ?? ''
+    return token ? `token=${encodeURIComponent(token)}` : ''
 }
 
 export default api

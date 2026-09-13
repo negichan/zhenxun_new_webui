@@ -2,7 +2,7 @@
  * WebUI Next API - 系统状态 WebSocket
  */
 
-import { getWsBaseUrl } from './client'
+import { getWsBaseUrl, getWsTokenQuery } from './client'
 import { startMockPush, type MockWsHandle } from '@/mocks/ws'
 import { MOCK_MODE } from 'virtual:mock-mode'
 
@@ -48,7 +48,7 @@ export function connectStatusWebSocket(): void {
     }
 
     try {
-        const url = `${getWsBaseUrl()}/status`
+        const url = `${getWsBaseUrl()}/status?${getWsTokenQuery()}`
         ws = new WebSocket(url)
 
         ws.onopen = () => {

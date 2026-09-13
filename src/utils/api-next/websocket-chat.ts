@@ -3,7 +3,7 @@
  */
 
 import type { ChatMessage } from '@/types/api-next.types'
-import { getWsBaseUrl } from './client'
+import { getWsBaseUrl, getWsTokenQuery } from './client'
 import { startMockPush, type MockWsHandle } from '@/mocks/ws'
 import { defaultAva } from '@/mocks/fixtures'
 import { MOCK_MODE } from 'virtual:mock-mode'
@@ -78,7 +78,7 @@ export function connectChatWebSocket(): void {
     }
 
     try {
-        const url = `${getWsBaseUrl()}/chat`
+        const url = `${getWsBaseUrl()}/chat?${getWsTokenQuery()}`
         ws = new WebSocket(url)
 
         ws.onopen = () => {

@@ -14,10 +14,12 @@ export const authApi = {
     },
 
     verifyToken(token: string): Promise<APIResponse<{ valid: boolean; username?: string; error?: string }>> {
-        return api.get(`/auth/verify?token=${encodeURIComponent(token)}`)
+        // token 经 Authorization 头传递（拦截器自动附带），不拼 query，
+        // 避免 JWT 落进服务器访问日志
+        return api.get('/auth/verify')
     },
 
     refreshToken(token: string): Promise<APIResponse<LoginResponse>> {
-        return api.post<LoginResponse>(`/auth/refresh?token=${encodeURIComponent(token)}`)
+        return api.post('/auth/refresh')
     },
 }

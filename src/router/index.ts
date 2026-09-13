@@ -18,6 +18,13 @@ const routes = [
         component: () => import("@/pages/Login.vue"),
     },
     {
+        path: "/bot",
+        name: "Bot",
+        // OneBot Bot 端（模拟端）：弹窗窗口加载主站同包的该路由，
+        // 自带登录与后端指向，不走主站登录守卫
+        component: () => import("@/views/debug/DebugShell.vue"),
+    },
+    {
         path: "/",
         name: "Home",
         component: () => import("@/pages/Home.vue"),
@@ -76,6 +83,12 @@ const routes = [
                 component: () => import("@/views/extension/ExtensionTest.vue"),
                 meta: { menuKey: "ext-test" },
             },
+            {
+                path: "/config",
+                name: "配置",
+                component: () => import("@/views/config/Config.vue"),
+                meta: { menuKey: "config" },
+            },
             // {
             //     path: '/settings',
             //     name: '设置',
@@ -93,6 +106,12 @@ const routes = [
                 name: "管理",
                 redirect: "/chat",
                 meta: { menuKey: "manage" },
+            },
+            {
+                // UI 风格参考页：不进菜单，直接访问 URL
+                path: "/ui-style",
+                name: "UI 风格参考",
+                component: () => import("@/views/ui-style/UIStyle.vue"),
             },
         ],
     },
@@ -151,24 +170,64 @@ router.beforeEach(
         const isAuthenticated = auth.getAuthState();
         const themeStore = useThemeStore();
 
+        // 已登录但会话 cookie 缺失/过期（如被单独清理）时补写，
+        // 避免伺服层页面闸门把已登录用户挡在登录页外
+        if (isAuthenticated) {
+            auth.syncSessionCookie();
+        }
+
         // 如果访问的是配置页，直接放行
         if (to.name === "Configure") {
             return next();
         }
 
         // 如果用户认证了但是又前往登录页，则阻止他
+        // （红屏拦截态除外：红屏期间路由退回登录页是白屏组件主动为之；
+        //   闸门弹回除外：已登录但会话 cookie 缺失时被伺服层 302 到
+        //   /login?gate=1，这里静默送回原页面——补写 cookie 自愈，不弹通知）
         if (to.name === "Login" && isAuthenticated) {
-            ZXNotification({
-                title: "哼唧",
-                message: "哥哥这就嫌弃人家了吗？(ノへ￣、))",
-                type: "😭",
-                confetti: true,
-            });
-
-            if (from.path !== "/") {
-                return next(false);
+            if (auth.hasWhiteGate()) {
+                // 放行：白屏拦截态
+            } else if (to.query.gate) {
+                const raw =
+                    typeof to.query.redirect === "string"
+                        ? to.query.redirect
+                        : "";
+                const base = router.options.history.base ?? "";
+                let target =
+                    raw.startsWith("/") && !raw.startsWith("//")
+                        ? raw
+                        : "/dashboard";
+                // 生产环境伺服路径带 /next 前缀，router 内部路径不含 base
+                if (base && target.startsWith(base)) {
+                    target = target.slice(base.length) || "/";
+                }
+                return next(target);
             } else {
-                return next("/dashboard");
+                ZXNotification({
+                    title: "哼唧",
+                    message: "哥哥这就嫌弃人家了吗？(ノへ￣、))",
+                    type: "😭",
+                    confetti: true,
+                });
+
+                // 显式跳回之前的路径：站内跳来的用 from；地址栏直入
+                // /login 时 from 是空的，用本标签页最后的应用内路径兜底。
+                // next(false) 在直入场景下 URL 会停在 /login 而页面留在
+                // 原地，造成"路径是 login、人还在主页"的错位
+                const fromPath =
+                    from.fullPath && from.fullPath !== "/"
+                        ? from.fullPath
+                        : "";
+                const lastPath = sessionStorage.getItem(LAST_PATH_KEY) ?? "";
+                const fallback = [fromPath, lastPath].find(
+                    (p) =>
+                        p &&
+                        p.startsWith("/") &&
+                        !p.startsWith("/login") &&
+                        !p.startsWith("//"),
+                );
+                return next(fallback || "/dashboard");
             }
         }
 
@@ -180,7 +239,8 @@ router.beforeEach(
         }
 
         // 如果用户未认证且尝试访问非登录页面，则重定向到登录页
-        if (to.name !== "Login" && !isAuthenticated) {
+        // 未认证不允许进业务页面（/bot 是独立 Bot 端，自带登录，豁免）
+        if (to.name !== "Login" && to.name !== "Bot" && !isAuthenticated) {
             if (to.path === "/") {
                 ZXNotification({
                     title: "欢迎光临~",
@@ -208,4 +268,15 @@ router.beforeEach(
 
 eventBus.on("LOGIN:SUCCESS", () => {
     router.push({ name: "Home" });
+});
+
+// 记录本标签页最后停留的应用内路径：已登录访问 /login 被拦时
+// "跳回之前的路径"——地址栏直入 /login 的场景下导航起点是空的，
+// 路由不知道之前在哪，只能靠这里补
+const LAST_PATH_KEY = "zxLastPath";
+
+router.afterEach((to) => {
+    if (to.name !== "Login") {
+        sessionStorage.setItem(LAST_PATH_KEY, to.fullPath);
+    }
 });

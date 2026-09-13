@@ -3,7 +3,7 @@
  */
 
 import type { LogEntry } from '@/types/api-next.types'
-import { getWsBaseUrl } from './client'
+import { getWsBaseUrl, getWsTokenQuery } from './client'
 import { startMockPush, type MockWsHandle } from '@/mocks/ws'
 import { MOCK_MODE } from 'virtual:mock-mode'
 
@@ -64,7 +64,7 @@ export function connectLogsWebSocket(): void {
     }
 
     try {
-        const url = `${getWsBaseUrl()}/logs`
+        const url = `${getWsBaseUrl()}/logs?${getWsTokenQuery()}`
         ws = new WebSocket(url)
 
         ws.onopen = () => {
