@@ -80,6 +80,18 @@ const handleRowSelect = (file: FileItem, e: MouseEvent) => {
     lastClickedIndex = idx;
 };
 
+// 复选框切换：只增删该项，不影响资源管理器式的 Shift 锚点
+const toggleSelect = (file: FileItem) => {
+    if (!file.path) return;
+    const next = new Set(selectedPaths.value);
+    if (next.has(file.path)) {
+        next.delete(file.path);
+    } else {
+        next.add(file.path);
+    }
+    selectedPaths.value = next;
+};
+
 const selectAll = () => {
     selectedPaths.value = new Set(sortedFileList.value.map((f) => f.path));
 };
@@ -258,29 +270,12 @@ const openEditor = async (file: FileItem) => {
         return;
     }
 
-    try {
-        const res = await fileApi.readFile(fullPath, { skipInterceptor: true });
-
-        if (res?.success && res?.data) {
-            editorInitialFile.value = {
-                path: fullPath,
-                name: file.name,
-                content: res.data.content,
-            };
-            showEditor.value = true;
-        }
-    } catch (error) {
-        const errorMessage =
-            (error as any)?.response?.data?.message ||
-            "文件读取失败了 (´；ω；`)";
-
-        ZXNotification({
-            title: "读取失败",
-            message: errorMessage,
-            type: "😭",
-            position: "top-right",
-        });
-    }
+    // 内容与编码由编辑器弹窗自行读取（需要探测编码）
+    editorInitialFile.value = {
+        path: fullPath,
+        name: file.name,
+    };
+    showEditor.value = true;
 };
 
 const handleNew = async () => {
@@ -568,6 +563,7 @@ onBeforeUnmount(() => {
             :search-query="searchQuery"
             :selected-paths="selectedPaths"
             @clear-selection="clearSelection"
+            @toggle-select="toggleSelect"
             @compress="handleCompress"
             @delete="handleDelete"
             @download="handleDownload"

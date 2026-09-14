@@ -2,6 +2,7 @@
 import {
     Archive,
     ArchiveRestore,
+    Check,
     Download,
     Edit2,
     FileText,
@@ -25,6 +26,7 @@ const props = defineProps<{
 const emit = defineEmits<{
     open: [file: FileItem];
     select: [file: FileItem, event: MouseEvent];
+    "toggle-select": [file: FileItem];
     "clear-selection": [];
     "enter-folder": [file: FileItem];
     rename: [file: FileItem];
@@ -228,6 +230,7 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
             <table class="hidden w-full sm:table">
                 <thead class="sticky top-0 border-b-1 border-gray-200 bg-white">
                     <tr>
+                        <th class="w-10 pl-6 pr-0 pt-6 pb-4"></th>
                         <th
                             class="px-6 pt-6 pb-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
                         >
@@ -260,6 +263,28 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
                         @dblclick="handleOpen(file)"
                         @contextmenu.prevent="openFileMenu($event, file)"
                     >
+                        <td class="pl-6 pr-0 py-2">
+                            <label
+                                class="flex h-6 w-6 cursor-pointer items-center justify-center"
+                                title="选择"
+                                @click.stop
+                            >
+                                <input
+                                    type="checkbox"
+                                    class="peer sr-only"
+                                    :checked="isSelected(file)"
+                                    @change="emit('toggle-select', file)"
+                                />
+                                <span
+                                    class="flex h-4.5 w-4.5 items-center justify-center rounded-md border border-gray-300 bg-white transition-colors peer-checked:border-zx-primary peer-checked:bg-zx-primary peer-focus-visible:ring-2 peer-focus-visible:ring-zx-primary/40"
+                                >
+                                    <Check
+                                        v-if="isSelected(file)"
+                                        class="h-3 w-3 text-white"
+                                    />
+                                </span>
+                            </label>
+                        </td>
                         <td class="px-4 py-2">
                             <div class="ml-2 flex items-center gap-3">
                                 <div
@@ -327,6 +352,26 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
                     @contextmenu.prevent="openFileMenu($event, file)"
                 >
                     <div class="flex items-start gap-3" @click="handleOpen(file)">
+                        <label
+                            class="flex h-10 w-6 flex-shrink-0 cursor-pointer items-center justify-center"
+                            title="选择"
+                            @click.stop
+                        >
+                            <input
+                                type="checkbox"
+                                class="peer sr-only"
+                                :checked="isSelected(file)"
+                                @change="emit('toggle-select', file)"
+                            />
+                            <span
+                                class="flex h-4.5 w-4.5 items-center justify-center rounded-md border border-gray-300 bg-white transition-colors peer-checked:border-zx-primary peer-checked:bg-zx-primary"
+                            >
+                                <Check
+                                    v-if="isSelected(file)"
+                                    class="h-3 w-3 text-white"
+                                />
+                            </span>
+                        </label>
                         <div
                             :class="getFileIconStyle(file)"
                             class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
