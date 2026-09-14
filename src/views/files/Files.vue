@@ -31,56 +31,14 @@ const fileList = ref<FileItem[]>([]);
 const loading = ref(false);
 const searchQuery = ref("");
 
-// ==================== 多选（资源管理器式） ====================
+// ==================== 多选（复选框驱动） ====================
 const selectedPaths = ref<Set<string>>(new Set());
-let lastClickedIndex = -1;
 
 const clearSelection = () => {
     selectedPaths.value = new Set();
-    lastClickedIndex = -1;
 };
 
-// 单击选中、Ctrl+单击切换、Shift+单击范围选择，双击打开
-const handleRowSelect = (file: FileItem, e: MouseEvent) => {
-    const items = sortedFileList.value;
-    const idx = items.findIndex((f) => f.path === file.path);
-
-    if (!file.path) {
-        clearSelection();
-        return;
-    }
-
-    if (e.shiftKey && lastClickedIndex >= 0 && idx >= 0) {
-        const [a, b] = [
-            Math.min(lastClickedIndex, idx),
-            Math.max(lastClickedIndex, idx),
-        ];
-        if (!e.ctrlKey && !e.metaKey) {
-            selectedPaths.value = new Set();
-        }
-        const next = new Set(selectedPaths.value);
-        for (let i = a; i <= b; i++) next.add(items[i].path);
-        selectedPaths.value = next;
-        return;
-    }
-
-    if (e.ctrlKey || e.metaKey) {
-        const next = new Set(selectedPaths.value);
-        if (next.has(file.path)) {
-            next.delete(file.path);
-        } else {
-            next.add(file.path);
-        }
-        selectedPaths.value = next;
-        lastClickedIndex = idx;
-        return;
-    }
-
-    selectedPaths.value = new Set([file.path]);
-    lastClickedIndex = idx;
-};
-
-// 复选框切换：只增删该项，不影响资源管理器式的 Shift 锚点
+// 复选框切换：只增删该项
 const toggleSelect = (file: FileItem) => {
     if (!file.path) return;
     const next = new Set(selectedPaths.value);
@@ -572,7 +530,6 @@ onBeforeUnmount(() => {
             @open="openEditor"
             @preview-archive="handlePreviewArchive"
             @rename="openRenameDialog"
-            @select="handleRowSelect"
         />
 
         <NewItemDialog

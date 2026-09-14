@@ -25,7 +25,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     open: [file: FileItem];
-    select: [file: FileItem, event: MouseEvent];
     "toggle-select": [file: FileItem];
     "clear-selection": [];
     "enter-folder": [file: FileItem];
@@ -167,7 +166,7 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
 
     menuItems.push(
         {
-            label: batch ? "压缩选中项为 zip" : "压缩为 zip",
+            label: batch ? `压缩选中项为 zip` : "压缩为 zip",
             icon: Package,
             action: () => emit("compress", targets),
         },
@@ -187,11 +186,6 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
             action: () => emit("delete", targets),
         },
     );
-
-    // 右键未选中项时，顺便把选中收敛到该项
-    if (!isSelected(file)) {
-        emit("select", file, e);
-    }
 
     ZXContextMenu.show({
         x: e.clientX,
@@ -259,8 +253,7 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
                         :key="file.name"
                         class="cursor-pointer transition-colors hover:bg-gray-50"
                         :class="isSelected(file) && 'row-selected bg-zx-primary-soft'"
-                        @click="emit('select', file, $event)"
-                        @dblclick="handleOpen(file)"
+                        @click="handleOpen(file)"
                         @contextmenu.prevent="openFileMenu($event, file)"
                     >
                         <td class="pl-6 pr-0 py-2">
