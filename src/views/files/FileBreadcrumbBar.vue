@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { nextTick, ref } from "vue";
 import {
     ArrowLeft,
     ChevronRight,
@@ -28,32 +27,6 @@ const emit = defineEmits<{
     "compress-selected": [];
     "delete-selected": [];
 }>();
-
-// Windows 式可编辑路径：点击面包屑空白处进入编辑，回车跳转、Esc/失焦取消
-const editingPath = ref(false);
-const pathInput = ref("");
-const pathInputRef = ref<HTMLInputElement | null>(null);
-
-const startEdit = () => {
-    pathInput.value = props.currentPath;
-    editingPath.value = true;
-    nextTick(() => {
-        pathInputRef.value?.focus();
-        pathInputRef.value?.select();
-    });
-};
-
-const cancelEdit = () => {
-    editingPath.value = false;
-};
-
-const commitEdit = () => {
-    const target = pathInput.value.trim();
-    editingPath.value = false;
-    if (target && target !== props.currentPath) {
-        emit("navigate", target);
-    }
-};
 </script>
 
 <template>
@@ -98,29 +71,10 @@ const commitEdit = () => {
                 </button>
             </div>
 
-            <!-- 路径编辑模式（Windows 式：点空白处进入，回车跳转） -->
-            <div
-                v-else-if="editingPath"
-                class="flex min-w-0 flex-1 items-center"
-                @click.stop
-            >
-                <input
-                    ref="pathInputRef"
-                    v-model="pathInput"
-                    class="min-w-0 flex-1 rounded-2xl border border-zx-primary bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none"
-                    placeholder="输入路径后回车，如 data/plugins"
-                    type="text"
-                    @keydown.enter.prevent="commitEdit"
-                    @keydown.esc.prevent="cancelEdit"
-                    @blur="cancelEdit"
-                />
-            </div>
-
-            <!-- 面包屑（每一级独立胶囊；点击空白处进入路径编辑） -->
+            <!-- 面包屑（每一级独立胶囊，点击跳转对应层级） -->
             <div
                 v-else
-                class="scrollbar-hide flex min-w-0 flex-1 cursor-text items-center gap-1.5 overflow-x-auto text-sm"
-                @click="startEdit"
+                class="scrollbar-hide flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto text-sm"
             >
                 <template v-for="(segment, index) in pathSegments" :key="index">
                     <ChevronRight class="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
@@ -141,7 +95,7 @@ const commitEdit = () => {
                     v-if="!pathSegments.length"
                     class="px-2 py-1 text-gray-400"
                 >
-                    点击这里输入路径
+                    根目录
                 </span>
             </div>
 

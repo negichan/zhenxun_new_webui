@@ -252,7 +252,6 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
                         v-for="file in files"
                         :key="file.name"
                         class="cursor-pointer transition-colors hover:bg-gray-50"
-                        :class="isSelected(file) && 'row-selected bg-zx-primary-soft'"
                         @click="handleOpen(file)"
                         @contextmenu.prevent="openFileMenu($event, file)"
                     >
@@ -341,7 +340,6 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
                     v-for="file in files"
                     :key="file.name"
                     class="p-3 transition-colors hover:bg-gray-50"
-                    :class="isSelected(file) && 'row-selected bg-zx-primary-soft'"
                     @contextmenu.prevent="openFileMenu($event, file)"
                 >
                     <div class="flex items-start gap-3" @click="handleOpen(file)">
@@ -429,14 +427,3 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
         </div>
     </div>
 </template>
-
-<style scoped>
-/* 选中行 hover 时在选中色基础上向主色加深，避免被默认灰 hover 覆盖 */
-.row-selected:hover {
-    background-color: color-mix(
-        in srgb,
-        var(--zx-color-primary) 18%,
-        var(--zx-color-primary-soft)
-    );
-}
-</style>
