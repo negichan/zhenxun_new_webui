@@ -27,10 +27,10 @@ export const fileApi = {
     },
 
     /**
-     * 保存文件内容
+     * 保存文件内容（encoding 可选：utf-8 / gbk）
      */
-    saveFile(filePath: string, content: string): Promise<APIResponse<boolean>> {
-        return api.post<boolean>('/file/save', { file_path: filePath, content })
+    saveFile(filePath: string, content: string, encoding = 'utf-8'): Promise<APIResponse<boolean>> {
+        return api.post<boolean>('/file/save', { file_path: filePath, content, encoding })
     },
 
     /**

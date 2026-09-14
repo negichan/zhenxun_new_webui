@@ -17,6 +17,15 @@
                     </option>
                 </select>
 
+                <select
+                    v-model="selectedEncoding"
+                    class="toolbar-select"
+                    title="文件编码"
+                >
+                    <option value="utf-8">UTF-8</option>
+                    <option value="gbk">GBK</option>
+                </select>
+
                 <button
                     v-if="!isPreviewing"
                     class="toolbar-chip"
@@ -59,6 +68,26 @@
                     </button>
                 </div>
                 <template v-if="!isPreviewing">
+                    <button
+                        v-if="monacoReady"
+                        class="toolbar-chip"
+                        type="button"
+                        title="查找 (Ctrl+F)"
+                        @click="openFind"
+                    >
+                        <Search class="icon" />
+                        <span>查找</span>
+                    </button>
+                    <button
+                        v-if="monacoReady && monacoLang === 'json'"
+                        class="toolbar-chip"
+                        type="button"
+                        title="格式化 JSON"
+                        @click="formatDocument"
+                    >
+                        <Braces class="icon" />
+                        <span>格式化</span>
+                    </button>
                     <ZxButton
                         variant="ghost"
                         size="sm"
@@ -124,6 +153,9 @@
                         @input="handleInput"
                         @keydown="handleKeydown"
                         @scroll="syncOverlayScroll"
+                        @keyup="onTextareaCursor"
+                        @click="onTextareaCursor"
+                        @focus="onTextareaCursor"
                     />
                 </div>
             </template>
@@ -135,6 +167,16 @@
                     <p>加载中...</p>
                 </div>
             </div>
+        </div>
+
+        <!-- 状态栏：光标位置 / 字符数 / 换行符 / 编码 / 语言 -->
+        <div class="editor-statusbar">
+            <span>行 {{ cursorLine }}，列 {{ cursorCol }}</span>
+            <span>{{ charCount.toLocaleString() }} 字符</span>
+            <span class="flex-1"></span>
+            <span>{{ currentEolLabel }}</span>
+            <span>{{ encodingLabel }}</span>
+            <span class="hidden sm:inline">{{ languageLabel }}</span>
         </div>
     </div>
 </template>
@@ -149,11 +191,13 @@ import {
     watch,
 } from "vue";
 import {
+    Braces,
     Edit3,
     Eye,
     Loader2,
     RefreshCw,
     Save,
+    Search,
     Settings,
     WrapText,
 } from "lucide-vue-next";
@@ -174,6 +218,8 @@ interface Props {
     readonly?: boolean;
     loading?: boolean;
     hideToolbar?: boolean;
+    /** 文件实际编码（读取接口探测），保存时随写回参数传给后端 */
+    encoding?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -183,11 +229,12 @@ const props = withDefaults(defineProps<Props>(), {
     readonly: false,
     loading: false,
     hideToolbar: false,
+    encoding: "utf-8",
 });
 
 const emit = defineEmits<{
     "update:modelValue": [value: string];
-    save: [content: string];
+    save: [content: string, encoding: string];
 }>();
 
 const languages = [
@@ -268,12 +315,48 @@ const initialValue = ref(props.modelValue);
 const selectedLanguage = ref(detectLanguage());
 const currentEOL = ref<"lf" | "crlf">("lf");
 const wordWrap = ref(localStorage.getItem("zx-editor-wordwrap") !== "false");
+const selectedEncoding = ref(
+    ["utf-8", "gbk"].includes(props.encoding) ? props.encoding : "utf-8",
+);
+
+watch(
+    () => props.encoding,
+    (enc) => {
+        if (["utf-8", "gbk"].includes(enc)) selectedEncoding.value = enc;
+    },
+);
 
 const isDirty = computed(() => content.value !== initialValue.value);
 const lineCount = computed(() => Math.max(content.value.split("\n").length, 1));
 const currentEolLabel = computed(() =>
     currentEOL.value === "lf" ? "LF" : "CRLF",
 );
+const charCount = computed(() => content.value.length);
+const languageLabel = computed(
+    () =>
+        languages.find((l) => l.value === selectedLanguage.value)?.label ||
+        "Plain Text",
+);
+const encodingLabel = computed(() =>
+    selectedEncoding.value === "gbk" ? "GBK" : "UTF-8",
+);
+
+// 光标位置（monaco / textarea 双引擎各自上报）
+const cursorLine = ref(1);
+const cursorCol = ref(1);
+
+const setTextCursor = (pos: number) => {
+    const before = content.value.slice(0, pos);
+    const lines = before.split("\n");
+    cursorLine.value = lines.length;
+    cursorCol.value = (lines[lines.length - 1] || "").length + 1;
+};
+
+/** textarea 兜底引擎的光标上报 */
+const onTextareaCursor = () => {
+    const ta = textareaRef.value;
+    if (ta) setTextCursor(ta.selectionStart);
+};
 
 const normalizeEOL = (value: string) =>
     currentEOL.value === "crlf"
@@ -287,7 +370,7 @@ const handleInput = () => {
 const handleSave = () => {
     const raw = monacoEditor ? monacoEditor.getValue() : content.value;
     content.value = raw;
-    emit("save", normalizeEOL(raw));
+    emit("save", normalizeEOL(raw), selectedEncoding.value);
     initialValue.value = raw;
 };
 
@@ -450,6 +533,17 @@ const defineZxThemes = (monaco: typeof MonacoNamespace) => {
 const zxThemeName = () =>
     editorShikiTheme.value === "dark" ? "zx-dark" : "zx-light";
 
+// ==================== 专业编辑功能（monaco） ====================
+const openFind = () => {
+    monacoEditor?.getAction("actions.find")?.run();
+};
+
+const formatDocument = async () => {
+    if (!monacoEditor) return;
+    await monacoEditor.getAction("editor.action.formatDocument")?.run();
+    // 格式化的变更通过 onDidChangeModelContent 自动同步回 content
+};
+
 const syncMonacoValue = () => {
     if (monacoEditor && monacoEditor.getValue() !== content.value) {
         applyingMonacoValue = true;
@@ -484,6 +578,10 @@ onMounted(async () => {
             if (applyingMonacoValue) return;
             content.value = monacoEditor!.getValue();
             emit("update:modelValue", content.value);
+        });
+        monacoEditor.onDidChangeCursorPosition((e) => {
+            cursorLine.value = e.position.lineNumber;
+            cursorCol.value = e.position.column;
         });
         monacoEditor.addCommand(
             monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
@@ -829,6 +927,20 @@ defineExpose({
     flex: 1;
     grid-template-columns: auto minmax(0, 1fr);
     overflow: hidden;
+}
+
+.editor-statusbar {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 1rem;
+    border-top: 1px solid var(--zx-color-border);
+    background-color: var(--zx-color-surface-muted);
+    padding: 0.25rem 1rem;
+    color: var(--zx-color-text-subtle);
+    font-size: 0.6875rem;
+    line-height: 1.4rem;
+    user-select: none;
 }
 
 .editor-wrapper:has(> .md-preview) {
