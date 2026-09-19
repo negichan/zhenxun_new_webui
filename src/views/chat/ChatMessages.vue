@@ -672,7 +672,7 @@ onMounted(async () => {
                         v-if="message.parts && message.parts.length > 1"
                         :class="
                             message.is_self
-                                ? 'bg-zx-primary text-white rounded-br-xs'
+                                ? 'bg-zx-primary text-[color:var(--zx-color-on-primary)] rounded-br-xs'
                                 : 'bg-gray-200 text-gray-800 rounded-bl-xs'
                         "
                         class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl"
@@ -737,7 +737,7 @@ onMounted(async () => {
                     <!-- 语音消息 -->
                     <div
                         v-else-if="message.message_type === 'record'"
-                        :class="message.is_self ? 'bg-zx-primary text-white' : 'bg-gray-200 text-gray-800'"
+                        :class="message.is_self ? 'bg-zx-primary text-[color:var(--zx-color-on-primary)]' : 'bg-gray-200 text-gray-800'"
                         class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl"
                     >
                         <div class="flex items-center gap-2 px-3 py-2 text-xs sm:text-sm">
@@ -765,7 +765,7 @@ onMounted(async () => {
                         ></video>
                         <div
                             v-else
-                            :class="message.is_self ? 'bg-zx-primary text-white' : 'bg-gray-200 text-gray-800'"
+                            :class="message.is_self ? 'bg-zx-primary text-[color:var(--zx-color-on-primary)]' : 'bg-gray-200 text-gray-800'"
                             class="flex items-center gap-2 rounded-2xl px-3 py-2 text-xs sm:text-sm"
                         >
                             <Video class="h-4 w-4 shrink-0" />
@@ -835,7 +835,7 @@ onMounted(async () => {
                     <!-- 表情消息 -->
                     <div
                         v-else-if="message.message_type === 'face'"
-                        :class="message.is_self ? 'bg-zx-primary text-white' : 'bg-gray-200 text-gray-800'"
+                        :class="message.is_self ? 'bg-zx-primary text-[color:var(--zx-color-on-primary)]' : 'bg-gray-200 text-gray-800'"
                         class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl"
                     >
                         <p class="px-3 py-2 text-xs sm:text-sm">
@@ -848,7 +848,7 @@ onMounted(async () => {
                         v-else
                         :class="[
                             message.is_self
-                                ? 'bg-zx-primary text-white rounded-br-xs'
+                                ? 'bg-zx-primary text-[color:var(--zx-color-on-primary)] rounded-br-xs'
                                 : 'bg-gray-200 text-gray-800 rounded-bl-xs',
                         ]"
                         class="max-w-[min(70%,28rem)] overflow-hidden rounded-2xl"

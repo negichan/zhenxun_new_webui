@@ -84,7 +84,7 @@ const handleLeaveGroup = () => {
             <button
                 @click="handleViewDetail"
                 :disabled="processing"
-                class="flex-1 px-3 py-2 bg-zx-primary text-white rounded-2xl text-sm font-medium hover:bg-zx-primary-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 btn-touch"
+                class="flex-1 px-3 py-2 bg-zx-primary text-[color:var(--zx-color-on-primary)] rounded-2xl text-sm font-medium hover:bg-zx-primary-hover transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 btn-touch"
             >
                 <Eye class="w-4 h-4" />
                 <span>详情</span>

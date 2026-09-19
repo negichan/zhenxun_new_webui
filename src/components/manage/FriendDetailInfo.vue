@@ -144,7 +144,7 @@ watch(() => props.friend, () => {
                             <button
                                 @click="confirmSave"
                                 :disabled="saving"
-                                class="p-1.5 rounded-lg bg-zx-primary hover:bg-zx-primary-hover text-white transition-colors disabled:opacity-50"
+                                class="p-1.5 rounded-lg bg-zx-primary hover:bg-zx-primary-hover text-[color:var(--zx-color-on-primary)] transition-colors disabled:opacity-50"
                             >
                                 <Check class="w-3.5 h-3.5" />
                             </button>
@@ -196,7 +196,7 @@ watch(() => props.friend, () => {
                             <button
                                 @click="confirmSave"
                                 :disabled="saving"
-                                class="p-1.5 rounded-lg bg-zx-primary hover:bg-zx-primary-hover text-white transition-colors disabled:opacity-50"
+                                class="p-1.5 rounded-lg bg-zx-primary hover:bg-zx-primary-hover text-[color:var(--zx-color-on-primary)] transition-colors disabled:opacity-50"
                             >
                                 <Check class="w-3.5 h-3.5" />
                             </button>

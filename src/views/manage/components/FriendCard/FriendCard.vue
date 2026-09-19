@@ -50,7 +50,7 @@ const handleDeleteFriend = () => {
             <!-- 发送消息按钮 -->
             <button
                 @click="handleSendMessage"
-                class="flex-1 px-3 py-2 bg-zx-primary text-white rounded-2xl text-sm font-medium hover:bg-zx-primary-hover transition-colors flex items-center justify-center gap-1.5 btn-touch"
+                class="flex-1 px-3 py-2 bg-zx-primary text-[color:var(--zx-color-on-primary)] rounded-2xl text-sm font-medium hover:bg-zx-primary-hover transition-colors flex items-center justify-center gap-1.5 btn-touch"
             >
                 <MessageCircle class="w-4 h-4" />
                 <span>消息</span>

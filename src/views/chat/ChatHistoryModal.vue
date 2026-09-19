@@ -3,6 +3,7 @@ import { modalJelly } from "@/composables/useGsapTransition";
 import { computed, ref, watch } from "vue";
 import { Pin, PinOff, Search, SlidersHorizontal, X } from "lucide-vue-next";
 import { useChatStore } from "@/store/chat.ts";
+import { useBotStore } from "@/store/bot.ts";
 import { getCachedMessages } from "@/utils/chat-message-db";
 import { useDynamicVirtualList } from "@/composables/useDynamicVirtualList";
 import MiniDatePicker from "@/components/zxcomponent/MiniDatePicker.vue";
@@ -18,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 const chatStore = useChatStore();
+const botStore = useBotStore();
 
 // ==================== 数据加载：内存 + IndexedDB 合并 ====================
 const allMessages = ref<ChatMessage[]>([]);
@@ -26,7 +28,8 @@ watch(
     () => props.visible,
     async (visible) => {
         if (!visible) return;
-        const key = `${props.contactType}:${props.contactId}`;
+        const botId = botStore.getSelectedBotId() || "anon";
+        const key = `${botId}:${props.contactType}:${props.contactId}`;
         const inStore =
             (chatStore.messagesByConversation[key] as
                 | ChatMessage[]

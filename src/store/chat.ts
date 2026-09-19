@@ -25,10 +25,14 @@ const MESSAGE_CACHE_LIMIT = 300;
 const getConversationKey = (
     type: "friend" | "group" | null,
     id: string | null | undefined,
+    botId?: string | null,
 ) => {
     if (!type || !id) return "";
-    return `${type}:${id}`;
+    // 必须带上 bot：同一群/好友下多 bot 各自独立会话，否则切换视角会串消息
+    return `${botId || "anon"}:${type}:${id}`;
 };
+
+const currentBotId = () => useBotStore().getSelectedBotId();
 
 const createMessageId = () =>
     Math.floor(Date.now() * 1000 + Math.random() * 1000);
@@ -61,7 +65,11 @@ export const useChatStore = defineStore("chat", () => {
     const messageReceiverRegistered = ref(false);
 
     const currentConversationKey = () =>
-        getConversationKey(selectedContact.value, selectedId.value);
+        getConversationKey(
+            selectedContact.value,
+            selectedId.value,
+            currentBotId(),
+        );
 
     /** 拉取当前 bot 的好友与群列表（审批通过后也需要调用以刷新联系人） */
     const loadContacts = async () => {
@@ -148,7 +156,7 @@ export const useChatStore = defineStore("chat", () => {
     };
 
     const loadCachedMessages = async (type: "friend" | "group", id: string) => {
-        const conversationKey = getConversationKey(type, id);
+        const conversationKey = getConversationKey(type, id, currentBotId());
         const cachedMessages = await getCachedMessages(
             conversationKey,
             MESSAGE_CACHE_LIMIT,
@@ -162,7 +170,7 @@ export const useChatStore = defineStore("chat", () => {
         id: string,
         message: ChatMessage,
     ) => {
-        const conversationKey = getConversationKey(type, id);
+        const conversationKey = getConversationKey(type, id, currentBotId());
         const currentMessages =
             messagesByConversation.value[conversationKey] ?? [];
 
@@ -176,7 +184,7 @@ export const useChatStore = defineStore("chat", () => {
         id: string,
         messageId: number,
     ) => {
-        const conversationKey = getConversationKey(type, id);
+        const conversationKey = getConversationKey(type, id, currentBotId());
         const currentMessages =
             messagesByConversation.value[conversationKey] ?? [];
 
@@ -184,7 +192,7 @@ export const useChatStore = defineStore("chat", () => {
             conversationKey,
             currentMessages.filter((message) => message.id !== messageId),
         );
-        await removeCachedMessage(messageId);
+        await removeCachedMessage(conversationKey, messageId);
     };
 
     const appendCurrentMessage = async (message: ChatMessage) => {
@@ -299,7 +307,7 @@ export const useChatStore = defineStore("chat", () => {
 
     const appendIncomingMessage = async (data: WsChatMessage | any) => {
         const botStore = useBotStore();
-        const currentBotId = botStore.selectedBot?.self_id || "";
+        const selfBotId = botStore.selectedBot?.self_id || "";
         const groupId = data.group_id ? String(data.group_id) : "";
         const objectId = data.object_id ? String(data.object_id) : "";
         const userId = data.user_id ? String(data.user_id) : "";
@@ -309,7 +317,7 @@ export const useChatStore = defineStore("chat", () => {
         const conversationId =
             conversationType === "group"
                 ? groupId
-                : objectId && objectId !== currentBotId
+                : objectId && objectId !== selfBotId
                   ? objectId
                   : userId;
 
@@ -326,7 +334,7 @@ export const useChatStore = defineStore("chat", () => {
             message,
             message_type: messageType,
             timestamp: data.time || new Date().toISOString(),
-            is_self: currentBotId ? userId === currentBotId : false,
+            is_self: selfBotId ? userId === selfBotId : false,
             group_id: groupId || undefined,
             parts: parts.length > 1 ? parts : undefined,
         };
@@ -334,6 +342,7 @@ export const useChatStore = defineStore("chat", () => {
         const conversationKey = getConversationKey(
             conversationType,
             conversationId,
+            currentBotId(),
         );
         const currentMessages =
             messagesByConversation.value[conversationKey] ?? [];
@@ -369,7 +378,7 @@ export const useChatStore = defineStore("chat", () => {
         selectedId.value = id;
         selectedName.value = name;
 
-        const conversationKey = getConversationKey(type, id);
+        const conversationKey = getConversationKey(type, id, currentBotId());
         messages.value = messagesByConversation.value[conversationKey] ?? [];
         await loadCachedMessages(type, id);
     };

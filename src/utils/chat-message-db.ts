@@ -129,11 +129,22 @@ export const cacheMessage = async (
     }
 };
 
-export const removeCachedMessage = async (id: number) => {
+export const removeCachedMessage = async (
+    conversationKey: string,
+    messageId: number,
+) => {
     if (!isIndexedDBAvailable()) return;
 
     try {
-        await runTransaction("readwrite", (store) => store.delete(id));
+        await runTransaction("readwrite", (store) =>
+            store.index("conversationKey").getAll(conversationKey),
+        ).then((records) => {
+            const hit = (records ?? []).find((r) => r.id === messageId);
+            if (!hit) return;
+            return runTransaction("readwrite", (store) =>
+                store.delete(hit.id),
+            );
+        });
     } catch (error) {
         console.error("删除聊天缓存失败:", error);
     }
