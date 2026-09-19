@@ -48,23 +48,31 @@
             </div>
 
             <div class="toolbar-right">
-                <!-- Markdown 预览切换 -->
+                <!-- Markdown 模式切换：编辑 / 编辑与预览 / 预览 -->
                 <div v-if="isMarkdown" class="preview-segmented">
                     <button
                         type="button"
-                        :class="{ 'segmented-active': !isPreviewing }"
-                        @click="isPreviewing = false"
+                        :class="{ 'segmented-active': mdMode === 'edit' }"
+                        title="仅编辑"
+                        @click="setMdMode('edit')"
                     >
-                        <Edit3 class="icon" />
-                        <span>编辑</span>
+                        <PenLine class="icon" />
                     </button>
                     <button
                         type="button"
-                        :class="{ 'segmented-active': isPreviewing }"
-                        @click="togglePreview"
+                        :class="{ 'segmented-active': mdMode === 'split' }"
+                        title="编辑与预览 (双栏分屏)"
+                        @click="setMdMode('split')"
+                    >
+                        <SquareSplitHorizontal class="icon" />
+                    </button>
+                    <button
+                        type="button"
+                        :class="{ 'segmented-active': mdMode === 'preview' }"
+                        title="仅预览"
+                        @click="setMdMode('preview')"
                     >
                         <Eye class="icon" />
-                        <span>预览</span>
                     </button>
                 </div>
                 <template v-if="!isPreviewing">
@@ -109,63 +117,90 @@
             </div>
         </div>
 
-        <!-- Markdown 预览视图 -->
-        <div v-if="isPreviewing" class="editor-wrapper">
+        <!-- 编辑与预览区域 -->
+        <div ref="editorSplitRef" class="flex min-h-0 flex-1 overflow-hidden">
+            <!-- 编辑视图：monaco 就绪前先用轻量 textarea 兜底渲染，保持挂载（v-show） -->
             <div
-                ref="previewRef"
-                class="md-preview"
-                v-html="previewHtml"
-            ></div>
-        </div>
+                v-show="!isMarkdown || mdMode !== 'preview'"
+                class="editor-wrapper min-h-0 overflow-hidden"
+                :class="{
+                    'is-monaco': monacoReady,
+                    'flex-1 w-full': !isMarkdown || mdMode === 'edit',
+                }"
+                :style="
+                    isMarkdown && mdMode === 'split'
+                        ? { width: `${100 - previewRatio}%` }
+                        : {}
+                "
+            >
+                <template v-if="!monacoReady">
+                    <div class="line-number-gutter" aria-hidden="true">
+                        <span v-for="line in lineCount" :key="line">{{
+                            line
+                        }}</span>
+                    </div>
+                    <div class="editor-content-host">
+                        <!-- 语法高亮层：垫在透明文本的 textarea 下面 -->
+                        <div
+                            ref="highlightRef"
+                            class="editor-highlight"
+                            :class="{ 'is-wrap': wordWrap }"
+                            aria-hidden="true"
+                            v-html="highlightHtml"
+                        ></div>
+                        <textarea
+                            ref="textareaRef"
+                            v-model="content"
+                            class="editor-textarea"
+                            :class="{
+                                'whitespace-pre': !wordWrap,
+                                'has-highlight': highlightHtml !== '',
+                            }"
+                            :readonly="readonly"
+                            spellcheck="false"
+                            @input="handleInput"
+                            @keydown="handleKeydown"
+                            @scroll="syncOverlayScroll"
+                            @keyup="onTextareaCursor"
+                            @click="onTextareaCursor"
+                            @focus="onTextareaCursor"
+                        />
+                    </div>
+                </template>
+                <div v-show="monacoReady" ref="monacoHost" class="monaco-host h-full w-full"></div>
 
-        <!-- 编辑视图：monaco 就绪前先用轻量 textarea 兜底渲染 -->
-        <!-- 编辑视图：保持挂载（v-show），避免预览切换反复重建 monaco 容器 -->
-        <div
-            v-show="!isPreviewing"
-            class="editor-wrapper"
-            :class="{ 'is-monaco': monacoReady }"
-        >
-            <template v-if="!monacoReady">
-                <div class="line-number-gutter" aria-hidden="true">
-                    <span v-for="line in lineCount" :key="line">{{
-                        line
-                    }}</span>
+                <div v-if="loading" class="loading-overlay">
+                    <div class="loading-content">
+                        <Loader2 class="loading-icon" />
+                        <p>加载中...</p>
+                    </div>
                 </div>
-                <div class="editor-content-host">
-                    <!-- 语法高亮层：垫在透明文本的 textarea 下面 -->
-                    <div
-                        ref="highlightRef"
-                        class="editor-highlight"
-                        :class="{ 'is-wrap': wordWrap }"
-                        aria-hidden="true"
-                        v-html="highlightHtml"
-                    ></div>
-                    <textarea
-                        ref="textareaRef"
-                        v-model="content"
-                        class="editor-textarea"
-                        :class="{
-                            'whitespace-pre': !wordWrap,
-                            'has-highlight': highlightHtml !== '',
-                        }"
-                        :readonly="readonly"
-                        :spellcheck="false"
-                        @input="handleInput"
-                        @keydown="handleKeydown"
-                        @scroll="syncOverlayScroll"
-                        @keyup="onTextareaCursor"
-                        @click="onTextareaCursor"
-                        @focus="onTextareaCursor"
-                    />
-                </div>
-            </template>
-            <div v-show="monacoReady" ref="monacoHost" class="monaco-host"></div>
+            </div>
 
-            <div v-if="loading" class="loading-overlay">
-                <div class="loading-content">
-                    <Loader2 class="loading-icon" />
-                    <p>加载中...</p>
-                </div>
+            <!-- Markdown 分屏拖拽手柄 Splitter (仅双栏分屏时显示) -->
+            <div
+                v-if="isMarkdown && mdMode === 'split'"
+                class="group relative z-20 w-1 -ml-0.5 flex-shrink-0 cursor-col-resize select-none bg-slate-200 hover:bg-zx-primary active:bg-zx-primary transition-colors"
+                :class="{ 'bg-zx-primary': isDraggingPreview }"
+                title="拖拽调节预览栏宽度，双击居中"
+                @mousedown.prevent="startDragPreview"
+                @dblclick="resetPreviewRatio"
+            >
+                <div class="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize"></div>
+            </div>
+
+            <!-- Markdown 预览视图：双栏分屏 或 纯预览 -->
+            <div
+                v-if="isMarkdown && mdMode !== 'edit'"
+                class="min-h-0 overflow-y-auto bg-white"
+                :class="mdMode === 'split' ? '' : 'flex-1 w-full'"
+                :style="
+                    mdMode === 'split'
+                        ? { width: `${previewRatio}%` }
+                        : {}
+                "
+            >
+                <MarkdownPreview :content="content" :path="path" />
             </div>
         </div>
 
@@ -192,13 +227,14 @@ import {
 } from "vue";
 import {
     Braces,
-    Edit3,
     Eye,
     Loader2,
+    PenLine,
     RefreshCw,
     Save,
     Search,
     Settings,
+    SquareSplitHorizontal,
     WrapText,
 } from "lucide-vue-next";
 import {
@@ -207,9 +243,10 @@ import {
     selectLangToShiki,
 } from "./highlighter";
 import { loadMonaco } from "./monacoLoader";
+import { defineZxThemes, zxThemeName } from "./monacoTheme";
+import MarkdownPreview from "./MarkdownPreview.vue";
 import type * as MonacoNamespace from "monaco-editor/editor/editor.api";
 import { useThemeStore } from "@/store/theme";
-import { fileApi } from "@/utils/api-next";
 
 interface Props {
     modelValue?: string;
@@ -494,45 +531,6 @@ const monacoLang = computed(() => {
     return MONACO_LANG_MAP[key] || "plaintext";
 });
 
-const cssVar = (name: string, fallback: string) =>
-    getComputedStyle(document.documentElement).getPropertyValue(name).trim() ||
-    fallback;
-
-/** 用主题变量定义编辑器深浅主题，颜色跟随全局换肤 */
-const defineZxThemes = (monaco: typeof MonacoNamespace) => {
-    const colors = () => ({
-        "editor.background": cssVar("--zx-color-surface", "#ffffff"),
-        "editor.foreground": cssVar("--zx-color-text-strong", "#0f172a"),
-        "editorLineNumber.foreground": cssVar(
-            "--zx-color-text-subtle",
-            "#94a3b8",
-        ),
-        "editorLineNumber.activeForeground": cssVar(
-            "--zx-color-primary",
-            "#3b82f6",
-        ),
-        "editorIndentGuide.background": cssVar(
-            "--zx-color-border",
-            "#e2e8f0",
-        ),
-    });
-    monaco.editor.defineTheme("zx-light", {
-        base: "vs",
-        inherit: true,
-        rules: [],
-        colors: colors(),
-    });
-    monaco.editor.defineTheme("zx-dark", {
-        base: "vs-dark",
-        inherit: true,
-        rules: [],
-        colors: colors(),
-    });
-};
-
-const zxThemeName = () =>
-    editorShikiTheme.value === "dark" ? "zx-dark" : "zx-light";
-
 // ==================== 专业编辑功能（monaco） ====================
 const openFind = () => {
     monacoEditor?.getAction("actions.find")?.run();
@@ -560,7 +558,19 @@ onMounted(async () => {
         monacoEditor = monacoInstance.editor.create(monacoHost.value, {
             value: content.value,
             language: monacoLang.value,
-            theme: zxThemeName(),
+            theme: zxThemeName(editorShikiTheme.value),
+            "semanticHighlighting.enabled": true,
+            bracketPairColorization: {
+                enabled: true,
+                independentColorPoolPerBracketType: true,
+            },
+            guides: {
+                bracketPairs: true,
+                bracketPairsHorizontal: true,
+                highlightActiveBracketPair: true,
+                indentation: true,
+                highlightActiveIndentation: true,
+            },
             automaticLayout: true,
             fontFamily: '"JetBrains Mono", "Cascadia Mono", Consolas, monospace',
             fontSize: 14,
@@ -570,9 +580,19 @@ onMounted(async () => {
             wordWrap: wordWrap.value ? "on" : "off",
             scrollBeyondLastLine: false,
             tabSize: 4,
+            cursorBlinking: "blink",
+            cursorSmoothCaretAnimation: "off",
             renderLineHighlight: "none",
             smoothScrolling: true,
             padding: { top: 10, bottom: 10 },
+            scrollbar: {
+                vertical: "auto",
+                horizontal: "auto",
+                verticalScrollbarSize: 6,
+                horizontalScrollbarSize: 6,
+                arrowSize: 0,
+                useShadows: false,
+            },
         });
         monacoEditor.onDidChangeModelContent(() => {
             if (applyingMonacoValue) return;
@@ -664,118 +684,107 @@ watch([content, shikiLang, editorShikiTheme], requestHighlight, {
 watch(editorShikiTheme, () => {
     if (!monacoInstance || !monacoEditor) return;
     defineZxThemes(monacoInstance);
-    monacoInstance.editor.setTheme(zxThemeName());
+    monacoInstance.editor.setTheme(zxThemeName(editorShikiTheme.value));
 });
 
-// ==================== Markdown 预览 ====================
+// ==================== Markdown 预览与模式 ====================
 const isMarkdown = computed(() => {
     if (selectedLanguage.value === "markdown") return true;
-    if (selectedLanguage.value === "auto") {
+    if (selectedLanguage.value === "auto" && props.path) {
         const ext = props.path.split(".").pop()?.toLowerCase();
         return ext === "md" || ext === "markdown";
     }
     return false;
 });
 
-const isPreviewing = ref(false);
-const previewRef = ref<HTMLElement | null>(null);
-const previewHtml = ref("");
+export type MarkdownViewMode = "edit" | "split" | "preview";
+const mdMode = ref<MarkdownViewMode>("edit");
+const isPreviewing = computed(() => mdMode.value === "preview");
 
-let markedPromise: Promise<typeof import("marked")> | null = null;
-
-const renderPreview = async () => {
-    if (!markedPromise) markedPromise = import("marked");
-    const { marked } = await markedPromise;
-    try {
-        previewHtml.value = await marked.parse(content.value, {
-            async: false,
-            gfm: true,
-            breaks: true,
-        });
-    } catch {
-        previewHtml.value = "";
-    }
-};
-
-const togglePreview = () => {
-    isPreviewing.value = true;
-    renderPreview();
-};
-
-// ---- 相对路径资源解析：md 里引用的同目录图片通过文件接口读成 base64 ----
-const imageFetchCache = new Map<string, Promise<string | null>>();
-
-/** 把 md 内的相对 src 解析为服务器绝对路径；非相对路径返回 null */
-const resolveRelativeImagePath = (src: string): string | null => {
-    const raw = src.trim();
-    if (!raw || !props.path) return null;
-    if (/^(data|https?):/i.test(raw) || raw.startsWith("//")) return null;
-
-    const dir = props.path.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
-    const base = dir.startsWith("/") ? `file://${dir}/` : `file:///${dir}/`;
-    try {
-        let pathname = new URL(raw, base).pathname;
-        // Windows 盘符路径（/C:/a/b.png）去掉 URL 器加的首斜杠
-        if (/^\/[A-Za-z]:\//.test(pathname)) pathname = pathname.slice(1);
-        return decodeURIComponent(pathname);
-    } catch {
-        return null;
-    }
-};
-
-const fetchRelativeImage = (serverPath: string): Promise<string | null> => {
-    if (!imageFetchCache.has(serverPath)) {
-        imageFetchCache.set(
-            serverPath,
-            fileApi
-                .readFile(serverPath, { skipInterceptor: true, as_image: true })
-                .then((res) =>
-                    res?.success && res?.data?.content ? res.data.content : null,
-                )
-                .catch(() => null),
-        );
-    }
-    return imageFetchCache.get(serverPath)!;
-};
-
-/** 预览渲染后把相对路径图片替换为可展示的 base64 */
-const resolvePreviewImages = () => {
-    const container = previewRef.value;
-    if (!container) return;
-
-    container.querySelectorAll("img").forEach((img) => {
-        const serverPath = resolveRelativeImagePath(img.getAttribute("src") || "");
-        if (!serverPath) return;
-        img.alt = img.alt || serverPath.split("/").pop() || "";
-        fetchRelativeImage(serverPath).then((dataUrl) => {
-            if (dataUrl) img.src = dataUrl;
-            else img.classList.add("md-img-broken");
-        });
+const setMdMode = (mode: MarkdownViewMode) => {
+    mdMode.value = mode;
+    nextTick(() => {
+        monacoEditor?.layout();
     });
 };
 
-watch(previewHtml, () => nextTick(resolvePreviewImages));
+// ==================== Markdown 分屏宽度拖拽 ====================
+const editorSplitRef = ref<HTMLElement | null>(null);
+const previewRatio = ref(
+    Math.max(20, Math.min(80, Number(localStorage.getItem("zx-editor-preview-ratio")) || 50)),
+);
+const isDraggingPreview = ref(false);
+let cleanupPreviewDrag: (() => void) | null = null;
 
-watch(content, () => {
-    if (isPreviewing.value) {
-        window.clearTimeout(previewTimer);
-        previewTimer = window.setTimeout(renderPreview, 300);
-    }
-});
+const resetPreviewRatio = () => {
+    previewRatio.value = 50;
+    localStorage.setItem("zx-editor-preview-ratio", "50");
+    nextTick(() => {
+        monacoEditor?.layout();
+    });
+};
 
-let previewTimer: number | undefined;
+const startDragPreview = (e: MouseEvent) => {
+    if (!editorSplitRef.value) return;
+    isDraggingPreview.value = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const startX = e.clientX;
+    const containerW = editorSplitRef.value.clientWidth || 800;
+    const startR = previewRatio.value;
+    let rafId: number | null = null;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+        const delta = moveEvent.clientX - startX;
+        const deltaRatio = (delta / containerW) * 100;
+        const newRatio = startR - deltaRatio;
+        previewRatio.value = Math.max(20, Math.min(80, Math.round(newRatio * 10) / 10));
+
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+            monacoEditor?.layout();
+        });
+    };
+
+    const onMouseUp = () => {
+        isDraggingPreview.value = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        cleanupPreviewDrag = null;
+        if (rafId) cancelAnimationFrame(rafId);
+        localStorage.setItem("zx-editor-preview-ratio", String(previewRatio.value));
+        nextTick(() => {
+            monacoEditor?.layout();
+        });
+    };
+
+    cleanupPreviewDrag = () => {
+        isDraggingPreview.value = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        if (rafId) cancelAnimationFrame(rafId);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+};
 
 // 文件切换时回到编辑视图
 watch(
     () => props.path,
     () => {
-        isPreviewing.value = false;
+        mdMode.value = "edit";
     },
 );
 
 onBeforeUnmount(() => {
+    cleanupPreviewDrag?.();
     window.clearTimeout(highlightTimer);
-    window.clearTimeout(previewTimer);
     monacoEditor?.getModel()?.dispose();
     monacoEditor?.dispose();
     monacoEditor = null;
@@ -895,12 +904,13 @@ defineExpose({
 .preview-segmented button {
     display: inline-flex;
     height: 1.75rem;
+    width: 1.75rem;
     align-items: center;
-    gap: 0.25rem;
+    justify-content: center;
     border: 0;
     border-radius: 9999px;
     background: transparent;
-    padding: 0 0.75rem;
+    padding: 0;
     color: var(--zx-color-text-muted);
     font-size: 0.75rem;
     line-height: 1;
@@ -943,6 +953,7 @@ defineExpose({
     user-select: none;
 }
 
+/* 预览态：单列布局（md-preview 视图在 MarkdownPreview 子组件内） */
 .editor-wrapper:has(> .md-preview) {
     grid-template-columns: minmax(0, 1fr);
     overflow-y: auto;
@@ -1042,150 +1053,6 @@ defineExpose({
 .editor-textarea.has-highlight {
     color: transparent;
     caret-color: var(--zx-color-text-strong);
-}
-
-/* ==================== Markdown 预览 ==================== */
-.md-preview {
-    min-height: 0;
-    padding: 1.25rem 1.5rem 2rem;
-    color: var(--zx-color-text-strong);
-    font-size: 0.9375rem;
-    line-height: 1.75;
-    overflow-wrap: break-word;
-}
-
-.md-preview :deep(h1),
-.md-preview :deep(h2),
-.md-preview :deep(h3),
-.md-preview :deep(h4),
-.md-preview :deep(h5),
-.md-preview :deep(h6) {
-    margin: 1.5em 0 0.6em;
-    color: var(--zx-color-text-strong);
-    font-weight: 700;
-    line-height: 1.35;
-}
-
-.md-preview :deep(h1) {
-    padding-bottom: 0.35em;
-    border-bottom: 1px solid var(--zx-color-border);
-    font-size: 1.6em;
-}
-
-.md-preview :deep(h2) {
-    padding-bottom: 0.3em;
-    border-bottom: 1px solid var(--zx-color-border);
-    font-size: 1.35em;
-}
-
-.md-preview :deep(h3) {
-    font-size: 1.15em;
-}
-
-.md-preview :deep(h4) {
-    font-size: 1em;
-}
-
-.md-preview :deep(p) {
-    margin: 0.75em 0;
-}
-
-.md-preview :deep(a) {
-    color: var(--zx-color-primary);
-    text-decoration: underline;
-    text-underline-offset: 2px;
-}
-
-.md-preview :deep(ul),
-.md-preview :deep(ol) {
-    margin: 0.75em 0;
-    padding-left: 1.5em;
-}
-
-.md-preview :deep(ul) {
-    list-style: disc;
-}
-
-.md-preview :deep(ol) {
-    list-style: decimal;
-}
-
-.md-preview :deep(li) {
-    margin: 0.25em 0;
-}
-
-.md-preview :deep(blockquote) {
-    margin: 1em 0;
-    border-left: 3px solid var(--zx-color-primary);
-    border-radius: 0 0.5rem 0.5rem 0;
-    background-color: var(--zx-color-surface-muted);
-    padding: 0.5em 1em;
-    color: var(--zx-color-text-muted);
-}
-
-.md-preview :deep(code) {
-    border-radius: 0.375rem;
-    background-color: var(--zx-color-surface-muted);
-    padding: 0.15em 0.4em;
-    font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
-    font-size: 0.85em;
-}
-
-.md-preview :deep(pre) {
-    margin: 1em 0;
-    border: 1px solid var(--zx-color-border);
-    border-radius: 0.75rem;
-    background-color: var(--zx-color-surface-muted);
-    padding: 0.875rem 1rem;
-    overflow-x: auto;
-}
-
-.md-preview :deep(pre code) {
-    background: transparent;
-    padding: 0;
-    font-size: 0.85em;
-    line-height: 1.6;
-}
-
-.md-preview :deep(table) {
-    margin: 1em 0;
-    border-collapse: collapse;
-    width: 100%;
-    font-size: 0.875em;
-}
-
-.md-preview :deep(th),
-.md-preview :deep(td) {
-    border: 1px solid var(--zx-color-border);
-    padding: 0.45em 0.75em;
-    text-align: left;
-}
-
-.md-preview :deep(th) {
-    background-color: var(--zx-color-surface-muted);
-    font-weight: 600;
-}
-
-.md-preview :deep(hr) {
-    margin: 1.5em 0;
-    border: 0;
-    border-top: 1px solid var(--zx-color-border);
-}
-
-.md-preview :deep(img) {
-    max-width: 100%;
-    border-radius: 0.75rem;
-}
-
-/* 相对路径图片解析失败时的占位样式 */
-.md-preview :deep(img.md-img-broken) {
-    display: inline-block;
-    min-width: 120px;
-    min-height: 60px;
-    border: 1px dashed var(--zx-color-border);
-    background-color: var(--zx-color-surface-muted);
-    object-fit: contain;
-    padding: 0.5rem;
 }
 
 .loading-overlay {

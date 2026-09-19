@@ -1,19 +1,27 @@
 <script setup lang="ts">
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
     Archive,
     ArchiveRestore,
     Check,
+    ChevronDown,
+    ChevronUp,
+    ClipboardPaste,
+    Copy,
     Download,
     Edit2,
-    FileText,
-    Folder,
-    Image as ImageIcon,
     Package,
-    Search,
+    Scissors,
     Trash2,
 } from "lucide-vue-next";
 import type { FileItem } from "@/types/api-next.types";
-import { ZXContextMenu } from "@/components/zxcomponent/ContextMenu";
+import { ZXContextMenu, menuSep } from "@/components/zxcomponent/ContextMenu";
+import type { ZXContextMenuItem } from "@/components/zxcomponent/ContextMenu";
+import { getFileIcon } from "@/components/FileEditorModal/fileIcons";
+import FolderIcon from "@/components/zxcomponent/icons/FolderIcon.vue";
+
+type SortField = "name" | "size" | "mtime";
+type SortDir = "asc" | "desc";
 
 const props = defineProps<{
     files: FileItem[];
@@ -21,6 +29,9 @@ const props = defineProps<{
     isEmpty: boolean;
     searchQuery: string;
     selectedPaths: Set<string>;
+    sortField: SortField;
+    sortDir: SortDir;
+    canPaste?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -34,7 +45,42 @@ const emit = defineEmits<{
     "preview-archive": [file: FileItem];
     "extract-archive": [file: FileItem];
     compress: [files: FileItem[]];
+    sort: [field: SortField];
+    copy: [files: FileItem[]];
+    cut: [files: FileItem[]];
+    paste: [destDir?: string];
 }>();
+
+const scrollEl = ref<HTMLElement | null>(null);
+
+const normPath = (p: string | undefined) =>
+    String(p || "").replace(/\\/g, "/");
+
+const isSelected = (file: FileItem) => {
+    const p = normPath(file.path);
+    return !!p && props.selectedPaths.has(p);
+};
+
+/** 选中/列表变化时尽量保住滚动位置 */
+const lockScrollTop = () => {
+    const el = scrollEl.value;
+    if (!el) return;
+    const top = el.scrollTop;
+    void nextTick(() => {
+        const node = scrollEl.value;
+        if (!node) return;
+        const max = Math.max(0, node.scrollHeight - node.clientHeight);
+        node.scrollTop = Math.min(top, max);
+    });
+};
+
+watch(() => props.selectedPaths, lockScrollTop);
+watch(() => props.files, lockScrollTop);
+
+onMounted(lockScrollTop);
+onBeforeUnmount(() => {
+    /* noop */
+});
 
 const formatFileSize = (bytes: number | undefined | null, isFile = true) => {
     if (!isFile) return "-";
@@ -65,22 +111,22 @@ const getFileIconStyle = (file: FileItem) => {
     }
 
     if (!file.is_image) {
-        return "text-slate-500";
+        return "text-zx-text-muted";
     }
 
     const ext = file.name.split(".").pop()?.toLowerCase();
     const colorMap: Record<string, string> = {
-        jpg: "text-slate-500",
-        jpeg: "text-slate-500",
-        png: "text-slate-500",
-        gif: "text-slate-500",
-        svg: "text-slate-500",
-        webp: "text-slate-500",
-        bmp: "text-slate-500",
-        ico: "text-slate-500",
+        jpg: "text-zx-text-muted",
+        jpeg: "text-zx-text-muted",
+        png: "text-zx-text-muted",
+        gif: "text-zx-text-muted",
+        svg: "text-zx-text-muted",
+        webp: "text-zx-text-muted",
+        bmp: "text-zx-text-muted",
+        ico: "text-zx-text-muted",
     };
 
-    return colorMap[ext || ""] || "text-slate-500";
+    return colorMap[ext || ""] || "text-zx-text-muted";
 };
 
 const ZIP_EXTS = ["zip", "jar", "apk", "whl", "epub"];
@@ -112,45 +158,71 @@ const handleOpen = (file: FileItem) => {
     emit("enter-folder", file);
 };
 
-const isSelected = (file: FileItem) => props.selectedPaths.has(file.path);
+/** 单击选中，双击打开 */
+const onRowClick = (file: FileItem, e: MouseEvent) => {
+    if (e.detail >= 2) {
+        handleOpen(file);
+        return;
+    }
+    emit("toggle-select", file);
+};
 
-/** 右键目标：命中已选中项时整个选区一起操作，否则只操作该文件 */
+const rowSelectedCls =
+    "bg-zx-primary-soft/70 shadow-[inset_2px_0_0_0_var(--zx-color-primary)]";
+
 const menuTargets = (file: FileItem): FileItem[] => {
     if (isSelected(file)) {
-        return props.files.filter((f) => props.selectedPaths.has(f.path));
+        return props.files.filter((f) => isSelected(f));
     }
     return [file];
 };
 
-// 右键文件/文件夹：打开、下载、压缩包操作、压缩、重命名（仅文件）、删除
 const openFileMenu = (e: MouseEvent, file: FileItem) => {
     const targets = menuTargets(file);
     const batch = targets.length > 1;
-    const single = targets[0] ?? file;
 
-    const menuItems: {
-        label: string;
-        icon: any;
-        action: () => void;
-        danger?: boolean;
-    }[] = [];
+    const items: ZXContextMenuItem[] = [];
 
     if (!batch) {
-        menuItems.push({
+        items.push({
             label: file.is_file ? "打开文件" : "打开文件夹",
-            icon: file.is_file ? FileText : Folder,
+            icon: file.is_file ? getFileIcon(file.name).icon : FolderIcon,
             action: () => handleOpen(file),
         });
+        items.push(menuSep());
     }
 
-    menuItems.push({
-        label: batch ? `下载选中项 (${targets.length})` : "下载",
-        icon: Download,
-        action: () => emit("download", targets),
-    });
+    items.push(
+        {
+            label: batch ? `复制选中项 (${targets.length})` : "复制",
+            icon: Copy,
+            action: () => emit("copy", targets),
+        },
+        {
+            label: batch ? `剪切选中项 (${targets.length})` : "剪切",
+            icon: Scissors,
+            action: () => emit("cut", targets),
+        },
+        {
+            label: "粘贴到此处",
+            icon: ClipboardPaste,
+            disabled: !props.canPaste,
+            action: () =>
+                emit("paste", file.is_file ? undefined : file.path),
+        },
+    );
+
+    items.push(
+        menuSep(),
+        {
+            label: batch ? `下载选中项 (${targets.length})` : "下载",
+            icon: Download,
+            action: () => emit("download", targets),
+        },
+    );
 
     if (!batch && isArchive(file)) {
-        menuItems.push(
+        items.push(
             {
                 label: "预览压缩包内容",
                 icon: Archive,
@@ -164,21 +236,22 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
         );
     }
 
-    menuItems.push(
-        {
-            label: batch ? `压缩选中项为 zip` : "压缩为 zip",
-            icon: Package,
-            action: () => emit("compress", targets),
-        },
-        ...(!batch && file.is_file
-            ? [
-                  {
-                      label: "重命名",
-                      icon: Edit2,
-                      action: () => emit("rename", file),
-                  },
-              ]
-            : []),
+    items.push({
+        label: batch ? "压缩选中项为 zip" : "压缩为 zip",
+        icon: Package,
+        action: () => emit("compress", targets),
+    });
+
+    if (!batch && file.is_file) {
+        items.push({
+            label: "重命名",
+            icon: Edit2,
+            action: () => emit("rename", file),
+        });
+    }
+
+    items.push(
+        menuSep(),
         {
             label: batch ? `删除选中项 (${targets.length})` : "删除",
             icon: Trash2,
@@ -190,58 +263,157 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
     ZXContextMenu.show({
         x: e.clientX,
         y: e.clientY,
-        items: menuItems,
+        items,
+    });
+};
+
+const openEmptyMenu = (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("[data-file-row]") || target?.closest("input")) return;
+    e.preventDefault();
+    ZXContextMenu.show({
+        x: e.clientX,
+        y: e.clientY,
+        items: [
+            {
+                label: "粘贴到此处",
+                icon: ClipboardPaste,
+                disabled: !props.canPaste,
+                action: () => emit("paste"),
+            },
+            menuSep(),
+            {
+                label: "全选",
+                icon: Check,
+                disabled: !props.files.length,
+                action: () => {
+                    props.files.forEach((f) => {
+                        if (!isSelected(f)) emit("toggle-select", f);
+                    });
+                },
+            },
+        ],
     });
 };
 </script>
 
 <template>
     <div
-        class="flex-1 overflow-hidden rounded-3xl border-1 border-slate-200 bg-white shadow-sm select-none"
+        class="relative min-h-0 flex-1 overflow-hidden rounded-3xl border-1 border-slate-200 bg-white shadow-sm select-none"
     >
-        <div v-if="loading" class="flex h-full items-center justify-center">
-            <div class="text-center text-gray-400">
-                <Folder class="mx-auto mb-4 h-12 w-12 animate-pulse" />
+        <div
+            v-if="loading && !files.length"
+            class="absolute inset-0 z-10 flex items-center justify-center"
+        >
+            <div class="text-center text-zx-text-subtle">
+                <FolderIcon class="mx-auto mb-4 h-12 w-12 animate-pulse" />
                 <p>加载中...</p>
             </div>
         </div>
 
         <div
-            v-else-if="isEmpty"
-            class="flex h-full items-center justify-center"
+            v-else-if="isEmpty || !files.length"
+            class="absolute inset-0 flex items-center justify-center"
+            @contextmenu.prevent="openEmptyMenu"
         >
-            <div class="text-center text-gray-400">
-                <Folder class="mx-auto mb-4 h-16 w-16 opacity-50" />
-                <p>此文件夹为空</p>
+            <div class="text-center text-zx-text-subtle">
+                <FolderIcon class="mx-auto mb-4 h-16 w-16 opacity-50" />
+                <p>{{ loading ? "加载中..." : "此文件夹为空" }}</p>
+                <p v-if="props.canPaste && !loading" class="mt-1 text-[11px]">
+                    右键可粘贴到此处
+                </p>
             </div>
         </div>
 
+        <!-- 滚动区：absolute 撑满面板，不依赖 h-full 百分比 -->
         <div
             v-else
-            class="h-full overflow-x-hidden overflow-y-auto px-4"
+            ref="scrollEl"
+            class="absolute inset-0 overflow-x-hidden overflow-y-auto px-2"
+            style="overflow-anchor: none"
             @click.self="emit('clear-selection')"
+            @contextmenu.self="openEmptyMenu"
         >
-            <table class="hidden w-full sm:table">
-                <thead class="sticky top-0 border-b-1 border-gray-200 bg-white">
+            <table class="w-full">
+                <thead
+                    class="sticky top-0 z-10 border-b-1 border-gray-200 bg-white"
+                >
                     <tr>
                         <th class="w-10 pl-6 pr-0 pt-6 pb-4"></th>
                         <th
-                            class="px-6 pt-6 pb-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
+                            class="px-6 pt-6 pb-4 text-left text-xs font-medium tracking-wider text-zx-text-muted uppercase"
                         >
-                            名称
+                            <span
+                                class="inline-flex cursor-pointer items-center gap-1 select-none hover:text-zx-text"
+                                @click="emit('sort', 'name')"
+                            >
+                                名称
+                                <ChevronUp
+                                    v-if="
+                                        props.sortField === 'name' &&
+                                        props.sortDir === 'asc'
+                                    "
+                                    class="h-3 w-3 text-zx-primary"
+                                />
+                                <ChevronDown
+                                    v-else-if="
+                                        props.sortField === 'name' &&
+                                        props.sortDir === 'desc'
+                                    "
+                                    class="h-3 w-3 text-zx-primary"
+                                />
+                            </span>
                         </th>
                         <th
-                            class="px-6 pt-6 pb-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase"
+                            class="px-6 pt-6 pb-4 text-left text-xs font-medium tracking-wider text-zx-text-muted uppercase"
                         >
-                            大小
+                            <span
+                                class="inline-flex cursor-pointer items-center gap-1 select-none hover:text-zx-text"
+                                @click="emit('sort', 'size')"
+                            >
+                                大小
+                                <ChevronUp
+                                    v-if="
+                                        props.sortField === 'size' &&
+                                        props.sortDir === 'asc'
+                                    "
+                                    class="h-3 w-3 text-zx-primary"
+                                />
+                                <ChevronDown
+                                    v-else-if="
+                                        props.sortField === 'size' &&
+                                        props.sortDir === 'desc'
+                                    "
+                                    class="h-3 w-3 text-zx-primary"
+                                />
+                            </span>
                         </th>
                         <th
-                            class="hidden px-6 pt-6 pb-4 text-left text-xs font-medium tracking-wider text-gray-500 uppercase md:table-cell"
+                            class="hidden px-6 pt-6 pb-4 text-left text-xs font-medium tracking-wider text-zx-text-muted uppercase md:table-cell"
                         >
-                            修改时间
+                            <span
+                                class="inline-flex cursor-pointer items-center gap-1 select-none hover:text-zx-text"
+                                @click="emit('sort', 'mtime')"
+                            >
+                                修改时间
+                                <ChevronUp
+                                    v-if="
+                                        props.sortField === 'mtime' &&
+                                        props.sortDir === 'asc'
+                                    "
+                                    class="h-3 w-3 text-zx-primary"
+                                />
+                                <ChevronDown
+                                    v-else-if="
+                                        props.sortField === 'mtime' &&
+                                        props.sortDir === 'desc'
+                                    "
+                                    class="h-3 w-3 text-zx-primary"
+                                />
+                            </span>
                         </th>
                         <th
-                            class="px-6 pt-6 pb-4 text-right text-xs font-medium tracking-wider text-gray-500 uppercase"
+                            class="px-6 pt-6 pb-4 text-right text-xs font-medium tracking-wider text-zx-text-muted uppercase"
                         >
                             操作
                         </th>
@@ -250,9 +422,11 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
                 <tbody class="divide-y divide-gray-100">
                     <tr
                         v-for="file in files"
-                        :key="file.name"
+                        :key="file.path || file.name"
+                        data-file-row
                         class="cursor-pointer transition-colors hover:bg-gray-50"
-                        @click="handleOpen(file)"
+                        :class="isSelected(file) ? rowSelectedCls : ''"
+                        @click="onRowClick(file, $event)"
                         @contextmenu.prevent="openFileMenu($event, file)"
                     >
                         <td class="pl-6 pr-0 py-2">
@@ -283,29 +457,30 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
                                     :class="getFileIconStyle(file)"
                                     class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-2xl"
                                 >
-                                    <Folder
+                                    <FolderIcon
                                         v-if="!file.is_file"
                                         class="h-5 w-5"
                                     />
-                                    <ImageIcon
-                                        v-else-if="file.is_image"
+                                    <component
+                                        :is="getFileIcon(file.name).icon"
+                                        v-else
                                         class="h-5 w-5"
+                                        :class="getFileIcon(file.name).class"
                                     />
-                                    <FileText v-else class="h-5 w-5" />
                                 </div>
-                                <span class="truncate text-sm text-gray-700">
+                                <span class="truncate text-sm text-zx-text">
                                     {{ file.name }}
                                 </span>
                             </div>
                         </td>
-                        <td class="px-4 py-2 text-sm text-gray-500">
+                        <td class="px-4 py-2 text-sm text-zx-text-muted">
                             {{
                                 file.size_formatted ||
                                 formatFileSize(file.size, file.is_file)
                             }}
                         </td>
                         <td
-                            class="hidden px-4 py-2 text-sm text-gray-500 md:table-cell"
+                            class="hidden px-4 py-2 text-sm text-zx-text-muted md:table-cell"
                         >
                             {{ file.mtime_formatted || formatTime(file.mtime) }}
                         </td>
@@ -335,14 +510,21 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
                 </tbody>
             </table>
 
-            <div class="divide-y divide-gray-100 sm:hidden">
+            <!-- 窄屏卡片列表 -->
+            <div class="divide-y divide-gray-100 md:hidden">
                 <div
                     v-for="file in files"
-                    :key="file.name"
+                    :key="`m-${file.path || file.name}`"
+                    data-file-row
                     class="p-3 transition-colors hover:bg-gray-50"
+                    :class="isSelected(file) ? rowSelectedCls : ''"
+                    @click="onRowClick(file, $event)"
                     @contextmenu.prevent="openFileMenu($event, file)"
                 >
-                    <div class="flex items-start gap-3" @click="handleOpen(file)">
+                    <div
+                        class="flex items-start gap-3"
+                        @click.stop="onRowClick(file, $event)"
+                    >
                         <label
                             class="flex h-10 w-6 flex-shrink-0 cursor-pointer items-center justify-center"
                             title="选择"
@@ -367,61 +549,36 @@ const openFileMenu = (e: MouseEvent, file: FileItem) => {
                             :class="getFileIconStyle(file)"
                             class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
                         >
-                            <Folder v-if="!file.is_file" class="h-6 w-6" />
-                            <ImageIcon
-                                v-else-if="file.is_image"
+                            <FolderIcon
+                                v-if="!file.is_file"
                                 class="h-6 w-6"
                             />
-                            <FileText v-else class="h-6 w-6" />
+                            <component
+                                :is="getFileIcon(file.name).icon"
+                                v-else
+                                class="h-6 w-6"
+                                :class="getFileIcon(file.name).class"
+                            />
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div
-                                class="truncate text-sm font-medium text-gray-700"
-                            >
+                            <div class="truncate text-sm text-zx-text">
                                 {{ file.name }}
                             </div>
-                            <div class="mt-1 text-xs text-gray-500">
+                            <div class="mt-0.5 text-xs text-zx-text-muted">
                                 {{
-                                    file.size_formatted ||
-                                    formatFileSize(file.size, file.is_file)
+                                    file.is_file
+                                        ? file.size_formatted ||
+                                          formatFileSize(file.size, true)
+                                        : "文件夹"
                                 }}
-                                <span v-if="file.mtime_formatted" class="mx-1"
-                                    >·</span
-                                >
+                                ·
                                 {{
                                     file.mtime_formatted ||
                                     formatTime(file.mtime)
                                 }}
                             </div>
                         </div>
-                        <div class="flex flex-shrink-0 items-center gap-1">
-                            <button
-                                v-if="file.is_file"
-                                class="btn-touch rounded-2xl p-2 text-slate-600 transition-colors hover:bg-slate-100"
-                                title="重命名"
-                                @click.stop="emit('rename', file)"
-                            >
-                                <Edit2 class="h-4 w-4" />
-                            </button>
-                            <button
-                                class="btn-touch rounded-2xl p-2 text-red-600 transition-colors hover:bg-red-50"
-                                title="删除"
-                                @click.stop="emit('delete', [file])"
-                            >
-                                <Trash2 class="h-4 w-4" />
-                            </button>
-                        </div>
                     </div>
-                </div>
-            </div>
-
-            <div
-                v-if="searchQuery && files.length === 0"
-                class="flex h-full items-center justify-center"
-            >
-                <div class="text-center text-gray-400">
-                    <Search class="mx-auto mb-4 h-16 w-16 opacity-50" />
-                    <p>未找到匹配的文件</p>
                 </div>
             </div>
         </div>

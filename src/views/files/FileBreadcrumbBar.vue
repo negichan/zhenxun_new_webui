@@ -2,9 +2,11 @@
 import {
     ArrowLeft,
     ChevronRight,
+    Database,
     Download,
     Home,
     Package,
+    Plus,
     Search,
     Trash2,
     X,
@@ -21,6 +23,8 @@ const emit = defineEmits<{
     back: [];
     home: [];
     navigate: [path: string];
+    new: [];
+    "open-database": [];
     "update:searchQuery": [value: string];
     "clear-selection": [];
     "download-selected": [];
@@ -37,14 +41,14 @@ const emit = defineEmits<{
             <button
                 :disabled="!currentPath"
                 title="返回上一层"
-                class="btn-touch flex-shrink-0 cursor-pointer rounded-2xl p-1.5 text-gray-500 transition-colors hover:bg-gray-100 disabled:opacity-30"
+                class="btn-touch flex-shrink-0 cursor-pointer rounded-2xl p-1.5 text-zx-text-muted transition-colors hover:bg-gray-100 disabled:opacity-30"
                 @click="emit('back')"
             >
                 <ArrowLeft class="h-4 w-4" />
             </button>
             <button
                 title="回到根目录"
-                class="btn-touch flex-shrink-0 cursor-pointer rounded-2xl p-1.5 text-gray-500 transition-colors hover:bg-gray-100"
+                class="btn-touch flex-shrink-0 cursor-pointer rounded-2xl p-1.5 text-zx-text-muted transition-colors hover:bg-gray-100"
                 @click="emit('home')"
             >
                 <Home class="h-4 w-4" />
@@ -62,7 +66,7 @@ const emit = defineEmits<{
                     已选中 {{ selectedCount }} 项
                 </span>
                 <button
-                    class="btn-touch flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1.5 text-xs text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                    class="btn-touch flex flex-shrink-0 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1.5 text-xs text-zx-text-muted transition-colors hover:bg-gray-100 hover:text-zx-text"
                     type="button"
                     @click="emit('clear-selection')"
                 >
@@ -77,7 +81,7 @@ const emit = defineEmits<{
                 class="scrollbar-hide flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto text-sm"
             >
                 <template v-for="(segment, index) in pathSegments" :key="index">
-                    <ChevronRight class="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
+                    <ChevronRight class="h-3.5 w-3.5 flex-shrink-0 text-zx-text-muted" />
                     <button
                         class="max-w-[140px] flex-shrink-0 truncate rounded-lg bg-[var(--zx-color-surface-muted)] px-2.5 py-1 text-[13px] font-medium text-[var(--zx-color-text)] transition-colors hover:bg-[var(--zx-color-primary-tint)] hover:text-zx-primary"
                         :title="segment"
@@ -93,7 +97,7 @@ const emit = defineEmits<{
                 </template>
                 <span
                     v-if="!pathSegments.length"
-                    class="px-2 py-1 text-gray-400"
+                    class="px-2 py-1 text-zx-text-subtle"
                 >
                     根目录
                 </span>
@@ -144,9 +148,30 @@ const emit = defineEmits<{
                     "
                 />
                 <Search
-                    class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-gray-400"
+                    class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-zx-text-subtle"
                 />
             </div>
+
+            <!-- 新建（搜索框右侧，多选模式下同样可用） -->
+            <ZxButton
+                size="sm"
+                variant="ghost"
+                class="flex-shrink-0"
+                title="打开数据库面板"
+                @click="emit('open-database')"
+            >
+                <Database class="h-4 w-4" />
+                <span class="hidden sm:inline">数据库</span>
+            </ZxButton>
+            <ZxButton
+                size="sm"
+                variant="primary"
+                class="flex-shrink-0"
+                @click="emit('new')"
+            >
+                <Plus class="h-4 w-4" />
+                <span class="hidden sm:inline">新建</span>
+            </ZxButton>
         </div>
     </div>
 </template>

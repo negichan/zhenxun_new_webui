@@ -6,6 +6,7 @@ import { api, apiClient } from './client'
 import type {
     FileListResult,
     FileContent,
+    FileSearchResult,
     ArchivePreviewResult,
     ArchiveExtractResult,
     APIResponse,
@@ -21,9 +22,10 @@ export const fileApi = {
 
     /**
      * 读取文件内容
+     * as_image：图片返回 data URL；as_bytes：原始字节返回裸 base64（hex/utf-8 视图）
      */
-    readFile(filePath: string, options?: { skipInterceptor?: boolean; as_image?: boolean }): Promise<APIResponse<FileContent>> {
-        return api.get<FileContent>('/file/read', { file_path: filePath, as_image: options?.as_image }, options)
+    readFile(filePath: string, options?: { skipInterceptor?: boolean; as_image?: boolean; as_bytes?: boolean }): Promise<APIResponse<FileContent>> {
+        return api.get<FileContent>('/file/read', { file_path: filePath, as_image: options?.as_image, as_bytes: options?.as_bytes }, options)
     },
 
     /**
@@ -52,6 +54,28 @@ export const fileApi = {
      */
     rename(sourcePath: string, newName: string): Promise<APIResponse<boolean>> {
         return api.post<boolean>('/file/rename', { source_path: sourcePath, new_name: newName })
+    },
+
+    /**
+     * 复制文件/文件夹到目标目录（同名自动 _copy），返回新路径
+     */
+    copyPath(sourcePath: string, destDir: string, newName?: string): Promise<APIResponse<string>> {
+        return api.post<string>('/file/copy', {
+            source_path: sourcePath,
+            dest_dir: destDir,
+            new_name: newName || undefined,
+        })
+    },
+
+    /**
+     * 移动文件/文件夹到目标目录，返回新路径
+     */
+    movePath(sourcePath: string, destDir: string, newName?: string): Promise<APIResponse<string>> {
+        return api.post<string>('/file/move', {
+            source_path: sourcePath,
+            dest_dir: destDir,
+            new_name: newName || undefined,
+        })
     },
 
     /**
@@ -105,10 +129,36 @@ export const fileApi = {
     },
 
     /**
-     * 预览压缩包内容
+     * 全文搜索目录下文本文件内容
      */
-    previewArchive(path: string): Promise<APIResponse<ArchivePreviewResult>> {
-        return api.post<ArchivePreviewResult>('/file/archive-preview', { path })
+    searchFiles(params: {
+        path?: string
+        keyword: string
+        is_regex?: boolean
+        case_sensitive?: boolean
+        whole_word?: boolean
+    }): Promise<APIResponse<FileSearchResult>> {
+        return api.post<FileSearchResult>('/file/search', {
+            path: params.path || undefined,
+            keyword: params.keyword,
+            is_regex: params.is_regex || false,
+            case_sensitive: params.case_sensitive || false,
+            whole_word: params.whole_word || false,
+        })
+    },
+
+    /**
+     * 预览压缩包内容；entries 为钻入嵌套压缩包的条目链
+     */
+    previewArchive(path: string, entries?: string[]): Promise<APIResponse<ArchivePreviewResult>> {
+        return api.post<ArchivePreviewResult>('/file/archive-preview', { path, entries: entries || [] })
+    },
+
+    /**
+     * 读取压缩包（含嵌套）内单个文件的原始字节（base64）
+     */
+    readArchiveEntry(path: string, entries: string[]): Promise<APIResponse<FileContent>> {
+        return api.post<FileContent>('/file/archive-read-entry', { path, entries })
     },
 
     /**

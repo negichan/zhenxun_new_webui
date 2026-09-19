@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from "vue";
-import { Plus } from "lucide-vue-next";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { fileApi } from "@/utils/api-next";
-import type { ArchiveEntry, FileItem } from "@/types/api-next.types";
+import type { FileItem } from "@/types/api-next.types";
 import { ZXMessageBox, ZXNotification } from "@/services/ui";
 import { useFilesStore } from "@/store/files";
-import { useGlobalStore } from "@/store/global.ts";
+import { pasteWithConflict } from "@/composables/usePasteConflict";
 import FileBreadcrumbBar from "./FileBreadcrumbBar.vue";
 import FileListPanel from "./FileListPanel.vue";
+import { isArchiveFile } from "@/components/FileEditorModal/fileIcons";
 import { openImageViewer } from "@/directives/imageViewer";
 import NewItemDialog from "./NewItemDialog.vue";
 import RenameDialog from "./RenameDialog.vue";
@@ -21,7 +21,6 @@ const ArchivePreviewModal = defineAsyncComponent(
 );
 
 const fileStore = useFilesStore();
-const globalStore = useGlobalStore();
 
 const { showNewDialog } = storeToRefs(fileStore);
 
@@ -31,8 +30,35 @@ const fileList = ref<FileItem[]>([]);
 const loading = ref(false);
 const searchQuery = ref("");
 
+// ==================== 列头排序 ====================
+type SortField = "name" | "size" | "mtime";
+type SortDir = "asc" | "desc";
+const sortField = ref<SortField>(
+    (localStorage.getItem("zx-files-sort-field") as SortField) || "name",
+);
+const sortDir = ref<SortDir>(
+    (localStorage.getItem("zx-files-sort-dir") as SortDir) || "asc",
+);
+
+const onSort = (field: SortField) => {
+    if (sortField.value === field) {
+        sortDir.value = sortDir.value === "asc" ? "desc" : "asc";
+    } else {
+        sortField.value = field;
+        sortDir.value = "asc";
+    }
+    localStorage.setItem("zx-files-sort-field", sortField.value);
+    localStorage.setItem("zx-files-sort-dir", sortDir.value);
+};
+
 // ==================== 多选（复选框驱动） ====================
 const selectedPaths = ref<Set<string>>(new Set());
+
+/** 统一为正斜杠，避免 Windows 反斜杠导致选中对不上 */
+const normalizePath = (p: string) =>
+    String(p || "")
+        .replace(/\\/g, "/")
+        .replace(/\/{2,}/g, "/");
 
 const clearSelection = () => {
     selectedPaths.value = new Set();
@@ -40,23 +66,30 @@ const clearSelection = () => {
 
 // 复选框切换：只增删该项
 const toggleSelect = (file: FileItem) => {
-    if (!file.path) return;
+    const path = normalizePath(resolveFilePath(file));
+    if (!path) return;
     const next = new Set(selectedPaths.value);
-    if (next.has(file.path)) {
-        next.delete(file.path);
+    if (next.has(path)) {
+        next.delete(path);
     } else {
-        next.add(file.path);
+        next.add(path);
     }
     selectedPaths.value = next;
 };
 
 const selectAll = () => {
-    selectedPaths.value = new Set(sortedFileList.value.map((f) => f.path));
+    selectedPaths.value = new Set(
+        sortedFileList.value
+            .map((f) => normalizePath(resolveFilePath(f)))
+            .filter(Boolean),
+    );
 };
 
 /** 当前选中的文件对象（地址栏批量操作用） */
 const getSelectedFiles = () =>
-    sortedFileList.value.filter((f) => selectedPaths.value.has(f.path));
+    sortedFileList.value.filter((f) =>
+        selectedPaths.value.has(normalizePath(resolveFilePath(f))),
+    );
 
 const hasAnyModalOpen = () =>
     showEditor.value ||
@@ -69,11 +102,155 @@ const handleKeydown = (e: KeyboardEvent) => {
     if (target?.closest("input, textarea, select, [contenteditable]")) return;
     if (hasAnyModalOpen()) return;
 
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && e.key.toLowerCase() === "a") {
         e.preventDefault();
         selectAll();
+    } else if (mod && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        copyFiles(getSelectedFiles());
+    } else if (mod && e.key.toLowerCase() === "x") {
+        e.preventDefault();
+        cutFiles(getSelectedFiles());
+    } else if (mod && e.key.toLowerCase() === "v") {
+        e.preventDefault();
+        void pasteFiles();
     } else if (e.key === "Escape") {
         clearSelection();
+    }
+};
+
+const resolveFilePath = (file: FileItem) =>
+    file.path ||
+    (currentPath.value
+        ? `${currentPath.value}/${file.name}`
+        : file.name || "");
+
+// ==================== 复制 / 剪切 / 粘贴 / 复制地址 ====================
+type ClipItem = { path: string; name: string; isFile: boolean };
+type ClipState = { mode: "copy" | "cut"; items: ClipItem[] };
+const clipboard = ref<ClipState | null>(null);
+/** 工作区根（面包屑最外层），预留相对路径计算 */
+const workspaceRoot = ref("");
+
+const notifyOk = (title: string, message: string) => {
+    ZXNotification({
+        title,
+        message,
+        type: "🥳",
+        position: "top-right",
+    });
+};
+
+const toClipItems = (files: FileItem[]): ClipItem[] =>
+    files
+        .map((f) => ({
+            path: resolveFilePath(f),
+            name: f.name,
+            isFile: f.is_file,
+        }))
+        .filter((x) => !!x.path);
+
+const copyFiles = (files: FileItem[]) => {
+    const items = toClipItems(files);
+    if (!items.length) return;
+    clipboard.value = { mode: "copy", items };
+    notifyOk(
+        "已复制",
+        items.length === 1
+            ? `${items[0].name}`
+            : `${items.length} 项（粘贴到当前目录）`,
+    );
+};
+
+const cutFiles = (files: FileItem[]) => {
+    const items = toClipItems(files);
+    if (!items.length) return;
+    clipboard.value = { mode: "cut", items };
+    notifyOk(
+        "已剪切",
+        items.length === 1
+            ? `${items[0].name}`
+            : `${items.length} 项（粘贴到当前目录）`,
+    );
+};
+
+const onPasteTo = (dest?: string) => {
+    void pasteFiles(dest);
+};
+
+const canPaste = () => !!clipboard.value?.items.length;
+
+/** destDir 省略 = 当前目录；右键文件夹时粘贴进该文件夹；同名弹窗询问 */
+const pasteFiles = async (destDir?: string) => {
+    const clip = clipboard.value;
+    if (!clip?.items.length) return;
+    const dest = destDir || currentPath.value || "";
+
+    const result = await pasteWithConflict({
+        items: clip.items,
+        mode: clip.mode,
+        destDir: dest,
+    });
+
+    if (result.cancelled) {
+        notifyOk("已取消粘贴", "未修改目标目录");
+        return;
+    }
+
+    if (clip.mode === "cut" && result.ok > 0) clipboard.value = null;
+
+    if (result.ok > 0) {
+        notifyOk(
+            clip.mode === "copy" ? "粘贴成功" : "移动成功",
+            result.failed
+                ? `成功 ${result.ok} 项，失败/跳过 ${result.failed} 项`
+                : `${result.ok} 项已放入目标目录`,
+        );
+    } else if (result.failed > 0) {
+        ZXNotification({
+            title: "粘贴失败",
+            message: "没有项目被粘贴 (´；ω；`)，后端需支持 /file/copy 与 /file/move",
+            type: "😭",
+            position: "top-right",
+        });
+    }
+
+    await loadFileList(currentPath.value);
+
+    if (result.createdNames.length) {
+        const next = new Set<string>();
+        for (const f of fileList.value) {
+            if (result.createdNames.includes(f.name)) {
+                next.add(normalizePath(resolveFilePath(f)));
+            }
+        }
+        selectedPaths.value = next;
+    }
+};
+
+const absolutePathOf = (file: FileItem) => resolveFilePath(file);
+
+const relativePathOf = (file: FileItem) => {
+    const full = resolveFilePath(file).replace(/\\/g, "/");
+    const root = workspaceRoot.value.replace(/\\/g, "/").replace(/\/+$/, "");
+    if (!root) return full;
+    if (full === root) return ".";
+    if (full.startsWith(`${root}/`)) return full.slice(root.length + 1);
+    return full;
+};
+
+const copyPathText = async (text: string, kind: string) => {
+    try {
+        await navigator.clipboard?.writeText(text);
+        notifyOk(`已复制${kind}`, text);
+    } catch {
+        ZXNotification({
+            title: "复制地址失败",
+            message: "剪贴板不可用 (´；ω；`)",
+            type: "😭",
+            position: "top-right",
+        });
     }
 };
 
@@ -84,6 +261,8 @@ const editorInitialFile = ref<{
     name: string;
     content?: string;
 } | null>(null);
+/** 打开编辑器时的侧栏面板；null = 默认文件树 */
+const editorInitialPanel = ref<"explorer" | "search" | "database" | null>(null);
 
 const newItemType = ref<"file" | "folder">("file");
 const newItemName = ref("");
@@ -94,19 +273,7 @@ const newName = ref("");
 
 // ==================== 压缩包预览 ====================
 const showArchivePreview = ref(false);
-const archivePreviewLoading = ref(false);
-const archivePreviewData = ref<{
-    name: string;
-    type: string;
-    entries: ArchiveEntry[];
-    total: number;
-    truncated: boolean;
-    path: string;
-} | null>(null);
-
-const resolveFilePath = (file: FileItem) =>
-    file.path ||
-    (currentPath.value ? `${currentPath.value}/${file.name}` : file.name);
+const archivePreviewTarget = ref<{ path: string; name: string } | null>(null);
 
 const loadFileList = async (path = "") => {
     loading.value = true;
@@ -115,10 +282,39 @@ const loadFileList = async (path = "") => {
         const res = await fileApi.getFileList(path || undefined);
 
         if (res?.success && res?.data) {
-            fileList.value = res.data.files || [];
+            const raw = res.data.files || [];
+            // 过滤无效项；补齐 name/path，路径统一正斜杠
+            fileList.value = raw
+                .filter((f) => f && (f.name || f.path))
+                .map((f) => {
+                    const path = normalizePath(
+                        f.path ||
+                            (res.data?.current_path
+                                ? `${res.data.current_path}/${f.name}`
+                                : f.name || ""),
+                    );
+                    const name =
+                        f.name ||
+                        path.split("/").filter(Boolean).pop() ||
+                        "";
+                    return { ...f, name, path };
+                })
+                .filter((f) => !!f.name);
             pathSegments.value = res.data.path_segments || [];
-            currentPath.value = res.data.current_path || path;
+            currentPath.value = normalizePath(
+                res.data.current_path || path,
+            );
+            if (!res.data.path_segments?.length) {
+                workspaceRoot.value = currentPath.value;
+            }
             clearSelection();
+        } else {
+            ZXNotification({
+                title: "加载失败",
+                message: res?.message || "文件列表加载失败了 (っ °Д °;) っ",
+                type: "😭",
+                position: "top-right",
+            });
         }
     } catch (error) {
         ZXNotification({
@@ -228,12 +424,33 @@ const openEditor = async (file: FileItem) => {
         return;
     }
 
+    // 压缩包走独立的预览页（不进文件编辑器）
+    if (isArchiveFile(file.name)) {
+        handlePreviewArchive(file);
+        return;
+    }
+
     // 内容与编码由编辑器弹窗自行读取（需要探测编码）
+    editorInitialPanel.value = "explorer";
     editorInitialFile.value = {
         path: fullPath,
         name: file.name,
     };
     showEditor.value = true;
+};
+
+/** 打开编辑器并直接切到数据库面板 */
+const openDatabasePanel = async () => {
+    editorInitialFile.value = null;
+    if (!showEditor.value) {
+        editorInitialPanel.value = "database";
+        showEditor.value = true;
+        return;
+    }
+    // 已打开：强制触发侧栏切换（同值 watch 不会响）
+    editorInitialPanel.value = null;
+    await nextTick();
+    editorInitialPanel.value = "database";
 };
 
 const handleNew = async () => {
@@ -368,50 +585,22 @@ const handleDownload = async (files: FileItem[]) => {
 };
 
 // ==================== 压缩包 ====================
-const handlePreviewArchive = async (file: FileItem) => {
-    archivePreviewLoading.value = true;
-    showArchivePreview.value = true;
-    archivePreviewData.value = {
-        name: file.name,
-        type: "",
-        entries: [],
-        total: 0,
-        truncated: false,
+const handlePreviewArchive = (file: FileItem) => {
+    archivePreviewTarget.value = {
         path: resolveFilePath(file),
+        name: file.name,
     };
-
-    try {
-        const res = await fileApi.previewArchive(resolveFilePath(file));
-        if (res?.success && res?.data) {
-            archivePreviewData.value = {
-                name: file.name,
-                type: res.data.archive_type,
-                entries: res.data.entries,
-                total: res.data.total_count,
-                truncated: res.data.truncated,
-                path: resolveFilePath(file),
-            };
-        } else {
-            showArchivePreview.value = false;
-        }
-    } catch (error) {
-        showArchivePreview.value = false;
-        ZXNotification({
-            title: "预览失败",
-            message:
-                (error as any)?.response?.data?.message ||
-                "压缩包读取失败了 (´；ω；`)",
-            type: "😭",
-            position: "top-right",
-        });
-    } finally {
-        archivePreviewLoading.value = false;
-    }
+    showArchivePreview.value = true;
 };
 
-const handleExtractArchive = async (file: FileItem) => {
+const handleExtractArchive = async (file?: FileItem) => {
+    // 右键直接解压时传 file；从预览弹窗解压时用当前目标
+    const target = file
+        ? { path: resolveFilePath(file), name: file.name }
+        : archivePreviewTarget.value;
+    if (!target) return;
     try {
-        const res = await fileApi.extractArchive(resolveFilePath(file));
+        const res = await fileApi.extractArchive(target.path);
         if (res?.success && res?.data) {
             ZXNotification({
                 title: "解压成功～",
@@ -470,11 +659,25 @@ const sortedFileList = computed(() => {
           )
         : fileList.value;
 
-    return [...files].sort((a, b) => {
+    const dir = sortDir.value === "asc" ? 1 : -1;
+    const field = sortField.value;
+
+    return [...files]
+        .filter((f) => f && f.name)
+        .sort((a, b) => {
+        // 文件夹始终排前（名称排序时；大小/时间也保持文件夹优先）
         if (!a.is_file && b.is_file) return -1;
         if (a.is_file && !b.is_file) return 1;
 
-        return a.name.localeCompare(b.name, "zh-CN");
+        if (field === "size") {
+            return ((a.size ?? -1) - (b.size ?? -1)) * dir;
+        }
+        if (field === "mtime") {
+            const ta = a.mtime ? new Date(a.mtime).getTime() || 0 : 0;
+            const tb = b.mtime ? new Date(b.mtime).getTime() || 0 : 0;
+            return (ta - tb) * dir;
+        }
+        return a.name.localeCompare(b.name, "zh-CN") * dir;
     });
 });
 
@@ -489,18 +692,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="flex h-full w-full flex-col space-y-3 sm:space-y-4">
-        <div
-            v-if="!globalStore.isDesktopMode"
-            class="flex items-center justify-end rounded-3xl border-1 border-slate-200 bg-white p-2 shadow-sm sm:p-3"
-        >
-            <ZxButton variant="primary" @click="showNewDialog = true">
-                <Plus class="h-4 w-4" />
-                <span class="hidden sm:inline">新建</span>
-            </ZxButton>
-        </div>
-
+    <!-- 页面根：锁定高度，列表在面板内部滚动 -->
+    <div
+        class="files-page-root flex h-full min-h-0 w-full flex-col overflow-hidden gap-3 sm:gap-4"
+    >
         <FileBreadcrumbBar
+            class="flex-shrink-0"
             v-model:search-query="searchQuery"
             :current-path="currentPath"
             :path-segments="pathSegments"
@@ -508,6 +705,8 @@ onBeforeUnmount(() => {
             @back="goBack"
             @home="loadFileList('')"
             @navigate="loadFileList"
+            @new="showNewDialog = true"
+            @open-database="openDatabasePanel"
             @clear-selection="clearSelection"
             @compress-selected="handleCompress(getSelectedFiles())"
             @delete-selected="handleDelete(getSelectedFiles())"
@@ -515,11 +714,16 @@ onBeforeUnmount(() => {
         />
 
         <FileListPanel
+            class="min-h-0 flex-1"
             :files="sortedFileList"
             :is-empty="fileList.length === 0"
             :loading="loading"
             :search-query="searchQuery"
             :selected-paths="selectedPaths"
+            :sort-field="sortField"
+            :sort-dir="sortDir"
+            :can-paste="canPaste()"
+            @sort="onSort"
             @clear-selection="clearSelection"
             @toggle-select="toggleSelect"
             @compress="handleCompress"
@@ -530,6 +734,9 @@ onBeforeUnmount(() => {
             @open="openEditor"
             @preview-archive="handlePreviewArchive"
             @rename="openRenameDialog"
+            @copy="copyFiles"
+            @cut="cutFiles"
+            @paste="onPasteTo"
         />
 
         <NewItemDialog
@@ -548,26 +755,23 @@ onBeforeUnmount(() => {
         <FileEditorModal
             v-if="showEditor"
             :initial-file="editorInitialFile"
+            :initial-panel="editorInitialPanel"
             @close="showEditor = false"
         />
 
         <ArchivePreviewModal
-            v-if="showArchivePreview && archivePreviewData"
-            :archive-name="archivePreviewData.name"
-            :archive-type="archivePreviewData.type"
-            :entries="archivePreviewData.entries"
-            :total-count="archivePreviewData.total"
-            :truncated="archivePreviewData.truncated"
-            :loading="archivePreviewLoading"
+            v-if="showArchivePreview && archivePreviewTarget"
+            :archive-path="archivePreviewTarget.path"
+            :archive-name="archivePreviewTarget.name"
             @close="showArchivePreview = false"
-            @extract="
-                handleExtractArchive({
-                    name: archivePreviewData.name,
-                    path: archivePreviewData.path,
-                    is_file: true,
-                    is_image: false,
-                })
-            "
+            @extract="handleExtractArchive()"
         />
     </div>
 </template>
+
+<style>
+/* 压住 Home 胶片带给页面根的 overflow-y:auto，滚动交给列表面板 */
+.files-page-root {
+    overflow: hidden !important;
+}
+</style>
