@@ -190,5 +190,17 @@ export default defineConfig(({ command }) =>({
     },
     server: {
         host: "::", // 监听所有 IPv4 和 IPv6 地址（等同于 0.0.0.0）
+        // Windows Hyper-V/WSNAT 保留了 TCP 5121-5220（含 Vite 默认 5173），
+        // 监听会 EACCES；固定到范围外端口，避免反复撞保留段
+        port: 3000,
+        strictPort: true,
+        proxy: {
+            // 开发期把 API / WS 反代到本机 8080 后端
+            "/zhenxun": {
+                target: "http://127.0.0.1:8080",
+                changeOrigin: true,
+                ws: true,
+            },
+        },
     },
 }));

@@ -29,18 +29,20 @@ const props = withDefaults(
 );
 
 /**
- * 语义档 → 主题变量对：[实体色底, 对比色文字]。
- * on-* 对比色由主题按深浅模式定义（浅色白字/深字，深色统一深字）。
+ * 语义档精确对齐 UIStyle.vue 的语义色 Token 标准
  */
-const VARIANT_VARS: Record<string, [string, string]> = {
-    neutral: ["var(--zx-color-neutral)", "var(--zx-color-on-neutral)"],
-    primary: ["var(--zx-color-primary)", "var(--zx-color-on-primary)"],
-    success: ["var(--zx-color-success)", "var(--zx-color-on-success)"],
-    warning: ["var(--zx-color-warning)", "var(--zx-color-on-warning)"],
-    danger: ["var(--zx-color-danger)", "var(--zx-color-on-danger)"],
-    info: ["var(--zx-color-info)", "var(--zx-color-on-info)"],
-    purple: ["var(--zx-color-purple)", "var(--zx-color-on-purple)"],
-    cyan: ["var(--zx-color-cyan)", "var(--zx-color-on-cyan)"],
+const VARIANT_MAP: Record<string, { background: string; color: string }> = {
+    primary: {
+        background: "var(--zx-color-primary, #3b82f6)",
+        color: "var(--zx-color-on-primary, #ffffff)",
+    },
+    success: { background: "#22c55e", color: "#ffffff" },
+    warning: { background: "#f59e0b", color: "#ffffff" },
+    danger: { background: "#ef4444", color: "#ffffff" },
+    info: { background: "#3b82f6", color: "#ffffff" },
+    neutral: { background: "#9ca3af", color: "#ffffff" },
+    purple: { background: "#8b5cf6", color: "#ffffff" },
+    cyan: { background: "#06b6d4", color: "#ffffff" },
 };
 
 // 按背景亮度计算可读的文字颜色：亮底深字、暗底白字（仅用于自定义品牌色）
@@ -62,12 +64,11 @@ const contrastColor = (hex: string): string => {
 };
 
 const style = computed(() => {
-    // 自定义品牌色走实底 + 亮度对比字；语义档走 [实体色底, on-* 对比字] 变量对
+    // 自定义品牌色走实底 + 亮度对比字
     if (props.color) {
         return { background: props.color, color: contrastColor(props.color) };
     }
-    const pair = VARIANT_VARS[props.variant];
-    return pair ? { background: pair[0], color: pair[1] } : undefined;
+    return VARIANT_MAP[props.variant] || VARIANT_MAP.neutral;
 });
 </script>
 

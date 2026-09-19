@@ -1,6 +1,18 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
-import { ChevronLeft, ChevronRight, RotateCw, X, ZoomIn, ZoomOut } from "lucide-vue-next";
+import {
+    ChevronLeft,
+    ChevronRight,
+    Copy,
+    Download,
+    RotateCcw,
+    RotateCw,
+    X,
+    ZoomIn,
+    ZoomOut,
+} from "lucide-vue-next";
+import { ZXContextMenu } from "@/components/zxcomponent/ContextMenu";
+import { ZXNotification } from "@/services/ui";
 
 /**
  * 图片查看器（自研，不依赖 Element Plus）：半透明遮罩 + 居中大图，
@@ -24,13 +36,13 @@ const offsetY = ref(0);
 const current = computed(() => urls.value[index.value] ?? "");
 const scalePercent = computed(() => `${Math.round(scale.value * 100)}%`);
 
-/** 图片加载完成：按视口 90% 计算最合适的展示尺寸（只缩小不放大） */
+/** 图片加载完成：按视口 75% 计算最合适的展示尺寸（只缩小不放大） */
 const onImgLoad = (event: Event) => {
     const img = event.currentTarget as HTMLImageElement;
     fitScale.value = Math.min(
         1,
-        (window.innerWidth * 0.9) / img.naturalWidth,
-        (window.innerHeight * 0.9) / img.naturalHeight,
+        (window.innerWidth * 0.75) / img.naturalWidth,
+        (window.innerHeight * 0.75) / img.naturalHeight,
     );
 };
 
@@ -109,6 +121,130 @@ const onKeydown = (event: KeyboardEvent) => {
     else if (event.key === "ArrowRight") step(1);
 };
 
+/** 当前旋转角（0–359） */
+const rotationDeg = computed(() => ((rotation.value % 360) + 360) % 360);
+
+const extFromMime = (mime: string) => {
+    const map: Record<string, string> = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/webp": "webp",
+        "image/gif": "gif",
+        "image/svg+xml": "svg",
+        "image/bmp": "bmp",
+    };
+    return map[mime] || "png";
+};
+
+const filenameFromUrl = (url: string) => {
+    try {
+        const path = url.startsWith("data:") ? "" : new URL(url).pathname;
+        const base = path.split("/").filter(Boolean).pop() || "";
+        if (base.includes(".")) return decodeURIComponent(base);
+    } catch {
+        /* data URL / 相对路径走默认名 */
+    }
+    return `image-${Date.now()}`;
+};
+
+/** 取当前图 Blob：优先 fetch，失败退回 canvas */
+const getImageBlob = async (img: HTMLImageElement): Promise<Blob | null> => {
+    const src = img.currentSrc || img.src;
+    try {
+        const res = await fetch(src);
+        const blob = await res.blob();
+        if (blob.type.startsWith("image/")) return blob;
+    } catch {
+        /* 降级 canvas */
+    }
+    try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d")?.drawImage(img, 0, 0);
+        return await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, "image/png"),
+        );
+    } catch {
+        return null;
+    }
+};
+
+const onImageContextMenu = (event: MouseEvent, img: HTMLImageElement) => {
+    event.preventDefault();
+    const deg = rotationDeg.value;
+    ZXContextMenu.show({
+        x: event.clientX,
+        y: event.clientY,
+        items: [
+            {
+                label: "复制图片",
+                icon: Copy,
+                action: async () => {
+                    const blob = await getImageBlob(img);
+                    let ok = false;
+                    if (blob) {
+                        try {
+                            await navigator.clipboard.write([
+                                new ClipboardItem({ [blob.type]: blob }),
+                            ]);
+                            ok = true;
+                        } catch {
+                            ok = false;
+                        }
+                    }
+                    ZXNotification({
+                        title: ok ? "已复制" : "复制失败",
+                        message: ok ? "图片已复制到剪贴板" : "剪贴板不可用",
+                        type: ok ? "🥳" : "😭",
+                        position: "top-right",
+                    });
+                },
+            },
+            {
+                label: `向左旋转（当前 ${deg}°）`,
+                icon: RotateCcw,
+                action: () => {
+                    rotation.value -= 90;
+                },
+            },
+            {
+                label: `向右旋转（当前 ${deg}°）`,
+                icon: RotateCw,
+                action: () => {
+                    rotation.value += 90;
+                },
+            },
+            {
+                label: "另存为",
+                icon: Download,
+                action: async () => {
+                    const blob = await getImageBlob(img);
+                    if (!blob) {
+                        ZXNotification({
+                            title: "保存失败",
+                            message: "无法读取图片数据",
+                            type: "😭",
+                            position: "top-right",
+                        });
+                        return;
+                    }
+                    const name = filenameFromUrl(img.currentSrc || img.src);
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = name.includes(".")
+                        ? name
+                        : `${name}.${extFromMime(blob.type)}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(a.href);
+                },
+            },
+        ],
+    });
+};
+
 watch(visible, (isOpen) => {
     if (isOpen) {
         window.addEventListener("keydown", onKeydown);
@@ -164,6 +300,7 @@ defineExpose({ open });
                     @pointermove="onPointerMove"
                     @pointerup="onPointerUp"
                     @pointercancel="onPointerUp"
+                    @contextmenu="onImageContextMenu($event, $event.currentTarget as HTMLImageElement)"
                 />
             </div>
 

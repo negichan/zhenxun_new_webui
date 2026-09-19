@@ -2,12 +2,18 @@ import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 
 const ANIM_KEY = "animationsEnabled";
+const EXP_KEY = "experimentalFeaturesEnabled";
 
 /** 全局动画开关的默认值：未设置过时跟随系统 prefers-reduced-motion */
 function defaultAnimationsEnabled(): boolean {
     const stored = localStorage.getItem(ANIM_KEY);
     if (stored !== null) return stored === "1";
     return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** 实验性功能开关默认值（默认关闭） */
+function defaultExperimentalFeaturesEnabled(): boolean {
+    return localStorage.getItem(EXP_KEY) === "1";
 }
 
 /** 供非响应式上下文（独立 app 实例、服务模块）读取的轻量判断 */
@@ -30,6 +36,16 @@ export const useGlobalStore = defineStore("global", () => {
     function setAnimationsEnabled(enabled: boolean): void {
         animationsEnabled.value = enabled;
         localStorage.setItem(ANIM_KEY, enabled ? "1" : "0");
+    }
+
+    // 实验性功能开关（解锁大模型高级路由、上下文压缩、Agent引擎等选项）
+    const experimentalFeaturesEnabled = ref(
+        defaultExperimentalFeaturesEnabled(),
+    );
+
+    function setExperimentalFeaturesEnabled(enabled: boolean): void {
+        experimentalFeaturesEnabled.value = enabled;
+        localStorage.setItem(EXP_KEY, enabled ? "1" : "0");
     }
 
     watch(
@@ -61,5 +77,7 @@ export const useGlobalStore = defineStore("global", () => {
         isTableMode,
         animationsEnabled,
         setAnimationsEnabled,
+        experimentalFeaturesEnabled,
+        setExperimentalFeaturesEnabled,
     };
 });

@@ -33,5 +33,10 @@
     "src/**/*.tsx",
     "src/**/*.vue"
   ],
+  "exclude": [
+    "src/views/database/**",
+    "src/components/home/Island/DatabaseIsland.vue",
+    "src/components/FileEditorModal/components/db/SqlConsoleView.vue"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

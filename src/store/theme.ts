@@ -17,6 +17,7 @@ const CUSTOM_COLOR_KEY = "zhenxun-custom-color";
 // 之后用户手动选了主题就由用户的选择接管
 const MODE_STORAGE_KEY = "zhenxun-theme-mode";
 // 多端统一开关跟随云端配置（本地缓存用于首屏），任意一端拨动都会同步到所有端
+// 默认开启；仅当本地/云端显式写入 false 时关闭
 const SYNC_ENABLED_KEY = "zhenxun-theme-sync";
 
 const systemDarkQuery =
@@ -33,10 +34,11 @@ export const useThemeStore = defineStore("theme", () => {
     const customColor = ref<string | null>(null);
     // light | dark | system（system = 跟随系统，实际模式由系统偏好解析）
     const customMode = ref<"light" | "dark" | "system">("light");
-    // 多端统一：开启后应用云端主题并跟随 theme_update 事件（设备本地开关）
+    // 多端统一：开启后应用云端主题并跟随 theme_update 事件
+    // 默认开启；localStorage 显式存了 "false" 才视为关闭
     const syncEnabled = ref(
-        typeof window !== "undefined" &&
-            localStorage.getItem(SYNC_ENABLED_KEY) === "true",
+        typeof window === "undefined" ||
+            localStorage.getItem(SYNC_ENABLED_KEY) !== "false",
     );
     const systemDark = ref(systemDarkQuery?.matches ?? false);
 
@@ -127,6 +129,8 @@ export const useThemeStore = defineStore("theme", () => {
         } else {
             applyThemePreset(defaultTheme.name);
         }
+        // 登录后先对齐云端：多端统一默认开启，避免恢复到过期的本地主题
+        void syncFromBackend();
     }
 
     function toggleTheme() {
@@ -158,10 +162,16 @@ export const useThemeStore = defineStore("theme", () => {
         }
     }
 
+    /** 云端/广播未显式 false 时按默认开启处理 */
+    function resolveRemoteSync(config: Pick<ThemeConfig, "sync">): boolean {
+        return config.sync !== false;
+    }
+
     /** 收到 theme_update 广播：开关状态全端一致；开启时跟随操作端的主题 */
     function applyRemoteTheme(config: ThemeConfig) {
-        setSyncEnabledLocal(Boolean(config.sync));
-        if (config.sync) {
+        const remoteSync = resolveRemoteSync(config);
+        setSyncEnabledLocal(remoteSync);
+        if (remoteSync) {
             applyThemeConfig(config);
         }
     }
@@ -175,16 +185,18 @@ export const useThemeStore = defineStore("theme", () => {
         }
     }
 
-    /** 拉取云端配置：对齐开关状态，开启时应用云端主题 */
+    /** 拉取云端配置：优先应用云端主题；云端未写 sync 时按默认开启 */
     async function syncFromBackend() {
         try {
             const res = await themeApi.getTheme();
             if (res?.success && res.data) {
-                setSyncEnabledLocal(Boolean(res.data.sync));
-                if (res.data.sync) {
+                const remoteSync = resolveRemoteSync(res.data);
+                setSyncEnabledLocal(remoteSync);
+                if (remoteSync) {
                     applyThemeConfig(res.data);
                 }
             }
+            // 无云端配置或请求失败：保持本地（默认开启）
         } catch {
             // 后端不可用时保持本地主题
         }

@@ -2,18 +2,35 @@
 import { ctxPop } from "@/composables/useGsapTransition";
 /**
  * 全局右键菜单面板（单例，由 index.ts 挂载并驱动 state）
- * 位置自动防溢出；点击菜单外 / Escape / 滚动 / 窗口缩放时关闭
+ * 位置自动防溢出；点击菜单外 / Escape / 滚动 / 窗口缩放时关闭。
+ * 支持二级子菜单（悬停展开）。
+ * 触控：菜单打开时铺透明遮罩，首次点按只关菜单、不穿透到下层。
  */
 import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import type { ZXContextMenuState } from "./index";
+import { ChevronRight } from "lucide-vue-next";
+import type { ZXContextMenuItem, ZXContextMenuState } from "./index";
 
 const props = defineProps<{ state: ZXContextMenuState }>();
 
 const menuRef = ref<HTMLElement | null>(null);
 const pos = ref({ x: 0, y: 0 });
 
+/** 二级菜单：挂在一级项右侧 */
+const subMenu = ref<{
+    items: ZXContextMenuItem[];
+    x: number;
+    y: number;
+} | null>(null);
+const subMenuRef = ref<HTMLElement | null>(null);
+
 const hide = () => {
     props.state.visible = false;
+    subMenu.value = null;
+};
+
+/** 遮罩关闭：走 ZXContextMenu.hide 以同步吞掉随后的 click 穿透 */
+const dismissViaOverlay = () => {
+    import("./index").then(({ ZXContextMenu }) => ZXContextMenu.hide());
 };
 
 /** 视口内防溢出定位 */
@@ -31,13 +48,9 @@ watch(
     () => props.state.visible,
     visible => {
         if (visible) nextTick(updatePos);
+        else subMenu.value = null;
     },
 );
-
-const onPointerDown = (e: PointerEvent) => {
-    if (!props.state.visible) return;
-    if (menuRef.value && !menuRef.value.contains(e.target as Node)) hide();
-};
 
 const onKeydown = (e: KeyboardEvent) => {
     if (props.state.visible && e.key === "Escape") hide();
@@ -47,28 +60,46 @@ const onDismiss = () => {
     if (props.state.visible) hide();
 };
 
-const handleClick = (item: ZXContextMenuItemLike) => {
-    if (item.disabled) return;
+const itemCls = (item: ZXContextMenuItem) => {
+    if (item.danger) return "text-red-500 hover:bg-red-50";
+    if (item.success) return "text-emerald-600 hover:bg-emerald-50";
+    return "text-slate-600 hover:bg-slate-100";
+};
+
+const handleClick = (item: ZXContextMenuItem) => {
+    if (item.disabled || item.divider) return;
+    if (item.children?.length) return;
     hide();
     item.action?.();
 };
 
-interface ZXContextMenuItemLike {
-    label: string;
-    danger?: boolean;
-    disabled?: boolean;
-    action?: () => void;
-}
+const openSubMenu = (item: ZXContextMenuItem, e: MouseEvent) => {
+    if (item.disabled || !item.children?.length) {
+        subMenu.value = null;
+        return;
+    }
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const kids = item.children;
+    nextTick(() => {
+        const sh = subMenuRef.value?.offsetHeight ?? 80;
+        const sw = subMenuRef.value?.offsetWidth ?? 140;
+        let x = r.right - 2;
+        let y = r.top - 4;
+        if (x + sw > window.innerWidth - 8) x = r.left - sw + 2;
+        if (y + sh > window.innerHeight - 8) {
+            y = Math.max(8, window.innerHeight - sh - 8);
+        }
+        subMenu.value = { items: kids, x, y };
+    });
+};
 
 onMounted(() => {
-    window.addEventListener("pointerdown", onPointerDown, true);
     window.addEventListener("keydown", onKeydown);
     window.addEventListener("scroll", onDismiss, true);
     window.addEventListener("resize", onDismiss);
 });
 
 onUnmounted(() => {
-    window.removeEventListener("pointerdown", onPointerDown, true);
     window.removeEventListener("keydown", onKeydown);
     window.removeEventListener("scroll", onDismiss, true);
     window.removeEventListener("resize", onDismiss);
@@ -76,34 +107,95 @@ onUnmounted(() => {
 </script>
 
 <template>
+    <div
+        v-if="state.visible"
+        class="fixed inset-0 z-9998"
+        @click.prevent.stop="dismissViaOverlay"
+    ></div>
     <Transition :css="false" @enter="ctxPop.onEnter" @leave="ctxPop.onLeave">
         <div
             v-if="state.visible"
             ref="menuRef"
-            class="fixed z-9999 min-w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+            class="fixed z-9999 min-w-36 touch-none overflow-visible rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
             :style="{ left: `${pos.x}px`, top: `${pos.y}px` }"
             @contextmenu.prevent
         >
-            <button
+            <template
                 v-for="(item, index) in state.items"
                 :key="index"
-                :disabled="item.disabled"
-                :class="
-                    item.danger
-                        ? 'text-red-500 hover:bg-red-50'
-                        : 'text-slate-600 hover:bg-slate-100'
-                "
-                class="flex w-full cursor-pointer items-center gap-2 px-3.5 py-1.5 text-left text-sm transition-colors disabled:pointer-events-none disabled:opacity-40"
-                type="button"
-                @click="handleClick(item)"
             >
-                <component :is="item.icon" v-if="item.icon" class="size-4 shrink-0" />
-                <span class="whitespace-nowrap">{{ item.label }}</span>
-            </button>
+                <div
+                    v-if="item.divider"
+                    class="my-1 h-px bg-slate-200/80"
+                    aria-hidden="true"
+                />
+                <button
+                    v-else
+                    :disabled="item.disabled"
+                    :class="itemCls(item)"
+                    class="flex w-full cursor-pointer items-center gap-2 px-3.5 py-1.5 text-left text-sm transition-colors disabled:pointer-events-none disabled:opacity-40"
+                    type="button"
+                    @click="handleClick(item)"
+                    @mouseenter="openSubMenu(item, $event)"
+                    @mouseleave="!item.children?.length && (subMenu = null)"
+                >
+                    <!-- 图标位固定：无图标也占位，文字对齐 -->
+                    <component
+                        :is="item.icon"
+                        v-if="item.icon"
+                        class="size-4 shrink-0"
+                    />
+                    <span v-else class="size-4 shrink-0" aria-hidden="true" />
+                    <span class="flex-1 whitespace-nowrap">{{ item.label }}</span>
+                    <span
+                        v-if="item.shortcut"
+                        class="text-[11px] text-zx-text-subtle"
+                        >{{ item.shortcut }}</span
+                    >
+                    <ChevronRight
+                        v-if="item.children?.length"
+                        class="h-3.5 w-3.5 shrink-0 text-zx-text-subtle"
+                    />
+                </button>
+            </template>
+        </div>
+    </Transition>
+
+    <!-- 二级菜单 -->
+    <Transition :css="false" @enter="ctxPop.onEnter" @leave="ctxPop.onLeave">
+        <div
+            v-if="state.visible && subMenu"
+            ref="subMenuRef"
+            class="fixed z-10000 min-w-32 touch-none rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+            :style="{ left: `${subMenu.x}px`, top: `${subMenu.y}px` }"
+            @click.stop
+        >
+            <template
+                v-for="(item, index) in subMenu.items"
+                :key="index"
+            >
+                <div
+                    v-if="item.divider"
+                    class="my-1 h-px bg-slate-200/80"
+                    aria-hidden="true"
+                />
+                <button
+                    v-else
+                    :disabled="item.disabled"
+                    :class="itemCls(item)"
+                    class="flex w-full cursor-pointer items-center gap-2 px-3.5 py-1.5 text-left text-sm transition-colors disabled:pointer-events-none disabled:opacity-40"
+                    type="button"
+                    @click="handleClick(item)"
+                >
+                    <component
+                        :is="item.icon"
+                        v-if="item.icon"
+                        class="size-4 shrink-0"
+                    />
+                    <span v-else class="size-4 shrink-0" aria-hidden="true" />
+                    <span class="whitespace-nowrap">{{ item.label }}</span>
+                </button>
+            </template>
         </div>
     </Transition>
 </template>
-
-<style scoped>
-
-</style>

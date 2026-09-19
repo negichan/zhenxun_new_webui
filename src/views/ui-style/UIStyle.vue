@@ -133,7 +133,7 @@ const demoDanger = () => {
                 <h2 class="text-lg font-bold text-gray-800">通用组件库</h2>
                 <p class="mt-1 text-sm text-gray-500">
                     设计规范文档见仓库根目录
-                    <code class="rounded bg-slate-100 px-1.5 py-0.5">AGENTS.md</code
+                    <code class="rounded bg-slate-100 px-1.5 py-0.5">DESIGN.md</code
                     >。通用组件源码在
                     <code class="rounded bg-slate-100 px-1.5 py-0.5"
                         >src/components/zxcomponent/</code

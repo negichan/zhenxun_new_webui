@@ -35,17 +35,39 @@ export interface TransitionPreset {
     overlaySelector?: string;
     overlayEnterDuration?: number;
     overlayLeaveDuration?: number;
+    /**
+     * 变换动画的目标选择器（相对根元素，如弹窗的 .modal-content）。
+     * 不设置时动画打在根元素上——带全屏遮罩的弹窗必须设置，
+     * 否则 scale/rotation 会连遮罩一起缩放。
+     */
+    contentSelector?: string;
 }
 
 export function createTransitionHooks(preset: TransitionPreset) {
+    const contentOf = (el: Element) =>
+        preset.contentSelector
+            ? (el.querySelector(preset.contentSelector) ?? el)
+            : el;
+
+    /**
+     * 遮罩元素：优先根元素内的 overlaySelector 子节点；
+     * 没有子节点遮罩时，若根元素自身匹配（"根即遮罩"写法）则用根——
+     * 只给它打透明度动画，变换动画归 content。
+     */
+    const overlayOf = (el: Element) => {
+        if (!preset.overlaySelector) return null;
+        return (
+            el.querySelector(preset.overlaySelector) ??
+            (el.matches(preset.overlaySelector) ? el : null)
+        );
+    };
+
     const onEnter = (el: Element, done: () => void) => {
         if (!animationsEnabled()) {
             done();
             return;
         }
-        const overlay = preset.overlaySelector
-            ? el.querySelector(preset.overlaySelector)
-            : null;
+        const overlay = overlayOf(el);
         if (overlay) {
             gsap.fromTo(
                 overlay,
@@ -64,11 +86,12 @@ export function createTransitionHooks(preset: TransitionPreset) {
                   ease: preset.enter.ease ?? "power2.out",
                   duration: preset.enter.duration,
               };
-        gsap.fromTo(el, preset.enter.from, {
+        const content = contentOf(el);
+        gsap.fromTo(content, preset.enter.from, {
             ...to,
             onComplete: () => {
                 // 清掉内联 transform/opacity，避免影响元素自身的响应式变换
-                gsap.set(el, { clearProps: "transform,opacity" });
+                gsap.set(content, { clearProps: "transform,opacity" });
                 done();
             },
         });
@@ -79,9 +102,7 @@ export function createTransitionHooks(preset: TransitionPreset) {
             done();
             return;
         }
-        const overlay = preset.overlaySelector
-            ? el.querySelector(preset.overlaySelector)
-            : null;
+        const overlay = overlayOf(el);
         if (overlay) {
             gsap.to(overlay, {
                 opacity: 0,
@@ -89,7 +110,7 @@ export function createTransitionHooks(preset: TransitionPreset) {
                 ease: "power1.in",
             });
         }
-        gsap.to(el, {
+        gsap.to(contentOf(el), {
             ...preset.leave.to,
             transformOrigin: preset.leave.transformOrigin,
             duration: preset.leave.duration,
@@ -121,6 +142,7 @@ export const modalJelly = createTransitionHooks({
     },
     leave: { to: { opacity: 0, y: 12, scale: 0.9 }, duration: 0.25 },
     overlaySelector: ".glass-overlay",
+    contentSelector: ".modal-content",
     overlayEnterDuration: 0.35,
     overlayLeaveDuration: 0.25,
 });
@@ -169,4 +191,15 @@ export const pickerPop = createTransitionHooks({
         ease: "back.out(1.75)",
     },
     leave: { to: { opacity: 0, y: 4 }, duration: 0.12, ease: "power1.in" },
+});
+
+/** 文件工作台侧边栏：宽度收拢（VSCode 式折叠，w-64=256px 固定宽），快节奏 */
+export const sidebarCollapse = createTransitionHooks({
+    enter: {
+        from: { width: 0 },
+        to: { width: 256, clearProps: "width" },
+        duration: 0.15,
+        ease: "power2.out",
+    },
+    leave: { to: { width: 0 }, duration: 0.15, ease: "power2.in" },
 });

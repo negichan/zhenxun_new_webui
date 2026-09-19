@@ -15,6 +15,9 @@
     --color-zx-primary-hover: var(--zx-color-primary-hover);
     --color-zx-primary-soft: var(--zx-color-primary-soft);
     --color-zx-primary-tint: var(--zx-color-primary-tint);
+    --color-zx-dirty: var(--zx-color-dirty);
+    --color-zx-tab-table: var(--zx-color-tab-table);
+    --color-zx-tab-sql: var(--zx-color-tab-sql);
     --color-zx-success: var(--zx-color-success);
     --color-zx-success-soft: var(--zx-color-success-soft);
     --color-zx-warning: var(--zx-color-warning);
@@ -23,6 +26,12 @@
     --color-zx-danger-soft: var(--zx-color-danger-soft);
     --color-zx-info: var(--zx-color-info);
     --color-zx-info-soft: var(--zx-color-info-soft);
+    --color-zx-purple: var(--zx-color-purple);
+    --color-zx-purple-soft: var(--zx-color-purple-soft);
+    --color-zx-cyan: var(--zx-color-cyan);
+    --color-zx-cyan-soft: var(--zx-color-cyan-soft);
+    --color-zx-neutral: var(--zx-color-neutral);
+    --color-zx-neutral-soft: var(--zx-color-neutral-soft);
     --color-zx-nav-icon: var(--zx-nav-icon-bg);
     --color-zx-nav-icon-hover: var(--zx-nav-icon-hover-bg);
     --color-zx-user-card-chip: var(--zx-user-card-chip-bg);
@@ -33,6 +42,13 @@
     --radius-zx-card: var(--zx-radius-card);
     --radius-zx-control: var(--zx-radius-control);
     --radius-zx-pill: var(--zx-radius-pill);
+    /* 全局大圆角家族接到运行时变量（设置 → 外观 → 卡片圆角可调）：
+       2xl/3xl/4xl 以 --zx-radius-card 为基准 ±0.5rem 保持层级，
+       默认 24px 时与 Tailwind 原值（16/24/32）完全一致；
+       xl/lg 等控件档不跟随，保持固定 */
+    --radius-2xl: max(0px, calc(var(--zx-radius-card) - 0.5rem));
+    --radius-3xl: var(--zx-radius-card);
+    --radius-4xl: calc(var(--zx-radius-card) + 0.5rem);
 
     --shadow-zx-card: var(--zx-shadow-card);
     --shadow-zx-popover: var(--zx-shadow-popover);
@@ -233,22 +249,28 @@
     --zx-color-primary-hover: #2563eb;
     --zx-color-primary-soft: #dbeafe;
     --zx-color-primary-tint: #eff6ff;
-    --zx-color-success: #10b981;
-    --zx-color-success-soft: #d1fae5;
+    --zx-color-dirty: #f97316;
+    --zx-color-success: #22c55e;
+    --zx-color-success-soft: #dcfce7;
     --zx-color-warning: #f59e0b;
     --zx-color-warning-soft: #fef3c7;
     --zx-color-danger: #ef4444;
     --zx-color-danger-soft: #fee2e2;
-    --zx-color-info: #06b6d4;
-    --zx-color-info-soft: #cffafe;
+    --zx-color-info: #3b82f6;
+    --zx-color-info-soft: #dbeafe;
+    --zx-color-purple: #8b5cf6;
+    --zx-color-purple-soft: #ede9fe;
+    --zx-color-cyan: #06b6d4;
+    --zx-color-cyan-soft: #cffafe;
+    --zx-color-neutral: #9ca3af;
+    --zx-color-neutral-soft: #f3f4f6;
     --zx-color-on-success: #ffffff;
     --zx-color-on-warning: #ffffff;
     --zx-color-on-danger: #ffffff;
     --zx-color-on-info: #ffffff;
     --zx-color-on-purple: #ffffff;
     --zx-color-on-cyan: #ffffff;
-    --zx-color-neutral: #9ca3af;
-    --zx-color-on-neutral: #333333;
+    --zx-color-on-neutral: #ffffff;
     --zx-color-active: #000000;
     --zx-color-on-accent: #ffffff;
     --zx-nav-icon-bg: #f0f1f6;
@@ -465,26 +487,28 @@
     --zx-color-primary-hover: #f4f4f5;
     --zx-color-primary-soft: #27272a;
     --zx-color-primary-tint: #18181b;
-    --zx-color-success: #34d399;
-    --zx-color-success-soft: #064e3b;
+    --zx-color-dirty: #fb923c;
+    --zx-color-success: #4ade80;
+    --zx-color-success-soft: #14532d;
     --zx-color-warning: #fbbf24;
     --zx-color-warning-soft: #78350f;
     --zx-color-danger: #f87171;
     --zx-color-danger-soft: #7f1d1d;
-    --zx-color-info: #22d3ee;
-    --zx-color-info-soft: #164e63;
+    --zx-color-info: #60a5fa;
+    --zx-color-info-soft: #1e3a8a;
     --zx-color-purple: #a78bfa;
     --zx-color-purple-soft: #2e1065;
     --zx-color-cyan: #22d3ee;
     --zx-color-cyan-soft: #164e63;
+    --zx-color-neutral: #9ca3af;
+    --zx-color-neutral-soft: #374151;
     --zx-color-on-success: #27272a;
     --zx-color-on-warning: #27272a;
     --zx-color-on-danger: #27272a;
     --zx-color-on-info: #27272a;
     --zx-color-on-purple: #27272a;
     --zx-color-on-cyan: #27272a;
-    --zx-color-neutral: #4b5563;
-    --zx-color-on-neutral: #f8fafc;
+    --zx-color-on-neutral: #27272a;
     --zx-color-active: #050505;
     --zx-color-on-accent: #f8fafc;
     --zx-nav-icon-bg: #1a1a1a;

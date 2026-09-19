@@ -1,99 +1,64 @@
-# AGENTS.md — UI 风格规范
+# AGENTS.md — Agent 开发与协作规范
 
-供 agent / 开发者参考的 zhenxun_webui 设计规范。**做任何 UI 改动前先读这份文档**，可视化版本见运行时的 `/ui-style` 页面。
+供所有 AI Agent 及开发者参考的 `zhenxun_webui` 核心工作与开发规范。**在进行任何开发前请完整阅读本文档**。
 
-技术栈：Vue 3 `<script setup>` + TypeScript + Tailwind CSS v4 + Element Plus（部分组件）+ GSAP（动效）。
+技术栈：Vue 3 `<script setup>` + TypeScript + Tailwind CSS v4 + GSAP（动效）+ Pinia。
 
-## 主题体系（最重要）
+---
 
-- 主题变量定义在 `src/assets/theme.css` / `src/theme/`，运行时切换，全部以 **`--zx-color-*`** 为准；
-- Tailwind 通过 `--color-zx-*` 映射出工具类：`text-zx-primary`、`bg-zx-primary-soft`、`bg-zx-primary-tint`、`text-zx-danger`、`bg-zx-danger-soft` 等，**优先用这些类**而不是写死颜色；
-- `bg-white` / `slate-*` / `gray-*` 这批中性色在深色主题下会被 theme.css 自动反转，可以放心用作卡片底色和描边；
-- 注意历史上存在 `--zx-color-*` 与 `--color-zx-*` 两套前缀，工具类走后者，CSS `var()` 走前者；
-- `--zx-color-on-primary`（主色上的文字色）需在多处同步修改，改主色时注意。
+## ⚠️ 最高优先级：UI/UX 设计规范强指引
 
-## 组件目录约定
+项目已建立完整的 UI/UX 设计规范体系并独立归档至 **[DESIGN.md](./DESIGN.md)**。
 
-- **`src/components/zxcomponent/`** 只放跨页面复用的通用组件（组件库性质）：ZxTag、ZXDropdown、ZXInput、MiniDatePicker、ZXMessageBox、ZXNotification、ZXConfetti、ContextMenu、ZXTextEditor、LocationAddress、WhiteScreen、CornerFrame 等；
-- **页面自用组件**放到所属页面/模块的文件夹：`src/views/<页面>/components/`（如 `views/plugin/components/StoreCard`、`views/manage/components/FriendCard`）或 `src/components/home/`（header 专属：User、HomeHeader、Island、RequestCenter 等）；
-- 新建组件前先判断：别的页面也会用 → zxcomponent；只有本页面用 → 页面目录。
+**所有涉及界面、样式、颜色、布局、组件选择与动效的改动，必须首先阅读并绝对遵从 [DESIGN.md](./DESIGN.md)！**
 
-## 卡片
+### 核心铁律速查（必须遵守）
 
-标准卡片：`rounded-3xl border border-slate-200 bg-white shadow-sm`（浅内边距 + `overflow-hidden` 按需）。
+1. **唯一绝对视觉基准**：
+   - 以 `src/views/ui-style/UIStyle.vue`（浏览器访问 `/ui-style`）展示的语义色与规范为**唯一绝对标准**；
+   - 遇到任何颜色不一致或样式冲突时，**绝对禁止修改 `UIStyle.vue` 中的标准语义定义**，必须以其为准去修改其他业务组件与样式！
+2. **全局标准语义色**：
+   - 必须严格遵守 8 大语义色标准：`primary` (主色), `success` (`#22c55e`), `warning` (`#f59e0b`), `danger` (`#ef4444`), `info` (`#3b82f6`), `neutral` (`#9ca3af`), `purple` (`#8b5cf6`), `cyan` (`#06b6d4`)；
+   - **饱满实色底 + 纯白对比字**：状态标签、徽标、激活筛选胶囊必须使用高饱和实色底 + 纯白对比字（主色使用 `var(--zx-color-on-primary)`），**严禁使用淡色半透底**；
+   - 插件管理与商店等状态/类型筛选按钮激活态严格对齐标准色。
+3. **全局组件优先**：
+   - 徽标统一使用全局组件 `<ZxTag>`；
+   - 按钮统一使用全局组件 `<ZxButton>`；
+   - 确认弹窗统一使用 `ZXMessageBox`；
+   - 下拉菜单统一使用 `ZXDropdown`；
+   - 严禁手写拼装非标样式类。
 
-## 徽标 / Tag（以插件市场卡片为准）
+👉 **完整的设计系统、颜色 Token、组件规范、卡片圆角与布局陷阱详见：[DESIGN.md](./DESIGN.md)**。
 
-- **统一使用全局组件 `<ZxTag>`**（`src/components/zxcomponent/ZxTag.vue`，已自动注册）；
-- **配色：实色底 + 主题 on-* 对比字，跟随主题**——底色用主题语义实体色（`--zx-color-success` 等，浅色饱和/深色提亮），文字用配套 `--zx-color-on-success` 等对比色变量（浅色白字、深色统一深字）。禁止写死的 Tailwind 色值（如 `#22c55e`）和 soft 半透底；
-- 规格：`h-[22px] rounded-lg px-2 text-[11px] leading-none font-medium`（ZxTag 内置；圆角走 MD3 chip 规范的 8dp，非全圆胶囊）；
-- 语义档：`primary`（品牌强调/选中）、`success`（启用/完成/在线）、`warning`（注意/待处理/常驻）、`danger`（错误/删除/下线）、`info`（提示/版本/链接）、`neutral`（禁用/占位）、`purple`（特殊分类，如内置插件）、`cyan`（字典/数据类）；
-- 自定义品牌色用 `color` prop（实色底 + 亮度自动黑白字）；
-- 插件页的具体映射：已启用 `success`、已禁用 `neutral`、版本 `info`、内置 `purple`、三方/常驻 `warning`、置顶 `purple`；
-- 群角色徽标：群主 `bg-red-500 text-white`、管理员 `bg-blue-500 text-white`、成员 `bg-gray-200 text-gray-500`。
+---
 
-## 按钮
+## 核心红线与技术约束
 
-- **统一用 `<ZxButton>`**（`src/components/zxcomponent/ZxButton.vue`，自动注册）：内置 `rounded-full`、`btn-touch`、`cursor-pointer`、`type="button"` 默认值与统一禁用态；
-- Props：`variant="primary | ghost | outline | danger"`、`circle`（图标圆钮）、`size="md | sm"`、`disabled`；
-- 主按钮文字用 `--zx-color-on-primary` 变量（深色主题下 `text-white` 会被反转成深色，禁用）；
-- 特殊交互形态（分段切换、分页、菜单项、Island、dropdown 触发器）仍手写，规格见 `BUTTON_MIGRATION_PLAN.md` 第四节。
+1. **包管理（pnpm 专用）**：
+   - 依赖严格由 **pnpm** 管理，**严禁执行 `npm install`**（npm 改写 node_modules 会破坏依赖树导致双 Vue 实例 `renderSlot` 读取 null 白屏崩溃）；
+   - 新增依赖一律使用 `pnpm add <pkg>`。
+2. **类型检查与构建质量**：
+   - 完成代码改动后，必须运行 `pnpm type-check` 验证，确保 **0 错误**。
+3. **严禁引入 Element Plus**：
+   - 项目已彻底移除 Element Plus 依赖，**严禁再引入任何 `el-*` 组件**；
+   - 加载态统一使用 `animate-spin` 圆环，骨架屏统一使用 `animate-pulse` 色块。
+4. **后端插件软链接与运行仓库路径**：
+   - 仓库根目录 `zhenxun-plugin/` 是 Windows junction，指向 `C:\Users\Hanako\PycharmProjects\zhenxun_bot-main\zhenxun\plugins\zhenxun_new_webui-webui`；
+   - **后端真实运行副本是 `C:\Users\Hanako\PycharmProjects\zhenxun_bot-main`**，切勿修改闲置副本；
+   - 端口约定：前端开发服务器 `localhost:5173`，后端 `localhost:8080`，构建输出 base `/next/`。
 
-## 页面头部（HomeHeader）
+---
 
-- 左侧：胶囊用户卡（`User.vue`，`rounded-full border bg-white shadow-sm`）+ 问候语；
-- 右侧：**岛屿（Island）** → 右侧动作圆钮组 → `h-5 w-[1px] bg-slate-200` 竖分隔线隔开；
-- 动作圆钮：`h-9 w-9 rounded-full border border-slate-200 bg-white shadow-sm hover:scale-105`（铃铛/主题/Bot/设置）。
+## 用户协作习惯与代码规范
 
-## 岛屿（Island，header 里的信息胶囊）
+1. **交流风格**：中文交流，简短直接。不要长篇大论，直接指出关键改动与结论。
+2. **代码漂移预警**：用户会随时自行调整或手改代码，**每次修改前务必重新读取目标文件现状**；做单块替换时需精准匹配上下文，严防误删相邻既有逻辑。
+3. **验证策略**：日常小样式改动用户会自行在浏览器中查看验证，无需过度横向插桩或无意义调用浏览器截图；重点保障代码逻辑、TypeScript 类型校验通过以及严格符合设计规范。
 
-- 标题胶囊：`rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm hover:scale-105`，彩色图标 + 标签文字；
-- 统计胶囊：`数字（语义色 font-black，v-odometer 滚动动画）+ h-3 w-[1px] bg-black/30 竖线 + 灰色小标签`，每个统计一个胶囊；
-- 数字色按语义：总数 blue、已启用 green、禁用 gray、内置 purple 等。
+---
 
-## 工具栏（插件页标准）
+## 关键文档索引
 
-- 工具栏本身是一张标准卡片：`rounded-3xl border border-slate-200 bg-white p-3 sm:p-4`，搜索/筛选/统计/切换全集成；
-- 分段切换：容器 `rounded-2xl border bg-gray-100 p-1`，选中项 `bg-white text-zx-primary shadow-sm`；
-- 搜索框：`rounded-full border bg-slate-50 py-1.5 pl-3.5 + Search 图标`，聚焦 `focus-within:bg-white`；
-- 筛选下拉按钮：`rounded-full border bg-gray-100 text-gray-500 hover:text-gray-700`（配合 ZXDropdown 的 `trigger-class`）；
-- 分页：圆形 `h-8 w-8`，选中 `bg-zx-primary text-white`，禁用 `text-gray-300`；
-- 卡片网格：`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4`。
-
-## 首页（Dashboard）
-
-- 大网格：`2xl:grid-cols-[0.6fr_1fr_24rem]`，右栏固定 24rem；
-- 资源卡：进度条 `h-2 rounded-full`，按使用率换语义色（绿→黄→橙）；
-- 时间线：圆点（首条 `border-zx-primary` 加粗）+ `w-px bg-slate-200` 连线 + 头像。
-
-## 弹窗
-
-- 自定义弹窗：`Teleport to body` + `glass-overlay` 遮罩 + `modal-content` 白色圆角容器，`<Transition name="modal-jelly" :duration="{ enter: 500, leave: 250 }">`（样式在 `custom.css` 全局定义），参考 `SettingsModal.vue` / `PluginConfigModal.vue`；
-- 确认框/输入框弹窗一律用 `ZXMessageBox`（支持 `slots.default`、危险按钮 `confirmButtonHoverBg`）；
-- 通知用 `ZXNotification`，表情文案风格（如 `(っ °Д °;) っ`）随场景。
-
-## 表单控件
-
-- 输入框：`ZXInput`（方框）、`ZxInputNumber`（数字步进器）或富文本 `rich-editor`（聊天输入）；
-- 下拉：`ZXDropdown`（`@/components/zxcomponent/ZXDropdown`，支持 `trigger-class`、`slots.trigger`、`slots.option`）；
-- 开关：`ZxSwitch`（`src/components/zxcomponent/ZxSwitch.vue`，`v-model` + `@change`）；页内一次性开关也可用纯 Tailwind peer 写法（`peer-checked:bg-zx-primary`）；
-- 日期选择：自制 `MiniDatePicker.vue`（日期）；精确到时分秒的范围筛选用原生 `<input type="datetime-local" step="1">`；
-- 代码编辑器：`ZXTextEditor`（monaco 引擎，CDN 优先 npmmirror→jsdelivr、失败回退本地打包；markdown 文件内置"编辑/预览"分段切换）。主题用 `zx-light`/`zx-dark`（defineTheme 读 `--zx-color-*`），跟随应用深浅色。`monacoLoader.ts` 的 `MONACO_VERSION` 必须与 package.json 版本同步。
-
-> 项目已移除 Element Plus 依赖，禁止再引入任何 `el-*` 组件；加载态用 `animate-spin` 圆环遮罩，骨架屏用 `animate-pulse` 色块，图片加载失败/占位态手写（配合 `v-image-viewer` 双击查看）。
-
-## 列表性能（UI 层约定）
-
-- 固定行高列表：`useVirtualList`；变动行高（图片/多行气泡）：`useDynamicVirtualList`；
-- 聊天主界面用「底部窗口渲染」：只渲染最近 N 条，扩窗 + 滚动锚定，进会话瞬时置底。
-
-## 已知约定 / 坑
-
-- 不自创副标题文案；页面头部大标题已移除；
-- `space-x-*` 会产生死边距（末尾元素多出间距），间距优先用 `gap-*`；
-- 无 `@layer` 的规则会压过 utilities，需要覆盖工具类时进 `@layer components`；
-- CSS 多列瀑布流会虚报固有宽度，需 `contain: inline-size`。
-
-## UI 参考页
-
-运行时访问 `/ui-style`（不在菜单里），展示：语义色板、ZxTag 全家族、按钮、头部胶囊（岛屿/统计）、分段切换、搜索框、分页、输入控件、卡片与弹窗示例。改设计规范时同步更新该页面与本文档。
+- 🎨 **[DESIGN.md](./DESIGN.md)** — 项目全局 UI/UX 设计规范、语义标准色表、组件库用法
+- 🔘 **[BUTTON_MIGRATION_PLAN.md](./BUTTON_MIGRATION_PLAN.md)** — 按钮规格与 ZxButton 迁移规划
+- 🖥️ **运行时基准页** — 本地启动后访问 `/ui-style`

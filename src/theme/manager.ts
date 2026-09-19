@@ -5,6 +5,7 @@ import {
     type ThemePresetName,
 } from "./tokens";
 import { CUSTOM_THEME_CLASS } from "./colorGenerator";
+import { setPresetRadiusValue } from "./radius";
 
 let activeTheme: AppTheme = defaultTheme;
 
@@ -31,6 +32,10 @@ export const applyTheme = (theme: AppTheme = defaultTheme) => {
     Object.entries(theme.cssVars).forEach(([key, value]) => {
         root.style.setProperty(key, value);
     });
+
+    // 预设 cssVars 里带 --zx-radius-card，换肤会盖掉用户的圆角覆写；
+    // 记录预设值并重放（有覆写用覆写，没有则回写预设值）
+    setPresetRadiusValue(theme.cssVars["--zx-radius-card"]);
 
     return theme;
 };

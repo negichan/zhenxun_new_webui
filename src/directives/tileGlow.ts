@@ -147,6 +147,7 @@ const AUTO_BG_TOKENS = ["bg-white", "bg-gray-100", "bg-slate-50"];
 
 const matchesAutoGlow = (el: Element): boolean => {
     if (el.hasAttribute(GLOW_ATTR)) return false;
+    if (el.classList.contains("no-tile-glow")) return false;
     if (!el.classList.contains(AUTO_BORDER_TOKEN)) return false;
     for (const token of el.classList) {
         for (const bg of AUTO_BG_TOKENS) {

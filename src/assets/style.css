@@ -33,10 +33,10 @@ body {
     }
 }
 
-/* 自定义滚动条样式 */
+/* 自定义滚动条样式（全局原生与 Monaco 统一风格：6px 胶囊圆角、透明轨道） */
 ::-webkit-scrollbar {
-    width: 4px;
-    height: 1px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -50,6 +50,26 @@ body {
 ::-webkit-scrollbar-thumb,
 ::-webkit-scrollbar-track {
     border: 0;
+    background: transparent;
+}
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--zx-color-border) transparent;
+}
+
+/* 文件编辑器：去掉原生滚动条上下箭头按钮（Windows Chromium 默认绘制） */
+.file-editor-modal ::-webkit-scrollbar-button {
+    display: none !important;
+}
+
+/* Monaco 编辑器虚拟滚动条外观与全局统一 */
+.monaco-editor .scrollbar .slider {
+    border-radius: 10px !important;
+}
+.monaco-editor .scrollbar.vertical,
+.monaco-editor .scrollbar.horizontal {
+    background: transparent !important;
 }
 
 .gutter {

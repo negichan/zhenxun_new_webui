@@ -210,7 +210,7 @@ const weekdays = ["一", "二", "三", "四", "五", "六", "日"];
                     :class="[
                         cell.inMonth ? 'text-slate-700' : 'text-slate-300',
                         format(cell.date) === modelValue
-                            ? 'bg-zx-primary font-semibold text-white'
+                            ? 'bg-zx-primary font-semibold text-[color:var(--zx-color-on-primary)]'
                             : format(cell.date) === todayStr
                               ? 'ring-1 ring-zx-primary'
                               : 'hover:bg-slate-100',

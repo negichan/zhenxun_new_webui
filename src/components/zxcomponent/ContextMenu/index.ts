@@ -2,13 +2,15 @@
  * ZXContextMenu - 全局右键菜单（单例）
  *
  * 用法：
- *   import { ZXContextMenu } from "@/components/zxcomponent/ContextMenu";
+ *   import { ZXContextMenu, menuSep } from "@/components/zxcomponent/ContextMenu";
  *   ZXContextMenu.show({
  *       x: e.clientX,
  *       y: e.clientY,
  *       items: [
  *           { label: "重命名", icon: Pencil, action: () => {} },
+ *           menuSep(),
  *           { label: "删除", danger: true, action: () => {} },
+ *           { label: "恢复", success: true, action: () => {} },
  *       ],
  *   });
  *
@@ -18,8 +20,10 @@ import { createVNode, reactive, render } from "vue";
 import { Copy } from "lucide-vue-next";
 import ContextMenu from "./ContextMenu.vue";
 import type { ZXContextMenuItem, ZXContextMenuOptions } from "./types";
+import { menuSep } from "./types";
 
 export type { ZXContextMenuItem, ZXContextMenuOptions };
+export { menuSep };
 
 export interface ZXContextMenuState {
     visible: boolean;
@@ -36,6 +40,43 @@ const state = reactive<ZXContextMenuState>({
 });
 
 let container: HTMLElement | null = null;
+
+/**
+ * 吞掉下一次菜单外的 click / pointerup：
+ * 1) 触控长按打开后，同一触摸序列会补 click 打到原目标
+ * 2) 点遮罩关闭时若在 pointerdown 卸载遮罩，后续 click 会穿到下层
+ */
+let swallowUntil = 0;
+let swallowCleanupTimer: number | null = null;
+
+const swallowGhost = (e: Event) => {
+    if (Date.now() >= swallowUntil) return;
+    const t = e.target as Node | null;
+    if (container && t && container.contains(t)) return;
+    e.preventDefault();
+    e.stopPropagation();
+};
+
+const disarmGhostSwallow = () => {
+    window.removeEventListener("click", swallowGhost, true);
+    window.removeEventListener("pointerup", swallowGhost, true);
+    window.removeEventListener("mouseup", swallowGhost, true);
+    swallowUntil = 0;
+    if (swallowCleanupTimer !== null) {
+        window.clearTimeout(swallowCleanupTimer);
+        swallowCleanupTimer = null;
+    }
+};
+
+const armGhostSwallow = (ms = 500) => {
+    // 重复 arm：先卸旧监听再装，避免叠加
+    disarmGhostSwallow();
+    swallowUntil = Date.now() + ms;
+    window.addEventListener("click", swallowGhost, true);
+    window.addEventListener("pointerup", swallowGhost, true);
+    window.addEventListener("mouseup", swallowGhost, true);
+    swallowCleanupTimer = window.setTimeout(disarmGhostSwallow, ms + 50);
+};
 
 function ensureMounted() {
     if (container) return;
@@ -77,10 +118,14 @@ export const ZXContextMenu = {
         state.x = options.x;
         state.y = options.y;
         state.visible = true;
+        // 必须同步 arm：长按后补发的 click 会打到原目标
+        armGhostSwallow();
     },
 
     hide() {
         state.visible = false;
+        // 关闭后再吞一次：避免关闭瞬间的 click 穿透
+        armGhostSwallow(300);
     },
 
     /** 供组件内部绑定的响应式状态 */

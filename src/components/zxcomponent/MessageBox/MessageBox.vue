@@ -4,7 +4,6 @@
             v-show="visible"
             ref="overlay"
             class="glass-overlay fixed inset-0 z-50 flex items-center justify-center select-none"
-            @click.self="handleCancel"
         >
             <div
                 ref="box"
@@ -12,13 +11,13 @@
             >
                 <h3
                     v-if="title"
-                    class="text-base font-bold text-slate-800"
+                    class="text-base font-bold text-zx-text-strong"
                 >
                     {{ title }}
                 </h3>
 
                 <div
-                    class="mt-1.5 mb-5 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm text-slate-700"
+                    class="mt-1.5 mb-5 rounded-2xl bg-slate-50 px-4 py-3.5 text-sm text-zx-text"
                 >
                     <slot>{{ message }}</slot>
                 </div>
@@ -27,7 +26,7 @@
                     <button
                         v-if="cancelButtonText"
                         @click="handleCancel"
-                        class="cursor-pointer rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-50 active:scale-95"
+                        class="cursor-pointer rounded-full border border-slate-200 px-4 py-1.5 text-xs font-semibold text-zx-text-muted transition-colors hover:bg-slate-50 active:scale-95"
                     >
                         {{ cancelButtonText }}
                     </button>
@@ -52,7 +51,7 @@
                 </div>
 
                 <button
-                    class="absolute top-4 right-4 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 active:scale-90"
+                    class="absolute top-4 right-4 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-zx-text-subtle transition-colors hover:bg-slate-100 hover:text-zx-text-muted active:scale-90"
                     @click="handleCancel"
                 >
                     <svg
@@ -78,6 +77,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { gsap } from "gsap";
+import { OVERLAY_ID, useZxOverlay } from "@/composables/useOverlayStack";
 
 const props = defineProps({
     title: String,
@@ -94,6 +94,15 @@ const visible = ref(false);
 const hovering = ref(false);
 const overlay = useTemplateRef("overlay");
 const box = useTemplateRef("box");
+
+const instanceId = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+useZxOverlay({
+    id: OVERLAY_ID.messageBox,
+    uniqueSuffix: () => instanceId,
+    open: visible,
+    el: () => overlay.value,
+    onClose: () => handleCancel(),
+});
 
 onMounted(() => {
     visible.value = true;
@@ -120,6 +129,7 @@ function handleCancel() {
 }
 
 function close(callback) {
+    visible.value = false;
     gsap.to(box.value, {
         opacity: 0,
         scale: 0.8,
@@ -131,7 +141,6 @@ function close(callback) {
         duration: 0.2,
         ease: "power2.in",
         onComplete() {
-            visible.value = false;
             callback?.();
         },
     });

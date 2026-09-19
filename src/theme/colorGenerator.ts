@@ -109,6 +109,25 @@ function hexToRgb(hex: string): string {
     return `${r}, ${g}, ${b}`;
 }
 
+/**
+ * 感知亮度（YIQ，0-1）。别用 HSL 亮度判对比字色——饱和红/蓝/紫的
+ * HSL L 都在 50-60 会被误判成"亮色"（#ef4343 L=60 配深灰字即此坑），
+ * YIQ 下它们是暗色配白字，浅灰/琥珀/绿才是亮色配深字。
+ */
+export function perceivedBrightness(hex: string): number {
+    const v = hex.replace("#", "");
+    if (v.length !== 6) return 0.5;
+    const r = parseInt(v.substring(0, 2), 16);
+    const g = parseInt(v.substring(2, 4), 16);
+    const b = parseInt(v.substring(4, 6), 16);
+    return (0.299 * r + 0.715 * g + 0.072 * b) / 255;
+}
+
+/** 彩色底上的对比文字色：亮底深字、暗底白字 */
+export function contrastTextFor(hex: string): string {
+    return perceivedBrightness(hex) > 0.55 ? "#334155" : "#ffffff";
+}
+
 export function generateThemeFromColors(
     primaryColor: string,
     mode: "light" | "dark" = "light",
@@ -134,8 +153,27 @@ export function generateThemeFromColors(
 
         // Primary
         "--zx-color-primary": hsl(p.h, p.s, p.l),
-        // 主色之上的对比文字色（同取色器对勾规则：亮度>55 用深灰，否则白）
-        "--zx-color-on-primary": p.l > 55 ? "#334155" : "#ffffff",
+        // 主色之上的对比文字色（感知亮度：亮底深字、暗底白字，同取色器对勾规则）
+        "--zx-color-on-primary": contrastTextFor(primaryColor),
+        // 未保存指示条：主色色相 +180°，与主色可区分。
+        // 亮度按主题表面约束：浅色主题压在中深（不接近白），深色主题抬在中亮（不接近黑）。
+        "--zx-color-dirty": hsl(
+            p.h + 180,
+            clamp(p.s + 15, 55, 95),
+            isDark ? clamp(p.l * 0.3 + 50, 52, 68) : clamp(p.l * 0.25 + 38, 38, 52),
+        ),
+        // 工作台「表 / SQL」标签顶条：同样由主色推导（色相偏移），随主题换色
+        // 表 +120°、SQL +210°，与主色/dirty 都可区分；亮度约束同 dirty
+        "--zx-color-tab-table": hsl(
+            p.h + 120,
+            clamp(p.s + 10, 50, 90),
+            isDark ? clamp(p.l * 0.3 + 48, 50, 66) : clamp(p.l * 0.25 + 40, 40, 54),
+        ),
+        "--zx-color-tab-sql": hsl(
+            p.h + 210,
+            clamp(p.s + 8, 45, 88),
+            isDark ? clamp(p.l * 0.3 + 50, 52, 68) : clamp(p.l * 0.25 + 38, 38, 52),
+        ),
         // hover 方向按主色亮度自适应：亮色变暗、暗色变亮，
         // 否则用户选了深色主色时 hover 再变暗就看不清了
         "--zx-color-primary-hover": isDark
@@ -153,26 +191,27 @@ export function generateThemeFromColors(
             : hsl(p.h, clamp(p.s * 0.3, 8, 30), 97),
 
         // Semantic (fixed)
-        "--zx-color-success": isDark ? "#34d399" : "#10b981",
-        "--zx-color-success-soft": isDark ? "#064e3b" : "#d1fae5",
+        "--zx-color-success": isDark ? "#4ade80" : "#22c55e",
+        "--zx-color-success-soft": isDark ? "#14532d" : "#dcfce7",
         "--zx-color-warning": isDark ? "#fbbf24" : "#f59e0b",
         "--zx-color-warning-soft": isDark ? "#78350f" : "#fef3c7",
         "--zx-color-danger": isDark ? "#f87171" : "#ef4444",
         "--zx-color-danger-soft": isDark ? "#7f1d1d" : "#fee2e2",
-        "--zx-color-info": isDark ? "#22d3ee" : "#06b6d4",
-        "--zx-color-info-soft": isDark ? "#164e63" : "#cffafe",
+        "--zx-color-info": isDark ? "#60a5fa" : "#3b82f6",
+        "--zx-color-info-soft": isDark ? "#1e3a8a" : "#dbeafe",
         "--zx-color-purple": isDark ? "#a78bfa" : "#8b5cf6",
         "--zx-color-purple-soft": isDark ? "#2e1065" : "#ede9fe",
         "--zx-color-cyan": isDark ? "#22d3ee" : "#06b6d4",
         "--zx-color-cyan-soft": isDark ? "#164e63" : "#cffafe",
+        "--zx-color-neutral": isDark ? "#9ca3af" : "#9ca3af",
+        "--zx-color-neutral-soft": isDark ? "#374151" : "#f3f4f6",
         "--zx-color-on-success": isDark ? "#27272a" : "#ffffff",
         "--zx-color-on-warning": isDark ? "#27272a" : "#ffffff",
         "--zx-color-on-danger": isDark ? "#27272a" : "#ffffff",
         "--zx-color-on-info": isDark ? "#27272a" : "#ffffff",
         "--zx-color-on-purple": isDark ? "#27272a" : "#ffffff",
         "--zx-color-on-cyan": isDark ? "#27272a" : "#ffffff",
-        "--zx-color-neutral": isDark ? "#4b5563" : "#9ca3af",
-        "--zx-color-on-neutral": isDark ? "#f8fafc" : "#333333",
+        "--zx-color-on-neutral": isDark ? "#27272a" : "#ffffff",
 
         // UI Chrome - 根据主色亮度自动计算对比色
         "--zx-color-active": isDark ? "#ffffff" : "#000000",
