@@ -60,5 +60,4 @@
 ## 关键文档索引
 
 - 🎨 **[DESIGN.md](./DESIGN.md)** — 项目全局 UI/UX 设计规范、语义标准色表、组件库用法
-- 🔘 **[BUTTON_MIGRATION_PLAN.md](./BUTTON_MIGRATION_PLAN.md)** — 按钮规格与 ZxButton 迁移规划
 - 🖥️ **运行时基准页** — 本地启动后访问 `/ui-style`

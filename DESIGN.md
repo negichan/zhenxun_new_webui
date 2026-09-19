@@ -106,7 +106,7 @@
   - `size="md | sm"`
   - `disabled`
 - **主按钮文字**：必须使用 `--zx-color-on-primary` 变量（禁止写死 `text-white`，避免深色主题反转）；
-- **特殊交互形态**：分段切换、分页、菜单项、Island 胶囊、下拉触发器等特殊形态仍允许手写，规格见 `BUTTON_MIGRATION_PLAN.md`。
+- **特殊交互形态**：分段切换、分页、菜单项、Island 胶囊、下拉触发器等特殊形态仍允许手写。
 
 ---
 
