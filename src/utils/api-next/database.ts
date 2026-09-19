@@ -4,78 +4,107 @@
 
 import { api } from './client'
 import type {
-    TableDataResult,
+    APIResponse,
+    RowInsertRequest,
+    RowMutationResult,
+    RowUpdateRequest,
     SqlExecuteRequest,
     SqlExecuteResult,
-    APIResponse,
+    SqlFileItem,
+    SqlFileListResult,
+    SqlLogListResult,
+    TableColumn,
+    TableDataResult,
 } from '@/types/api-next.types'
 
-interface ColumnInfo {
-    name: string
-    type: string
-    nullable: boolean
-    default?: string | null
-    primary_key?: boolean
-}
-
 export const databaseApi = {
-    /**
-     * 获取表列表
-     */
+    /** 表列表 */
     getTableList(): Promise<APIResponse<string[]>> {
         return api.get<string[]>('/database/tables')
     },
 
-    /**
-     * 获取表字段
-     */
-    getTableColumns(tableName: string): Promise<APIResponse<ColumnInfo[]>> {
-        return api.get<ColumnInfo[]>(`/database/tables/${encodeURIComponent(tableName)}/columns`)
+    /** 表字段 */
+    getTableColumns(tableName: string): Promise<APIResponse<TableColumn[]>> {
+        return api.get<TableColumn[]>(
+            `/database/tables/${encodeURIComponent(tableName)}/columns`,
+        )
     },
 
-    /**
-     * 获取表数据
-     */
+    /** 分页表数据 */
     getTableData(
         tableName: string,
         page: number = 1,
-        pageSize: number = 50
+        pageSize: number = 50,
     ): Promise<APIResponse<TableDataResult>> {
-        return api.get<TableDataResult>(`/database/tables/${encodeURIComponent(tableName)}/data`, {
+        return api.get<TableDataResult>(
+            `/database/tables/${encodeURIComponent(tableName)}/data`,
+            { page, page_size: pageSize },
+        )
+    },
+
+    /** 执行 SQL */
+    executeSql(request: SqlExecuteRequest): Promise<APIResponse<SqlExecuteResult>> {
+        return api.post<SqlExecuteResult>('/database/execute', request)
+    },
+
+    /** SQL 执行日志（倒序分页） */
+    getSqlLogs(
+        page: number = 1,
+        pageSize: number = 50,
+    ): Promise<APIResponse<SqlLogListResult>> {
+        return api.get<SqlLogListResult>('/database/sql-logs', {
             page,
             page_size: pageSize,
         })
     },
 
-    /**
-     * 执行 SQL 查询
-     */
-    executeSql(request: SqlExecuteRequest): Promise<APIResponse<SqlExecuteResult>> {
-        return api.post<SqlExecuteResult>('/database/execute', request)
+    /** 按主键更新单行 */
+    updateRow(
+        tableName: string,
+        rowId: string | number,
+        request: RowUpdateRequest,
+    ): Promise<APIResponse<RowMutationResult>> {
+        return api.patch<RowMutationResult>(
+            `/database/tables/${encodeURIComponent(tableName)}/rows/${encodeURIComponent(String(rowId))}`,
+            request,
+        )
     },
 
-    // ==================== 兼容旧代码的方法 ====================
-
-    /**
-     * 执行 SQL（兼容旧代码，使用 executeSql）
-     */
-    execSql(sql: string): Promise<APIResponse<any>> {
-        return this.executeSql({ sql })
+    /** 按主键删除单行 */
+    deleteRow(
+        tableName: string,
+        rowId: string | number,
+    ): Promise<APIResponse<RowMutationResult>> {
+        return api.delete<RowMutationResult>(
+            `/database/tables/${encodeURIComponent(tableName)}/rows/${encodeURIComponent(String(rowId))}`,
+        )
     },
 
-    /**
-     * 获取 SQL 日志（兼容旧代码，待实现）
-     */
-    getSqlLog(): Promise<APIResponse<any>> {
-        // TODO: 后端实现 SQL 日志功能
-        return Promise.resolve({ success: true, message: 'OK', code: 200, data: { data: [] } })
+    /** 插入单行 */
+    insertRow(
+        tableName: string,
+        request: RowInsertRequest,
+    ): Promise<APIResponse<RowMutationResult>> {
+        return api.post<RowMutationResult>(
+            `/database/tables/${encodeURIComponent(tableName)}/rows`,
+            request,
+        )
     },
 
-    /**
-     * 获取常用 SQL（兼容旧代码，待实现）
-     */
-    getCommonSql(): Promise<APIResponse<any>> {
-        // TODO: 后端实现常用 SQL 功能
-        return Promise.resolve({ success: true, message: 'OK', code: 200, data: {} })
+    /** SQL 编辑器文件：列表（后端持久化） */
+    listSqlFiles(): Promise<APIResponse<SqlFileListResult>> {
+        return api.get<SqlFileListResult>('/database/sql-files')
+    },
+
+    /** SQL 编辑器文件：新建/保存 */
+    saveSqlFile(name: string, content: string): Promise<APIResponse<SqlFileItem>> {
+        return api.post<SqlFileItem>('/database/sql-files', { name, content })
+    },
+
+    /** SQL 编辑器文件：删除 */
+    deleteSqlFile(name: string): Promise<APIResponse<boolean>> {
+        return api.delete<boolean>(
+            `/database/sql-files/${encodeURIComponent(name)}`,
+        )
     },
 }

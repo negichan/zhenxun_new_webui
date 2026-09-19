@@ -1,41 +1,16 @@
 /**
- * 数据库表信息
+ * 数据库类型再导出 — 实际定义见 api-next.types.ts，
+ * 保留此文件兼容既有 `@/types/database` 导入路径。
  */
-export interface TableInfo {
-    name: string
-}
-
-/**
- * 表列信息（后端返回的原始格式）
- */
-export interface ColumnInfo {
-    column_name: string
-    data_type: string
-    max_length?: number
-    is_nullable: string
-    // 别名用于前端显示
-    name?: string
-    type?: string
-    nullable?: boolean
-    default?: string | null
-    primary_key?: boolean
-}
-
-/**
- * SQL 日志记录
- */
-export interface SqlLog {
-    id: number
-    sql: string
-    result?: string
-    is_success?: boolean
-    ip?: string
-    created_at?: string
-}
-
-/**
- * 表格行数据（用于显示）
- */
-export interface TableRow {
-    [key: string]: any
-}
+export type {
+    RowInsertRequest,
+    RowMutationResult,
+    RowUpdateRequest,
+    SqlExecuteRequest,
+    SqlExecuteResult,
+    SqlLogItem,
+    SqlLogListResult,
+    TableColumn,
+    TableDataResult,
+    TableRowData,
+} from './api-next.types'
