@@ -76,7 +76,7 @@ onBeforeUnmount(() => {
         v-tile-glow="110"
         ref="dropdownRef"
         v-bind="$attrs"
-        class="relative flex h-15 min-w-0 flex-1 items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pr-1.5 shadow-sm sm:w-72 sm:flex-initial sm:gap-2 sm:pr-2"
+        class="relative flex h-15 min-w-0 flex-1 items-center gap-2 rounded-3xl border border-slate-200 bg-white p-1 pr-1.5 shadow-sm sm:w-72 sm:flex-initial sm:gap-2 sm:pr-2"
     >
         <div class="avatar h-full flex-shrink-0 cursor-pointer rounded-full">
             <img

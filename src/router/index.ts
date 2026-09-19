@@ -59,20 +59,24 @@ const routes = [
             {
                 path: "/store",
                 name: "插件商店",
-                redirect: { path: "/plugin", query: { tab: "market" } },
+                redirect: {
+                    path: "/plugin",
+                    query: { tab: "market", subKey: "plugin-market" },
+                },
             },
             {
                 path: "/files",
-                name: "文件",
+                name: "系统管理",
                 component: () => import("@/views/files/Files.vue"),
                 meta: { menuKey: "files" },
             },
-            {
-                path: "/database",
-                name: "数据库",
-                component: () => import("@/views/database/Database.vue"),
-                meta: { menuKey: "database" },
-            },
+            // 旧数据库页已下线，能力并入文件编辑器；文件暂留 src/views/database
+            // {
+            //     path: "/database",
+            //     name: "数据库",
+            //     component: () => import("@/views/database/Database.vue"),
+            //     meta: { menuKey: "database" },
+            // },
             {
                 path: "/logs",
                 redirect: "/dashboard",

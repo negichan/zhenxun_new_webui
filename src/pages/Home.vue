@@ -47,8 +47,10 @@ const slideName = ref<"slide-from-top" | "slide-from-bottom">(
 // 在导航确认前同步算好方向：过渡钩子保证读到的一定是本次导航的方向，
 // 不会出现新页沿用上一次方向（方向看起来反了）的情况
 const removeSlideDirectionGuard = router.beforeEach((to, from) => {
-    const toOrder = menuOrderMap[to.meta.menuKey as string];
-    const fromOrder = menuOrderMap[from.meta.menuKey as string];
+    const toKey = (to.query.subKey as string) || (to.meta.menuKey as string);
+    const fromKey = (from.query.subKey as string) || (from.meta.menuKey as string);
+    const toOrder = menuOrderMap[toKey] ?? menuOrderMap[to.meta.menuKey as string];
+    const fromOrder = menuOrderMap[fromKey] ?? menuOrderMap[from.meta.menuKey as string];
     if (toOrder === undefined || fromOrder === undefined) return;
     slideName.value =
         toOrder < fromOrder ? "slide-from-top" : "slide-from-bottom";
@@ -77,9 +79,15 @@ const onPageEnter = (el: Element, done: () => void) => {
     }
     gsap.fromTo(
         el,
-        { yPercent: slideName.value === "slide-from-top" ? -100 : 100 },
+        {
+            yPercent: slideName.value === "slide-from-top" ? -100 : 100,
+            x: 0,
+            xPercent: 0,
+        },
         {
             yPercent: 0,
+            x: 0,
+            xPercent: 0,
             duration: 0.55,
             ease: "power4.out",
             onComplete: () => {
@@ -108,6 +116,8 @@ const onPageLeave = (el: Element, done: () => void) => {
     }
     gsap.to(el, {
         yPercent: slideName.value === "slide-from-top" ? 100 : -100,
+        x: 0,
+        xPercent: 0,
         duration: 0.55,
         ease: "power4.out",
         onComplete: done,
@@ -162,14 +172,12 @@ const handleLogMessage = (log: any) => {
 onMounted(async () => {
     document.documentElement.classList.add("bg-gray-100");
 
-    // 多端统一：白屏揭开前先等云端主题落地（2s 兜底），避免首屏闪白
+    // 多端统一默认开启：白屏揭开前先从云端拉取主题（2s 兜底），避免首屏闪本地主题
     const themeStore = useThemeStore();
-    if (themeStore.syncEnabled) {
-        await Promise.race([
-            themeStore.syncFromBackend(),
-            new Promise((resolve) => setTimeout(resolve, 2000)),
-        ]);
-    }
+    await Promise.race([
+        themeStore.syncFromBackend(),
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+    ]);
 
     whiteScreen.out();
     connectStatusWebSocket();
@@ -321,7 +329,11 @@ const onGlobalDragStart = (e: DragEvent) => {
                             @leave="onPageLeave"
                         >
                             <KeepAlive :max="8">
-                                <component :is="Component" :key="$route.path" />
+                                <component
+                                    :is="Component"
+                                    :key="$route.path"
+                                    class="page-fill"
+                                />
                             </KeepAlive>
                         </Transition>
                     </router-view>

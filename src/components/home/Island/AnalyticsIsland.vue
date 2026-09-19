@@ -6,16 +6,14 @@ import { storeToRefs } from "pinia";
 const analyticsStore = useAnalyticsStore();
 const { granularity, selectedQuickRange } = storeToRefs(analyticsStore);
 
-// 快捷时间范围选项
 const quickTimeRanges = [
-    { label: "最近 1 天", value: "1d", hours: 24 },
-    { label: "最近 7 天", value: "7d", hours: 7 * 24 },
-    { label: "最近 30 天", value: "30d", hours: 30 * 24 },
-    { label: "最近 90 天", value: "90d", hours: 90 * 24 },
+    { label: "1天", value: "1d", hours: 24 },
+    { label: "7天", value: "7d", hours: 7 * 24 },
+    { label: "30天", value: "30d", hours: 30 * 24 },
+    { label: "90天", value: "90d", hours: 90 * 24 },
     { label: "自定义", value: "custom", hours: null },
 ] as const;
 
-// 时间粒度选项
 const granularityOptions = [
     { label: "小时", value: "hour" },
     { label: "天", value: "day" },
@@ -23,20 +21,21 @@ const granularityOptions = [
     { label: "月", value: "month" },
 ] as const;
 
-// 处理范围切换
-const handleRangeChange = (range: any) => {
+const handleRangeChange = (range: (typeof quickTimeRanges)[number]) => {
     selectedQuickRange.value = range.value;
+    if (range.value === "custom") {
+        // 保留当前起止时间，页面会展开自定义选择器
+        if (!analyticsStore.startTime || !analyticsStore.endTime) {
+            analyticsStore.setDefaultTimeRange(30 * 24);
+        }
+        return;
+    }
     analyticsStore.setDefaultTimeRange(range.hours || 30 * 24);
-
-    // 通过 Store 触发全局刷新信号
     analyticsStore.triggerRefresh();
 };
 
-// 处理粒度切换
-const handleGranularityChange = (val: any) => {
+const handleGranularityChange = (val: (typeof granularityOptions)[number]["value"]) => {
     granularity.value = val;
-
-    // 同样触发刷新信号，Analytics 页面会监听到并只更新图表或全部刷新
     analyticsStore.triggerRefresh();
 };
 </script>
@@ -59,6 +58,7 @@ const handleGranularityChange = (val: any) => {
                 <button
                     v-for="range in quickTimeRanges"
                     :key="range.value"
+                    type="button"
                     @click="handleRangeChange(range)"
                     class="btn-touch rounded-2xl px-3 py-2 text-xs font-medium whitespace-nowrap transition-all duration-200"
                     :class="[
@@ -77,6 +77,7 @@ const handleGranularityChange = (val: any) => {
                 <button
                     v-for="opt in granularityOptions"
                     :key="opt.value"
+                    type="button"
                     @click="handleGranularityChange(opt.value)"
                     class="btn-touch rounded-2xl px-3 py-2 text-xs font-medium whitespace-nowrap transition-all duration-200"
                     :class="[

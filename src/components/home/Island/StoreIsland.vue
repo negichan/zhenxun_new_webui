@@ -28,38 +28,41 @@ const stats = computed(() => {
                 class="group flex w-fit items-center space-x-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm transition-all hover:scale-105"
             >
                 <Package class="h-5 w-5 text-blue-500" />
-                <span class="text-sm font-medium text-slate-700">插件管理</span>
+                <span class="text-sm font-medium text-zx-text">插件管理</span>
             </div>
 
-            <div
-                class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
-            >
-                <span
-                    v-odometer="stats.total"
-                    class="text-sm font-black text-blue-500"
-                ></span>
-                <div class="h-3 w-[1px] bg-black/30"></div>
-                <span class="text-xs text-slate-600">总插件数</span>
-            </div>
-            <div
-                class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
-            >
-                <span
-                    v-odometer="stats.installed"
-                    class="text-sm font-black text-green-500"
-                ></span>
-                <div class="h-3 w-[1px] bg-black/30"></div>
-                <span class="text-xs text-slate-600">已安装</span>
-            </div>
-            <div
-                class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
-            >
-                <span
-                    v-odometer="stats.available"
-                    class="text-sm font-black text-orange-500"
-                ></span>
-                <div class="h-3 w-[1px] bg-black/30"></div>
-                <span class="text-xs text-slate-600">可安装</span>
+            <!-- 统计胶囊：xl 以下（平板横屏等窄桌面）隐藏，避免挤掉头部其它元素 -->
+            <div class="hidden items-center space-x-2 xl:flex">
+                <div
+                    class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
+                >
+                    <span
+                        v-odometer="stats.total"
+                        class="text-sm font-black text-blue-500"
+                    ></span>
+                    <div class="h-3 w-[1px] bg-black/30"></div>
+                    <span class="text-xs text-zx-text-muted">总插件数</span>
+                </div>
+                <div
+                    class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
+                >
+                    <span
+                        v-odometer="stats.installed"
+                        class="text-sm font-black text-green-500"
+                    ></span>
+                    <div class="h-3 w-[1px] bg-black/30"></div>
+                    <span class="text-xs text-zx-text-muted">已安装</span>
+                </div>
+                <div
+                    class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
+                >
+                    <span
+                        v-odometer="stats.available"
+                        class="text-sm font-black text-orange-500"
+                    ></span>
+                    <div class="h-3 w-[1px] bg-black/30"></div>
+                    <span class="text-xs text-zx-text-muted">可安装</span>
+                </div>
             </div>
         </div>
 

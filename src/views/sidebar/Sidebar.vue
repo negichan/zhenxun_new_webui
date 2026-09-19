@@ -11,11 +11,19 @@ import SidebarMenuItem from "./SidebarMenuItem.vue";
 const route = useRoute();
 const globalStore = useGlobalStore();
 
-// 监听路由变化，同步 Pinia 中的 activeMenuKey
+// 监听路由变化，同步 Pinia 中的 activeMenuKey（优先取 query.subKey 定位子菜单）
 watch(
-    () => route.meta.menuKey,
-    (newKey) => {
-        if (newKey) {
+    () => [route.path, route.meta.menuKey, route.query.subKey, route.query.tab] as const,
+    ([path, newKey, subKey, tab]) => {
+        if (subKey && typeof subKey === "string") {
+            globalStore.setActiveMenuKey(subKey);
+        } else if (path === "/plugin") {
+            globalStore.setActiveMenuKey(
+                tab === "market" ? "plugin-market" : "plugin-local",
+            );
+        } else if (path === "/config") {
+            globalStore.setActiveMenuKey("config-ai");
+        } else if (newKey) {
             globalStore.setActiveMenuKey(newKey as string);
         }
     },
@@ -24,15 +32,15 @@ watch(
 </script>
 
 <template>
-    <div class="flex h-full w-full flex-col items-center">
+    <div class="flex h-full w-full flex-col items-center select-none">
         <div
             v-tile-glow="120"
-            class="top relative flex w-full flex-1 flex-col items-center overflow-hidden border border-slate-200 bg-white py-3 shadow-sm transition-[padding,border-radius] duration-[400ms] ease-in-out sm:rounded-3xl sm:py-8"
+            class="top relative flex w-full min-h-0 flex-1 flex-col items-center overflow-hidden border border-slate-200 bg-white py-3 shadow-sm transition-[padding,border-radius] duration-[400ms] ease-in-out sm:rounded-3xl sm:py-8"
         >
             <SidebarLogo />
 
             <div
-                class="menus gutter relative w-full flex-1 snap-y snap-mandatory scroll-py-4 space-y-4 overflow-hidden scroll-smooth text-sm transition-[padding] duration-[400ms] ease-in-out hover:overflow-y-auto"
+                class="menus gutter relative w-full min-h-0 flex-1 snap-y snap-mandatory scroll-py-4 space-y-4 scroll-smooth text-sm transition-[padding] duration-[400ms] ease-in-out"
                 :class="
                     globalStore.navMini
                         ? 'no-scrollbar px-2 py-4'
@@ -57,5 +65,24 @@ watch(
 }
 .no-scrollbar::-webkit-scrollbar {
     display: none;
+}
+
+/* 触控始终可滚；真鼠标桌面悬停才出滚动条。
+   不能只靠 hover:overflow-y-auto——触控设备没有 hover。 */
+.menus {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .menus {
+        overflow-y: hidden;
+    }
+
+    .menus:hover {
+        overflow-y: auto;
+    }
 }
 </style>

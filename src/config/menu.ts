@@ -6,15 +6,20 @@
 import { reactive } from "vue";
 import type { Component } from "vue";
 import {
+    Activity,
     Blocks,
+    Bot,
     ChartBar,
-    Database,
+    Cpu,
     FlaskConical,
-    Folder,
+    HardDrive,
     LayoutPanelLeft,
     MessageSquareMore,
+    Package,
     Settings,
     Sparkles,
+    BrainCircuit,
+    Terminal,
 } from "lucide-vue-next";
 
 export interface MenuItem {
@@ -107,19 +112,39 @@ export const mainMenus = reactive<MenuItem[]>([
         name: "插件",
         key: "plugin",
         icon: Blocks,
-        path: "/plugin",
+        children: [
+            {
+                name: "本地插件",
+                key: "plugin-local",
+                icon: Blocks,
+                path: "/plugin?tab=local&subKey=plugin-local",
+            },
+            {
+                name: "插件市场",
+                key: "plugin-market",
+                icon: Package,
+                path: "/plugin?tab=market&subKey=plugin-market",
+            },
+        ],
     },
     {
-        name: "文件",
+        name: "系统管理",
         key: "files",
-        icon: Folder,
+        icon: HardDrive,
         path: "/files",
     },
     {
-        name: "数据库",
-        key: "database",
-        icon: Database,
-        path: "/database",
+        name: "配置",
+        key: "config",
+        icon: Settings,
+        children: [
+            {
+                name: "大模型配置",
+                key: "config-ai",
+                icon: BrainCircuit,
+                path: "/config?tab=ai&subKey=config-ai",
+            },
+        ],
     },
     {
         name: "数据统计",
@@ -128,21 +153,44 @@ export const mainMenus = reactive<MenuItem[]>([
         path: "/analytics",
     },
     {
-        name: "配置",
-        key: "config",
-        icon: Settings,
-        path: "/config",
-    },
-    {
         name: "扩展",
         key: "extensions",
         icon: FlaskConical,
         children: [
             {
-                name: "测试按钮",
+                name: "扩展实验室",
                 key: "ext-test",
                 icon: Sparkles,
-                path: "/ext/test",
+                path: "/ext/test?subKey=ext-test",
+            },
+            {
+                name: "脚本工作台",
+                key: "ext-scripts",
+                icon: Terminal,
+                path: "/ext/test?subKey=ext-scripts",
+            },
+            {
+                name: "模型测试场",
+                key: "ext-model",
+                icon: Bot,
+                path: "/ext/test?subKey=ext-model",
+            },
+            {
+                name: "算力与芯片",
+                key: "ext-compute",
+                icon: Cpu,
+                path: "/ext/test?subKey=ext-compute",
+            },
+            {
+                name: "网络与探针",
+                key: "ext-network",
+                icon: Activity,
+                path: "/ext/test?subKey=ext-network",
+            },
+            {
+                name: "自定义工具",
+                key: "ext-custom",
+                path: "/ext/test?subKey=ext-custom",
             },
         ],
     },

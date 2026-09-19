@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { modalJelly } from "@/composables/useGsapTransition";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import type { Component } from "vue";
 import { X, LogOut, Settings, Palette, Wrench } from "lucide-vue-next";
 import { auth } from "@/utils/auth.ts";
@@ -8,13 +8,28 @@ import { useGlobalStore } from "@/store/global.ts";
 import { ZXMessageBox } from "@/services/ui";
 import { router } from "@/router/index.js";
 import { version } from "@/version";
+import { getRadiusOverride, setRadiusOverride } from "@/theme/radius";
+import { OVERLAY_ID, useZxOverlay } from "@/composables/useOverlayStack";
+import ZxTag from "@/components/zxcomponent/ZxTag.vue";
 
 interface Props {
     visible: boolean;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
 const emit = defineEmits<{ close: [] }>();
+
+const rootRef = ref<HTMLElement | null>(null);
+const openState = computed({
+    get: () => props.visible,
+    set: () => emit("close"),
+});
+useZxOverlay({
+    id: OVERLAY_ID.settings,
+    open: openState,
+    el: () => rootRef.value,
+    onClose: () => emit("close"),
+});
 
 // 设置分类：往里加内容时先在这里注册一个分区，再到模板对应分支填内容
 interface Section {
@@ -29,6 +44,20 @@ const sections: Section[] = [
 ];
 
 const activeSection = ref<string>(sections[0].id);
+
+// 卡片圆角覆写（null = 跟随主题预设 1.5rem）
+const radiusOverride = ref<number | null>(getRadiusOverride());
+const PRESET_RADIUS_PX = 24;
+const radiusValue = computed(() => radiusOverride.value ?? PRESET_RADIUS_PX);
+const onRadiusInput = (e: Event) => {
+    const v = Number((e.target as HTMLInputElement).value);
+    radiusOverride.value = v;
+    setRadiusOverride(v);
+};
+const resetRadius = () => {
+    radiusOverride.value = null;
+    setRadiusOverride(null);
+};
 
 const globalStore = useGlobalStore();
 
@@ -51,12 +80,10 @@ const handleLogout = () => {
         <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
             <div
                 v-if="visible"
+                ref="rootRef"
                 class="fixed inset-0 z-50 flex items-center justify-center"
             >
-                <div
-                    class="glass-overlay absolute h-full w-full"
-                    @click.self="emit('close')"
-                ></div>
+                <div class="glass-overlay absolute h-full w-full"></div>
                 <div
                     class="modal-content relative z-1 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl max-sm:mx-4 max-sm:max-h-[90vh]"
                 >
@@ -132,6 +159,95 @@ const handleLogout = () => {
                         >
                             <!-- 通用 -->
                             <template v-if="activeSection === 'general'">
+                                <div class="space-y-3">
+                                    <div
+                                        class="flex items-center justify-between gap-4 rounded-2xl bg-[var(--zx-color-surface-muted)] px-4 py-3"
+                                    >
+                                        <div class="min-w-0">
+                                            <p
+                                                class="text-sm font-medium text-[var(--zx-color-text)]"
+                                            >
+                                                动画效果
+                                            </p>
+                                            <p
+                                                class="mt-0.5 text-xs text-[var(--zx-color-text-muted)]"
+                                            >
+                                                关闭后禁用过渡与动画，适合低性能设备
+                                            </p>
+                                        </div>
+                                        <label
+                                            class="relative inline-block h-6 w-11 shrink-0 cursor-pointer"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                class="peer sr-only"
+                                                :checked="
+                                                    globalStore.animationsEnabled
+                                                "
+                                                @change="
+                                                    globalStore.setAnimationsEnabled(
+                                                        ($event.target as HTMLInputElement)
+                                                            .checked,
+                                                    )
+                                                "
+                                            />
+                                            <span
+                                                class="absolute inset-0 rounded-full bg-slate-300 transition-colors peer-checked:bg-zx-primary"
+                                            ></span>
+                                            <span
+                                                class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"
+                                            ></span>
+                                        </label>
+                                    </div>
+
+                                    <!-- 实验性功能开关 -->
+                                    <div
+                                        class="flex items-center justify-between gap-4 rounded-2xl bg-[var(--zx-color-surface-muted)] px-4 py-3"
+                                    >
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-1.5">
+                                                <p
+                                                    class="text-sm font-medium text-[var(--zx-color-text)]"
+                                                >
+                                                    实验性功能
+                                                </p>
+                                                <ZxTag variant="warning">实验性</ZxTag>
+                                            </div>
+                                            <p
+                                                class="mt-0.5 text-xs text-[var(--zx-color-text-muted)]"
+                                            >
+                                                在大模型配置中解锁任务默认路由、上下文压缩、智能体与引擎等高级选项
+                                            </p>
+                                        </div>
+                                        <label
+                                            class="relative inline-block h-6 w-11 shrink-0 cursor-pointer"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                class="peer sr-only"
+                                                :checked="
+                                                    globalStore.experimentalFeaturesEnabled
+                                                "
+                                                @change="
+                                                    globalStore.setExperimentalFeaturesEnabled(
+                                                        ($event.target as HTMLInputElement)
+                                                            .checked,
+                                                    )
+                                                "
+                                            />
+                                            <span
+                                                class="absolute inset-0 rounded-full bg-slate-300 transition-colors peer-checked:bg-zx-primary"
+                                            ></span>
+                                            <span
+                                                class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"
+                                            ></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- 外观 -->
+                            <template v-else-if="activeSection === 'appearance'">
                                 <div
                                     class="flex items-center justify-between gap-4 rounded-2xl bg-[var(--zx-color-surface-muted)] px-4 py-3"
                                 >
@@ -139,47 +255,44 @@ const handleLogout = () => {
                                         <p
                                             class="text-sm font-medium text-[var(--zx-color-text)]"
                                         >
-                                            动画效果
+                                            卡片圆角
                                         </p>
                                         <p
                                             class="mt-0.5 text-xs text-[var(--zx-color-text-muted)]"
                                         >
-                                            关闭后禁用过渡与动画，适合低性能设备
+                                            全局大圆角（卡片 / 弹窗 / 面板），实时生效
                                         </p>
                                     </div>
-                                    <label
-                                        class="relative inline-block h-6 w-11 shrink-0 cursor-pointer"
-                                    >
+                                    <div class="flex shrink-0 items-center gap-2.5">
+                                        <span
+                                            class="h-9 w-9 border border-slate-200 bg-white shadow-sm"
+                                            :style="{ borderRadius: `${radiusValue}px` }"
+                                            title="预览"
+                                        ></span>
                                         <input
-                                            type="checkbox"
-                                            class="peer sr-only"
-                                            :checked="
-                                                globalStore.animationsEnabled
-                                            "
-                                            @change="
-                                                globalStore.setAnimationsEnabled(
-                                                    ($event.target as HTMLInputElement)
-                                                        .checked,
-                                                )
-                                            "
+                                            type="range"
+                                            min="0"
+                                            max="32"
+                                            step="2"
+                                            :value="radiusValue"
+                                            class="w-28 cursor-pointer accent-[var(--zx-color-primary)]"
+                                            @input="onRadiusInput"
                                         />
                                         <span
-                                            class="absolute inset-0 rounded-full bg-slate-300 transition-colors peer-checked:bg-zx-primary"
-                                        ></span>
-                                        <span
-                                            class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"
-                                        ></span>
-                                    </label>
+                                            class="w-10 text-right text-xs tabular-nums text-[var(--zx-color-text-muted)]"
+                                        >
+                                            {{ radiusValue }}px
+                                        </span>
+                                        <button
+                                            v-if="radiusOverride !== null"
+                                            class="cursor-pointer rounded-full border border-slate-200 px-2.5 py-1 text-xs text-[var(--zx-color-text-muted)] transition-colors hover:text-[var(--zx-color-text)]"
+                                            type="button"
+                                            @click="resetRadius"
+                                        >
+                                            跟随主题
+                                        </button>
+                                    </div>
                                 </div>
-                            </template>
-
-                            <!-- 外观：待填充 -->
-                            <template v-else-if="activeSection === 'appearance'">
-                                <p
-                                    class="text-center text-xs text-[var(--zx-color-text-subtle)]"
-                                >
-                                    暂无设置项
-                                </p>
                             </template>
                         </div>
                     </div>

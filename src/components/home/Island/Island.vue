@@ -10,8 +10,8 @@ import StoreIsland from "@/components/home/Island/StoreIsland.vue";
 import FilesIsland from "@/components/home/Island/FilesIsland.vue";
 import ManageIsland from "@/components/home/Island/ManageIsland.vue";
 import { useGlobalStore } from "@/store/global.ts";
-import DatabaseIsland from "@/components/home/Island/DatabaseIsland.vue";
 import LogIsland from "@/components/home/Island/LogIsland.vue";
+import ConfigIsland from "@/components/home/Island/ConfigIsland.vue";
 
 const route = useRoute();
 
@@ -24,8 +24,8 @@ const islandMap: Record<string, any> = {
     "/store": StoreIsland,
     "/files": FilesIsland,
     "/manage": ManageIsland,
-    "/database": DatabaseIsland,
     "/logs": LogIsland,
+    "/config": ConfigIsland,
 };
 
 const currentIsland = computed(() => {
@@ -37,7 +37,8 @@ const currentIsland = computed(() => {
 </script>
 
 <template>
-    <div class="flex space-x-4" v-if="globalStore.isDesktopMode">
+    <!-- 平板/桌面都显示；仅手机隐藏。平板竖屏也占位，配合 header 问候语避让 -->
+    <div class="flex space-x-4" v-if="!globalStore.isMobileMode">
         <keep-alive>
             <component :is="currentIsland" />
         </keep-alive>

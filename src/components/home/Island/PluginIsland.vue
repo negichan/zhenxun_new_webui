@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { Blocks } from "lucide-vue-next";
+import { Blocks, RefreshCw } from "lucide-vue-next";
 import { usePluginStore } from "@/store/plugin.ts";
 import { storeToRefs } from "pinia";
 import { computed } from "vue";
@@ -24,65 +24,69 @@ const stats = computed(() => {
 </script>
 
 <template>
-    <div class="flex w-full items-center justify-between space-x-2">
-        <div class="flex space-x-2">
-            <div
-                class="group flex w-fit items-center space-x-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm transition-all hover:scale-105"
+    <!-- w-fit：不要撑满 header -->
+    <div class="flex w-fit items-center gap-2">
+        <div
+            class="group flex w-fit items-center space-x-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm transition-all hover:scale-105"
+        >
+            <Blocks class="h-5 w-5 text-blue-500" />
+            <span class="text-sm font-medium whitespace-nowrap text-zx-text"
+                >插件管理</span
             >
-                <Blocks class="h-5 w-5 text-blue-500" />
-                <span
-                    class="text-sm font-medium whitespace-nowrap text-slate-700"
-                    >插件管理</span
-                >
-            </div>
+        </div>
 
+        <!-- 核心统计：平板也保留（禁用/内置 xl 再出） -->
+        <div class="flex items-center gap-2">
             <div
-                class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
+                class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm transition-all hover:scale-105 sm:px-4"
             >
                 <span
                     v-odometer="stats.total"
                     class="text-sm font-black text-blue-500"
                 ></span>
                 <div class="h-3 w-[1px] bg-black/30"></div>
-                <span class="text-xs whitespace-nowrap text-slate-600"
-                    >总插件数</span
+                <span class="text-xs whitespace-nowrap text-zx-text-muted"
+                    >总数</span
                 >
             </div>
             <div
-                class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
+                class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-3 py-2 shadow-sm transition-all hover:scale-105 sm:px-4"
             >
                 <span
                     v-odometer="stats.active"
                     class="text-sm font-black text-green-500"
                 ></span>
                 <div class="h-3 w-[1px] bg-black/30"></div>
-                <span class="text-xs whitespace-nowrap text-slate-600"
-                    >已启用</span
+                <span class="text-xs whitespace-nowrap text-zx-text-muted"
+                    >启用</span
                 >
             </div>
-            <div
-                class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
-            >
-                <span
-                    v-odometer="stats.inactive"
-                    class="text-sm font-black text-slate-500"
-                ></span>
-                <div class="h-3 w-[1px] bg-black/30"></div>
-                <span class="text-xs whitespace-nowrap text-slate-600"
-                    >已禁用</span
+            <!-- 扩展统计：xl 以上 -->
+            <div class="hidden items-center gap-2 xl:flex">
+                <div
+                    class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
                 >
-            </div>
-            <div
-                class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
-            >
-                <span
-                    v-odometer="stats.builtin"
-                    class="text-sm font-black text-purple-500"
-                ></span>
-                <div class="h-3 w-[1px] bg-black/30"></div>
-                <span class="text-xs whitespace-nowrap text-slate-600"
-                    >内置插件</span
+                    <span
+                        v-odometer="stats.inactive"
+                        class="text-sm font-black text-slate-500"
+                    ></span>
+                    <div class="h-3 w-[1px] bg-black/30"></div>
+                    <span class="text-xs whitespace-nowrap text-zx-text-muted"
+                        >禁用</span
+                    >
+                </div>
+                <div
+                    class="group flex w-fit items-center space-x-2 rounded-full border border-slate-200 bg-white px-4 shadow-sm transition-all hover:scale-105"
                 >
+                    <span
+                        v-odometer="stats.builtin"
+                        class="text-sm font-black text-purple-500"
+                    ></span>
+                    <div class="h-3 w-[1px] bg-black/30"></div>
+                    <span class="text-xs whitespace-nowrap text-zx-text-muted"
+                        >内置</span
+                    >
+                </div>
             </div>
         </div>
 
@@ -92,20 +96,7 @@ const stats = computed(() => {
             title="刷新列表"
             @click="loadPlugins"
         >
-            <svg
-                :class="{ 'animate-spin': loading }"
-                class="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                />
-            </svg>
+            <RefreshCw class="h-5 w-5" :class="{ 'animate-spin': loading }" />
         </button>
     </div>
 </template>

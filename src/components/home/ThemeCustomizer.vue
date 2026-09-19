@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, useTemplateRef } from "vue";
-import { generateThemeFromColors } from "@/theme";
+import { contrastTextFor, generateThemeFromColors } from "@/theme";
 import { useThemeStore } from "@/store/theme";
 import { ZXNotification } from "@/services/ui";
 import {
@@ -90,9 +90,9 @@ function hexLightness(hex: string): number {
     return Math.round(((Math.max(r, g, b) + Math.min(r, g, b)) / 2) * 100);
 }
 
-/** 对勾颜色按底色亮度自适应：浅色底配深对勾，深色底配白对勾 */
+/** 对勾颜色按底色感知亮度自适应：亮底配深对勾，暗底配白对勾 */
 function checkColorFor(color: string): string {
-    return hexLightness(color) > 55 ? "#334155" : "#ffffff";
+    return contrastTextFor(color);
 }
 
 function handleApply() {
