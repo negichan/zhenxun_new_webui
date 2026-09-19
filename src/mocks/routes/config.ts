@@ -68,6 +68,37 @@ const tables = [
     { name: 'sign_log', columns: ['id', 'user_id', 'sign_date', 'impression'] },
 ]
 
+const sqlLogSeed: {
+    id: number
+    sql: string
+    is_success: boolean
+    message: string
+    created_at: string
+}[] = [
+    {
+        id: 1,
+        sql: 'SELECT COUNT(*) FROM users',
+        is_success: true,
+        message: '查询成功，返回 1 行',
+        created_at: new Date(Date.now() - 3600_000).toISOString(),
+    },
+    {
+        id: 2,
+        sql: 'UPDATE users SET gold = gold + 10 WHERE user_id = "123"',
+        is_success: true,
+        message: '执行成功，影响 1 行',
+        created_at: new Date(Date.now() - 1800_000).toISOString(),
+    },
+]
+
+const sqlFileSeed: { name: string; content: string; updated_at: number }[] = [
+    {
+        name: 'query-1.sql',
+        content: '-- Write SQL here\nSELECT * FROM users LIMIT 20;\n',
+        updated_at: Date.now(),
+    },
+]
+
 export const databaseRoutes: MockRoute[] = [
     {
         method: 'get',
@@ -103,7 +134,7 @@ export const databaseRoutes: MockRoute[] = [
             const total = 57
             const items = Array.from({ length: Math.min(pageSize, total - (page - 1) * pageSize) }, (_, i) => {
                 const row: Record<string, any> = {}
-                table.columns.forEach((col, j) => {
+                table.columns.forEach((col) => {
                     if (col === 'id') row[col] = (page - 1) * pageSize + i + 1
                     else if (col.endsWith('_id')) row[col] = String(rand(10000, 99999))
                     else if (col.includes('count') || col === 'gold' || col === 'level') row[col] = rand(0, 500)
@@ -121,6 +152,13 @@ export const databaseRoutes: MockRoute[] = [
         url: '/database/execute',
         response: ({ body }) => {
             const sql = (body?.sql || '').trim()
+            sqlLogSeed.push({
+                id: sqlLogSeed.length + 1,
+                sql,
+                is_success: true,
+                message: /^select/i.test(sql) ? '查询成功' : '执行成功',
+                created_at: new Date().toISOString(),
+            })
             if (/^select/i.test(sql)) {
                 const data = Array.from({ length: 5 }, (_, i) => ({
                     id: i + 1,
@@ -129,6 +167,94 @@ export const databaseRoutes: MockRoute[] = [
                 return { success: true, message: `查询成功，返回 ${data.length} 行 (mock)`, data, rows_affected: data.length }
             }
             return { success: true, message: `执行成功，影响 ${rand(1, 12)} 行 (mock)`, rows_affected: rand(1, 12) }
+        },
+    },
+    {
+        method: 'get',
+        url: '/database/sql-logs',
+        response: ({ query }) => {
+            const page = Number(query.page || 1)
+            const pageSize = Number(query.page_size || 50)
+            const start = (page - 1) * pageSize
+            return {
+                items: sqlLogSeed.slice().reverse().slice(start, start + pageSize),
+                total: sqlLogSeed.length,
+            }
+        },
+    },
+    {
+        method: 'patch',
+        url: '/database/tables/:table/rows/:rowId',
+        response: ({ params, body }) => {
+            const keys = Object.keys(body?.data || {})
+            sqlLogSeed.push({
+                id: sqlLogSeed.length + 1,
+                sql: `UPDATE ${params.table} SET ${keys.join(', ')} WHERE id = ${params.rowId} (mock)`,
+                is_success: true,
+                message: `已更新 1 行`,
+                created_at: new Date().toISOString(),
+            })
+            return { success: true, message: `已更新 1 行 (mock)`, rows_affected: 1 }
+        },
+    },
+    {
+        method: 'delete',
+        url: '/database/tables/:table/rows/:rowId',
+        response: ({ params }) => {
+            sqlLogSeed.push({
+                id: sqlLogSeed.length + 1,
+                sql: `DELETE FROM ${params.table} WHERE id = ${params.rowId} (mock)`,
+                is_success: true,
+                message: '已删除 1 行',
+                created_at: new Date().toISOString(),
+            })
+            return { success: true, message: '已删除 1 行 (mock)', rows_affected: 1 }
+        },
+    },
+    {
+        method: 'post',
+        url: '/database/tables/:table/rows',
+        response: ({ params, body }) => {
+            const keys = Object.keys(body?.data || {})
+            sqlLogSeed.push({
+                id: sqlLogSeed.length + 1,
+                sql: `INSERT INTO ${params.table} (${keys.join(', ')}) (mock)`,
+                is_success: true,
+                message: '已插入 1 行',
+                created_at: new Date().toISOString(),
+            })
+            return { success: true, message: '已插入 1 行 (mock)', rows_affected: 1 }
+        },
+    },
+    {
+        method: 'get',
+        url: '/database/sql-files',
+        response: () => ({ items: sqlFileSeed.slice(), total: sqlFileSeed.length }),
+    },
+    {
+        method: 'post',
+        url: '/database/sql-files',
+        response: ({ body }) => {
+            let name = String(body?.name || '').trim()
+            if (!name.endsWith('.sql')) name += '.sql'
+            const content = String(body?.content ?? '')
+            const idx = sqlFileSeed.findIndex((f) => f.name === name)
+            const item = { name, content, updated_at: Date.now() }
+            if (idx >= 0) sqlFileSeed[idx] = item
+            else sqlFileSeed.unshift(item)
+            return item
+        },
+    },
+    {
+        method: 'delete',
+        url: '/database/sql-files/:name',
+        response: ({ params }) => {
+            const i = sqlFileSeed.findIndex((f) => f.name === params.name)
+            if (i < 0) {
+                return { success: false, message: '文件不存在', code: 404, data: null }
+            }
+            sqlFileSeed.splice(i, 1)
+            return true
         },
     },
 ]
