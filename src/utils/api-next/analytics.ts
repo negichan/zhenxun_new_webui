@@ -10,9 +10,32 @@ import type {
     Granularity,
     FavorabilityRank,
     GoldRank,
+    AnalyticsOverview,
+    MessageHeatmap,
 } from '@/types/api-next.types'
 
 export const analyticsApi = {
+    /**
+     * 获取区间概览 KPI（消息/调用/日均/峰值/活跃数 + 上一周期对比）
+     */
+    getOverview(params: {
+        start_time: string
+        end_time: string
+        bot_id?: string
+    }): Promise<APIResponse<AnalyticsOverview>> {
+        return api.get<AnalyticsOverview>('/analytics/overview', params)
+    },
+
+    /**
+     * 获取消息热力图（星期 × 小时）
+     */
+    getHeatmap(params: {
+        start_time: string
+        end_time: string
+        bot_id?: string
+    }): Promise<APIResponse<MessageHeatmap>> {
+        return api.get<MessageHeatmap>('/analytics/heatmap', params)
+    },
     /**
      * 获取趋势数据
      * @param params 请求参数

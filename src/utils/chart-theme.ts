@@ -145,42 +145,80 @@ export const createLineOptions = (
 
 export const createBarOptions = (
     overrides: ChartOptions<"bar"> = {},
-): ChartOptions<"bar"> => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: {
-        duration: 650,
-        easing: "easeOutQuart",
-    },
-    plugins: {
-        ...basePluginOptions,
-        legend: {
-            display: false,
+): ChartOptions<"bar"> => {
+    const base: ChartOptions<"bar"> = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+            duration: 650,
+            easing: "easeOutQuart",
         },
-    },
-    scales: {
-        x: {
-            ...baseScaleOptions,
-            grid: {
+        plugins: {
+            ...basePluginOptions,
+            legend: {
                 display: false,
             },
-            ticks: {
-                ...baseScaleOptions.ticks,
-                maxRotation: 35,
-                minRotation: 0,
+        },
+        scales: {
+            x: {
+                ...baseScaleOptions,
+                grid: {
+                    display: false,
+                },
+                ticks: {
+                    ...baseScaleOptions.ticks,
+                    maxRotation: 35,
+                    minRotation: 0,
+                },
+            },
+            y: {
+                ...baseScaleOptions,
+                beginAtZero: true,
+                ticks: {
+                    ...baseScaleOptions.ticks,
+                    precision: 0,
+                },
             },
         },
-        y: {
-            ...baseScaleOptions,
-            beginAtZero: true,
-            ticks: {
-                ...baseScaleOptions.ticks,
-                precision: 0,
+    };
+
+    return {
+        ...base,
+        ...overrides,
+        plugins: {
+            ...base.plugins,
+            ...overrides.plugins,
+            legend: {
+                ...(base.plugins as any)?.legend,
+                ...(overrides.plugins as any)?.legend,
+            },
+            tooltip: {
+                ...(base.plugins as any)?.tooltip,
+                ...(overrides.plugins as any)?.tooltip,
             },
         },
-    },
-    ...overrides,
-});
+        scales: {
+            ...base.scales,
+            ...overrides.scales,
+            x: {
+                ...(base.scales as any)?.x,
+                ...(overrides.scales as any)?.x,
+                ticks: {
+                    ...((base.scales as any)?.x?.ticks ?? {}),
+                    ...((overrides.scales as any)?.x?.ticks ?? {}),
+                },
+            },
+            y: {
+                ...(base.scales as any)?.y,
+                ...(overrides.scales as any)?.y,
+                ticks: {
+                    ...((base.scales as any)?.y?.ticks ?? {}),
+                    ...((overrides.scales as any)?.y?.ticks ?? {}),
+                },
+            },
+        },
+    };
+};
 
 export const createPieOptions = (
     overrides: ChartOptions<"pie"> = {},

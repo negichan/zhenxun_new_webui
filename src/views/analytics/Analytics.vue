@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import { Bar, Line, Pie } from "vue-chartjs";
+import { computed, onActivated, onMounted, ref, watch } from "vue";
+import { Bar } from "vue-chartjs";
 import {
-    ArcElement,
     BarElement,
     CategoryScale,
     Chart as ChartJS,
+    type ChartDataset,
     type ChartOptions,
     Filler,
     Legend,
@@ -15,48 +15,30 @@ import {
     Title,
     Tooltip,
 } from "chart.js";
-import {
-    Activity,
-    Calendar,
-    Clock,
-    DollarSign,
-    Hash,
-    Heart,
-    MessageSquare,
-    Plug,
-    RefreshCw,
-    TrendingUp,
-    User,
-    Users,
-} from "lucide-vue-next";
+import { RefreshCw, TrendingDown, TrendingUp } from "lucide-vue-next";
+import { storeToRefs } from "pinia";
 import { analyticsApi, mainApi } from "@/utils/api-next";
 import { ZXNotification } from "@/services/ui";
+import { useGlobalStore } from "@/store/global";
+import { useAnalyticsStore } from "@/store/analytics";
 import type { ActiveGroup, HotPlugin } from "@/types/main.types";
 import type {
+    AnalyticsOverview,
     FavorabilityRank,
     FriendStatistics,
-    FriendStatisticsTimeRange,
     GoldRank,
     Granularity,
     GroupStatistics,
-    GroupStatisticsTimeRange,
+    MessageHeatmap,
     TrendData,
 } from "@/types/api-next.types";
-import { useGlobalStore } from "@/store/global.ts";
-import { useAnalyticsStore } from "@/store/analytics.ts";
-import { storeToRefs } from "pinia";
-import {
-    createBarDatasetStyle,
-    createBarOptions,
-    createLineOptions,
-    createLineDatasetStyle,
-    createPieDatasetStyle,
-    createPieOptions,
-    pieBorderColors,
-    themeChartTextColor,
-} from "@/utils/chart-theme";
+import { createBarOptions, getChartColors } from "@/utils/chart-theme";
+import ZxButton from "@/components/zxcomponent/ZxButton.vue";
+import RankList, { type RankListItem } from "./components/RankList.vue";
+import DetailStatsTable from "./components/DetailStatsTable.vue";
+import ActivityHeatmap from "./components/ActivityHeatmap.vue";
+import FunnelBarList from "./components/FunnelBarList.vue";
 
-// 注册 ChartJS 组件
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -66,53 +48,23 @@ ChartJS.register(
     Tooltip,
     Legend,
     Filler,
-    ArcElement,
     BarElement,
 );
 
+const globalStore = useGlobalStore();
 const analyticsStore = useAnalyticsStore();
 const { startTime, endTime, granularity, selectedQuickRange, refreshSignal } =
     storeToRefs(analyticsStore);
 
-watch(refreshSignal, () => {
-    loadTrendData();
-    loadDetailedStatistics();
-    loadPieChartData();
-});
-
-// ==================== 统计数据 ====================
-const stats = ref({
-    chat_num: 0,
-    chat_week: 0,
-    chat_month: 0,
-    chat_year: 0,
-    call_num: 0,
-    call_week: 0,
-    call_month: 0,
-    call_year: 0,
-});
-
-const globalStore = useGlobalStore();
-
-// ==================== 时间范围选择 ====================
-// 时间范围选择
-// const startTime = ref<string>("");
-// const endTime = ref<string>("");
-// const granularity = ref<Granularity>("day");
-
-// 快捷时间范围选项
+// ==================== 时间范围 ====================
 const quickTimeRanges = [
-    { label: "最近 1 天", value: "1d", hours: 24 },
-    { label: "最近 7 天", value: "7d", hours: 7 * 24 },
-    { label: "最近 30 天", value: "30d", hours: 30 * 24 },
-    { label: "最近 90 天", value: "90d", hours: 90 * 24 },
+    { label: "1天", value: "1d", hours: 24 },
+    { label: "7天", value: "7d", hours: 7 * 24 },
+    { label: "30天", value: "30d", hours: 30 * 24 },
+    { label: "90天", value: "90d", hours: 90 * 24 },
     { label: "自定义", value: "custom", hours: null },
 ] as const;
 
-// 当前选中的快捷范围
-// const selectedQuickRange = ref<string>("30d");
-
-// 时间粒度选项
 const granularityOptions = [
     { label: "小时", value: "hour" as Granularity },
     { label: "天", value: "day" as Granularity },
@@ -120,236 +72,13 @@ const granularityOptions = [
     { label: "月", value: "month" as Granularity },
 ] as const;
 
-// ==================== 趋势图数据（真实 API） ====================
-const trendDataApi = ref<TrendData | null>(null);
-const isTrendLoading = ref(false);
+const showCustomRange = computed(() => selectedQuickRange.value === "custom");
 
-// ==================== 饼图数据 ====================
-const pieDataLoading = ref(false);
-
-// 活跃群组饼图数据
-const activeGroupData = ref({
-    labels: [] as string[],
-    datasets: [
-        {
-            data: [] as number[],
-            ...createPieDatasetStyle(),
-        },
-    ],
-});
-
-// 热门插件饼图数据
-const hotPluginData = ref({
-    labels: [] as string[],
-    datasets: [
-        {
-            data: [] as number[],
-            ...createPieDatasetStyle(),
-        },
-    ],
-});
-
-// ==================== 柱状图数据 ====================
-// 好感度 top10 数据
-const favorabilityData = ref<{
-    labels: string[];
-    datasets: [
-        {
-            data: number[];
-            backgroundColor: string;
-            borderColor: string;
-            borderWidth: number;
-        },
-    ];
-}>({
-    labels: [],
-    datasets: [
-        {
-            data: [],
-            ...createBarDatasetStyle("pink"),
-        },
-    ],
-});
-
-// 金币 top10 数据
-const goldData = ref<{
-    labels: string[];
-    datasets: [
-        {
-            data: number[];
-            backgroundColor: string;
-            borderColor: string;
-            borderWidth: number;
-        },
-    ];
-}>({
-    labels: [],
-    datasets: [
-        {
-            data: [],
-            ...createBarDatasetStyle("amber"),
-        },
-    ],
-});
-
-// 柱状图配置
-const barOptions: ChartOptions<"bar"> = createBarOptions({
-    plugins: {
-        legend: {
-            display: false,
-        },
-        tooltip: {
-            callbacks: {
-                label: (context: any) => {
-                    const value = Number(
-                        context.parsed?.y ?? context.parsed ?? 0,
-                    );
-                    return `数值：${value}`;
-                },
-            },
-        },
-    },
-});
-
-// 饼图配置
-const pieOptions: ChartOptions<"pie"> = createPieOptions({
-    plugins: {
-        legend: {
-            position: "right" as const,
-        },
-        tooltip: {
-            callbacks: {
-                label: (context: any) => {
-                    const label = context.label || "";
-                    const value = context.parsed || 0;
-                    const total = context.dataset.data.reduce(
-                        (a: number, b: number) => a + b,
-                        0,
-                    );
-                    const percentage =
-                        total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                    return `${label}: ${value} (${percentage}%)`;
-                },
-            },
-        },
-    },
-});
-
-// ==================== 详细统计数据 ====================
-const groupStats = ref<GroupStatistics[]>([]);
-const friendStats = ref<FriendStatistics[]>([]);
-const isLoadingStats = ref(false);
-const activeTab = ref<"groups" | "friends">("groups");
-
-// 分页相关
-const currentPage = ref(1);
-const pageSize = ref(10); // 每页显示 10 条
-
-// 计算总消息数用于百分比计算
-const totalGroupMessages = computed(() => {
-    return groupStats.value.reduce((sum, g) => sum + g.message_count, 0);
-});
-
-const totalFriendMessages = computed(() => {
-    return friendStats.value.reduce((sum, f) => sum + f.message_count, 0);
-});
-
-// 排序后的统计数据（按消息数量降序）
-const sortedGroupStats = computed(() => {
-    return [...groupStats.value].sort(
-        (a, b) => b.message_count - a.message_count,
-    );
-});
-
-const sortedFriendStats = computed(() => {
-    return [...friendStats.value].sort(
-        (a, b) => b.message_count - a.message_count,
-    );
-});
-
-// 分页后的群组数据
-const paginatedGroupStats = computed(() => {
-    const start = (currentPage.value - 1) * pageSize.value;
-    const end = start + pageSize.value;
-    return sortedGroupStats.value.slice(start, end);
-});
-
-// 分页后的好友数据
-const paginatedFriendStats = computed(() => {
-    const start = (currentPage.value - 1) * pageSize.value;
-    const end = start + pageSize.value;
-    return sortedFriendStats.value.slice(start, end);
-});
-
-// 群组总页数
-const groupTotalPages = computed(() => {
-    return Math.ceil(sortedGroupStats.value.length / pageSize.value);
-});
-
-// 好友总页数
-const friendTotalPages = computed(() => {
-    return Math.ceil(sortedFriendStats.value.length / pageSize.value);
-});
-
-// 当前显示的数据范围文本
-const currentPageRangeText = computed(() => {
-    const total =
-        activeTab.value === "groups"
-            ? sortedGroupStats.value.length
-            : sortedFriendStats.value.length;
-    if (total === 0) return "暂无数据";
-    const start = (currentPage.value - 1) * pageSize.value + 1;
-    const end = Math.min(currentPage.value * pageSize.value, total);
-    return `显示 ${start}-${end} / 共 ${total} 条`;
-});
-
-// 切换 Tab 时重置页码
-const changeTab = (tab: "groups" | "friends") => {
-    activeTab.value = tab;
-    currentPage.value = 1;
-};
-
-// 获取排名样式
-const getRankClass = (rank: number) => {
-    if (rank === 1) return "bg-yellow-400 text-yellow-900";
-    if (rank === 2) return "bg-gray-300 text-gray-700";
-    if (rank === 3) return "bg-amber-600 text-amber-100";
-    return "bg-gray-100 text-gray-600";
-};
-
-// 计算消息百分比
-const getMessagePercentage = (count: number) => {
-    const total =
-        activeTab.value === "groups"
-            ? totalGroupMessages.value
-            : totalFriendMessages.value;
-    if (total === 0) return 0;
-    return (count / total) * 100;
-};
-
-// ==================== 辅助函数 ====================
-/**
- * 格式化日期为 ISO 字符串（移除毫秒部分）
- */
-const formatToISOString = (date: Date): string => {
+const formatLocalIso = (date: Date): string => {
     const pad = (n: number) => n.toString().padStart(2, "0");
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 };
 
-/**
- * 设置默认时间范围（最近 N 小时）- 不改变粒度
- */
-const setDefaultTimeRange = (hours: number = 30 * 24) => {
-    const end = new Date();
-    const start = new Date();
-    start.setHours(start.getHours() - hours);
-
-    startTime.value = formatToISOString(start);
-    endTime.value = formatToISOString(end);
-};
-
-// 原生 datetime-local 绑定（替代 el-date-picker）：值格式与
-// formatToISOString 一致（YYYY-MM-DDTHH:mm:ss），浏览器省略秒时补 :00
 const startTimeLocal = computed({
     get: () => (startTime.value || "").slice(0, 19),
     set: (v: string) => {
@@ -364,77 +93,374 @@ const endTimeLocal = computed({
     },
 });
 
-/**
- * 根据时间范围自动计算合适的时间粒度
- */
-const calculateGranularity = (start: string, end: string): Granularity => {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const diffHours =
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
-
-    if (diffHours <= 24) return "hour";
-    if (diffHours <= 7 * 24) return "hour";
-    if (diffHours <= 31 * 24) return "day";
-    if (diffHours <= 90 * 24) return "day";
-    if (diffHours <= 365 * 24) return "week";
-    return "month";
-};
-
-// 图表配置
-const chartOptions: ChartOptions<"line"> = createLineOptions({
-    scales: {
-        x: {
-            grid: {
-                display: false,
-            },
-        },
-        y: {
-            type: "linear" as const,
-            display: true,
-            position: "left" as const,
-            title: {
-                display: true,
-                text: "消息数量",
-                color: themeChartTextColor,
-            },
-            beginAtZero: true,
-        },
-        y1: {
-            type: "linear" as const,
-            display: true,
-            position: "right" as const,
-            title: {
-                display: true,
-                text: "调用次数",
-                color: themeChartTextColor,
-            },
-            grid: {
-                drawOnChartArea: false,
-            },
-            beginAtZero: true,
-        },
-    },
+const rangeLabel = computed(() => {
+    if (!startTime.value || !endTime.value) return "";
+    const start = startTime.value.slice(0, 10);
+    const end = endTime.value.slice(0, 10);
+    const days = Math.max(
+        1,
+        Math.round(
+            (new Date(endTime.value).getTime() -
+                new Date(startTime.value).getTime()) /
+                86400000,
+        ),
+    );
+    return `${start} ~ ${end}`;
 });
 
-// ==================== API 调用函数 ====================
+const handleQuickRange = (range: (typeof quickTimeRanges)[number]) => {
+    selectedQuickRange.value = range.value;
+    if (range.value === "custom") {
+        if (!startTime.value || !endTime.value) {
+            analyticsStore.setDefaultTimeRange(30 * 24);
+        }
+        return;
+    }
+    analyticsStore.setDefaultTimeRange(range.hours || 30 * 24);
+    void refreshAll();
+};
 
-/**
- * 加载趋势数据（真实 API）
- */
+const handleGranularity = (value: Granularity) => {
+    granularity.value = value;
+    void loadTrendData();
+};
+
+const applyCustomRange = () => {
+    if (!startTime.value || !endTime.value) {
+        ZXNotification({
+            title: "呜呼～",
+            message: "请先选择起止时间 (っ °Д °;) っ",
+            type: "😭",
+            position: "top-right",
+        });
+        return;
+    }
+    if (new Date(startTime.value) >= new Date(endTime.value)) {
+        ZXNotification({
+            title: "呜呼～",
+            message: "起始时间要早于结束时间 (っ °Д °;) っ",
+            type: "😭",
+            position: "top-right",
+        });
+        return;
+    }
+    const diffHours =
+        (new Date(endTime.value).getTime() -
+            new Date(startTime.value).getTime()) /
+        3600000;
+    if (diffHours > 7 * 24 && granularity.value === "hour") {
+        granularity.value = "day";
+    }
+    void refreshAll();
+};
+
+// ==================== 加载状态 ====================
+const isOverviewLoading = ref(false);
+const isTrendLoading = ref(false);
+const isRankLoading = ref(false);
+const isDetailLoading = ref(false);
+const isEconomyLoading = ref(false);
+const isHeatmapLoading = ref(false);
+
+const isRefreshing = computed(
+    () =>
+        isOverviewLoading.value ||
+        isTrendLoading.value ||
+        isRankLoading.value ||
+        isDetailLoading.value ||
+        isEconomyLoading.value ||
+        isHeatmapLoading.value,
+);
+
+// ==================== 数据 ====================
+const overview = ref<AnalyticsOverview | null>(null);
+const trendData = ref<TrendData | null>(null);
+const prevTrendData = ref<TrendData | null>(null);
+const heatmap = ref<MessageHeatmap | null>(null);
+const groupStats = ref<GroupStatistics[]>([]);
+const friendStats = ref<FriendStatistics[]>([]);
+const activeGroups = ref<ActiveGroup[]>([]);
+const hotPlugins = ref<HotPlugin[]>([]);
+const favorability = ref<FavorabilityRank[]>([]);
+const goldRanks = ref<GoldRank[]>([]);
+
+const showMessages = ref(true);
+const showCalls = ref(true);
+const showPrevPeriod = ref(true);
+
+const toggleSeries = (series: "msg" | "call") => {
+    if (series === "msg") {
+        if (showMessages.value && !showCalls.value) return;
+        showMessages.value = !showMessages.value;
+    } else {
+        if (showCalls.value && !showMessages.value) return;
+        showCalls.value = !showCalls.value;
+    }
+};
+
+// ==================== KPI（参考图3：标签 + 环比 + 大数字 + 对比说明） ====================
+const kpiCards = computed(() => {
+    const o = overview.value;
+    const trend = trendData.value;
+    const messageCount = o?.message_count ?? trend?.total_message_count ?? null;
+    const callCount =
+        o?.plugin_call_count ?? trend?.total_plugin_call_count ?? null;
+    const points = trend?.data_points?.length ?? 0;
+    const avgDaily =
+        o?.avg_daily_messages ??
+        (trend && points > 0
+            ? Math.round(trend.total_message_count / points)
+            : null);
+    const callRate =
+        messageCount && callCount !== null
+            ? (callCount / messageCount) * 100
+            : null;
+
+    const format = (v: number | null) =>
+        v === null ? "—" : v.toLocaleString();
+
+    const pct = (curr: number | null, prev: number | null) => {
+        if (curr === null || prev === null || !prev) return null;
+        return ((curr - prev) / prev) * 100;
+    };
+
+    const msgDelta = o
+        ? pct(o.message_count, o.prev_message_count)
+        : null;
+    const callDelta = o
+        ? pct(o.plugin_call_count, o.prev_plugin_call_count)
+        : null;
+
+    return [
+        {
+            key: "msg",
+            label: "区间消息",
+            value: format(messageCount),
+            delta: msgDelta,
+            hint: o
+                ? `${o.active_group_count} 活跃群 · ${o.active_user_count} 活跃用户`
+                : "跟随所选时间范围",
+        },
+        {
+            key: "call",
+            label: "区间调用",
+            value: format(callCount),
+            delta: callDelta,
+            hint: "插件被触发次数",
+        },
+        {
+            key: "avg",
+            label: "日均消息",
+            value: format(avgDaily),
+            delta: null,
+            hint: o?.peak_date ? `峰值日 ${o.peak_date}` : "按数据点均摊",
+        },
+        {
+            key: "rate",
+            label: "调用率",
+            value: callRate === null ? "—" : `${callRate.toFixed(1)}%`,
+            delta: null,
+            hint: "调用 / 消息",
+        },
+    ];
+});
+
+const activeGroupItems = computed<RankListItem[]>(() =>
+    activeGroups.value.map((g) => ({
+        id: g.group_id,
+        name: g.name || g.group_id,
+        value: g.chat_num,
+        avatar: g.ava_img,
+        subtitle: g.group_id,
+    })),
+);
+
+const hotPluginItems = computed<RankListItem[]>(() =>
+    hotPlugins.value.map((p) => ({
+        id: p.module || p.plugin_name || String(p.call_count),
+        name: p.plugin_name || p.module || "未知插件",
+        value: p.call_count,
+    })),
+);
+
+const favorabilityItems = computed<RankListItem[]>(() =>
+    favorability.value.map((u) => ({
+        id: u.user_id,
+        name: u.user_name,
+        value: Number(u.favorability),
+        avatar: u.ava_url,
+        subtitle: u.user_id,
+    })),
+);
+
+const goldItems = computed<RankListItem[]>(() =>
+    goldRanks.value.map((u) => ({
+        id: u.user_id,
+        name: u.user_name,
+        value: Number(u.gold),
+        avatar: u.ava_url,
+        subtitle: u.user_id,
+    })),
+);
+
+// ==================== 趋势：本期堆叠柱 + 上期灰线 ====================
+const chartColors = getChartColors();
+
+const formatLabel = (timestamp: string) => {
+    const date = new Date(timestamp);
+    if (granularity.value === "hour") {
+        return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:00`;
+    }
+    if (granularity.value === "week") {
+        return `第${Math.ceil(date.getDate() / 7)}周`;
+    }
+    if (granularity.value === "month") {
+        return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+    }
+    return `${date.getMonth() + 1}/${date.getDate()}`;
+};
+
+const chartOptions = computed<ChartOptions<"bar">>(() =>
+    createBarOptions({
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                mode: "index",
+                intersect: false,
+            },
+        },
+        scales: {
+            x: {
+                stacked: true,
+                grid: { display: false },
+                ticks: {
+                    maxRotation: 0,
+                    autoSkip: true,
+                    maxTicksLimit: 12,
+                },
+            },
+            y: {
+                stacked: true,
+                beginAtZero: true,
+                ticks: { precision: 0 },
+            },
+        },
+    }),
+);
+
+const chartData = computed(() => {
+    if (!trendData.value?.data_points?.length) return null;
+    const labels = trendData.value.data_points.map((p) =>
+        formatLabel(p.timestamp),
+    );
+
+    const datasets: ChartDataset<"bar" | "line">[] = [];
+
+    if (showMessages.value) {
+        datasets.push({
+            type: "bar",
+            label: "消息",
+            data: trendData.value.data_points.map((p) => p.message_count),
+            backgroundColor: chartColors.blue.solid,
+            borderRadius: 0,
+            borderSkipped: false,
+            maxBarThickness: 28,
+            categoryPercentage: 0.72,
+            barPercentage: 0.9,
+            stack: "curr",
+        });
+    }
+    if (showCalls.value) {
+        datasets.push({
+            type: "bar",
+            label: "调用",
+            data: trendData.value.data_points.map((p) => p.plugin_call_count),
+            backgroundColor: chartColors.pink.solid,
+            borderRadius: showMessages.value
+                ? { topLeft: 6, topRight: 6 }
+                : 6,
+            borderSkipped: false,
+            maxBarThickness: 28,
+            categoryPercentage: 0.72,
+            barPercentage: 0.9,
+            stack: "curr",
+        });
+    }
+
+    if (showPrevPeriod.value && prevTrendData.value?.data_points?.length) {
+        const prevPoints = prevTrendData.value.data_points;
+        // 对齐点数：多退少补 null，线会断开但不串位
+        const aligned = trendData.value.data_points.map((_, i) => {
+            const p = prevPoints[i];
+            if (!p) return null;
+            if (showMessages.value && showCalls.value) {
+                return p.message_count + p.plugin_call_count;
+            }
+            if (showMessages.value) return p.message_count;
+            return p.plugin_call_count;
+        });
+        datasets.push({
+            type: "line",
+            label: "上期",
+            data: aligned,
+            borderColor: chartColors.slate.solid,
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            borderDash: [5, 4],
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            tension: 0.3,
+            fill: false,
+            order: 0,
+        });
+    }
+
+    return {
+        labels,
+        // 混合 bar + line：放宽为 bar ChartData 以通过 vue-chartjs 类型
+        datasets: datasets as unknown as ChartDataset<"bar">[],
+    };
+});
+
+// ==================== API ====================
+const loadOverview = async () => {
+    try {
+        isOverviewLoading.value = true;
+        const res = await analyticsApi.getOverview({
+            start_time: startTime.value,
+            end_time: endTime.value,
+        });
+        if (res?.success && res?.data) overview.value = res.data;
+    } catch (error) {
+        console.error("加载区间概览失败:", error);
+    } finally {
+        isOverviewLoading.value = false;
+    }
+};
+
 const loadTrendData = async () => {
     try {
         isTrendLoading.value = true;
+        const start = new Date(startTime.value);
+        const end = new Date(endTime.value);
+        const span = Math.max(end.getTime() - start.getTime(), 3600000);
+        const prevStart = new Date(start.getTime() - span);
+        const prevEnd = start;
 
-        const res = await analyticsApi.getTrendData({
-            start_time: startTime.value,
-            end_time: endTime.value,
-            granularity: granularity.value as Granularity,
-        });
-
-        if (res?.success && res?.data) {
-            trendDataApi.value = res.data;
-        }
+        const [currRes, prevRes] = await Promise.all([
+            analyticsApi.getTrendData({
+                start_time: startTime.value,
+                end_time: endTime.value,
+                granularity: granularity.value as Granularity,
+            }),
+            analyticsApi.getTrendData({
+                start_time: formatLocalIso(prevStart),
+                end_time: formatLocalIso(prevEnd),
+                granularity: granularity.value as Granularity,
+            }),
+        ]);
+        if (currRes?.success && currRes?.data) trendData.value = currRes.data;
+        if (prevRes?.success && prevRes?.data) prevTrendData.value = prevRes.data;
     } catch (error) {
         console.error("加载趋势数据失败:", error);
         ZXNotification({
@@ -448,1176 +474,460 @@ const loadTrendData = async () => {
     }
 };
 
-/**
- * 加载详细统计数据（带时间范围）
- */
-const loadDetailedStatistics = async () => {
+const loadHeatmap = async () => {
     try {
-        isLoadingStats.value = true;
-        // 重置页码到第一页
-        currentPage.value = 1;
+        isHeatmapLoading.value = true;
+        const res = await analyticsApi.getHeatmap({
+            start_time: startTime.value,
+            end_time: endTime.value,
+        });
+        if (res?.success && res?.data) heatmap.value = res.data;
+    } catch (error) {
+        console.error("加载热力图失败:", error);
+    } finally {
+        isHeatmapLoading.value = false;
+    }
+};
+
+const loadDetailStatistics = async () => {
+    try {
+        isDetailLoading.value = true;
         const res = await analyticsApi.getStatistics({
             start_time: startTime.value,
             end_time: endTime.value,
         });
         if (res?.success && res?.data) {
-            // 将新类型转换为现有类型
-            groupStats.value = res.data.groups.map(
-                (g: GroupStatisticsTimeRange) => ({
-                    group_id: g.group_id,
-                    group_name: g.group_name,
-                    message_count: g.message_count,
-                    plugin_call_count: g.plugin_call_count,
-                }),
-            );
-            friendStats.value = res.data.friends.map(
-                (f: FriendStatisticsTimeRange) => ({
-                    user_id: f.user_id,
-                    user_name: f.user_name,
-                    message_count: f.message_count,
-                    plugin_call_count: f.plugin_call_count,
-                }),
-            );
+            groupStats.value = res.data.groups ?? [];
+            friendStats.value = res.data.friends ?? [];
         }
     } catch (error) {
-        console.error("加载详细统计数据失败:", error);
+        console.error("加载明细统计失败:", error);
     } finally {
-        isLoadingStats.value = false;
+        isDetailLoading.value = false;
     }
 };
 
-/**
- * 加载饼图数据（活跃群组 Top10 和热门插件 Top10）
- */
-const loadPieChartData = async () => {
-    pieDataLoading.value = true;
+const loadRankData = async () => {
     try {
-        // 获取活跃群组数据（Top 10）- 使用自定义时间范围
-        const activeGroupRes = await mainApi.getActiveGroups(
-            undefined, // dateType 不使用
-            undefined, // botId
-            startTime.value,
-            endTime.value,
-        );
-        if (activeGroupRes?.success && activeGroupRes?.data) {
-            // 强制触发响应式更新
-            activeGroupData.value = {
-                labels: activeGroupRes.data.map(
-                    (g: ActiveGroup) => g.name || g.group_id,
-                ),
-                datasets: [
-                    {
-                        data: activeGroupRes.data.map(
-                            (g: ActiveGroup) => g.chat_num,
-                        ),
-                        backgroundColor:
-                            activeGroupData.value.datasets[0].backgroundColor,
-                        borderColor: "#ffffff",
-                        hoverBorderColor: pieBorderColors,
-                        borderWidth: 2,
-                        hoverOffset: 6,
-                    },
-                ],
-            };
+        isRankLoading.value = true;
+        const [groupRes, pluginRes] = await Promise.all([
+            mainApi.getActiveGroups(
+                undefined,
+                undefined,
+                startTime.value,
+                endTime.value,
+            ),
+            mainApi.getHotPlugins(
+                undefined,
+                undefined,
+                startTime.value,
+                endTime.value,
+            ),
+        ]);
+        if (groupRes?.success && groupRes?.data) {
+            activeGroups.value = groupRes.data;
         }
-
-        // 获取热门插件数据（Top 10）- 使用自定义时间范围
-        const hotPluginRes = await mainApi.getHotPlugins(
-            undefined, // dateType 不使用
-            undefined, // botId
-            startTime.value,
-            endTime.value,
-        );
-        if (hotPluginRes?.success && hotPluginRes?.data) {
-            // 强制触发响应式更新
-            hotPluginData.value = {
-                labels: hotPluginRes.data
-                    .map((p: HotPlugin) => p.plugin_name || p.module || "")
-                    .filter(Boolean),
-                datasets: [
-                    {
-                        data: hotPluginRes.data.map(
-                            (p: HotPlugin) => p.call_count,
-                        ),
-                        backgroundColor:
-                            hotPluginData.value.datasets[0].backgroundColor,
-                        borderColor: "#ffffff",
-                        hoverBorderColor: pieBorderColors,
-                        borderWidth: 2,
-                        hoverOffset: 6,
-                    },
-                ],
-            };
-        }
-    } catch (error) {
-        ZXNotification({
-            title: "呜呼～",
-            message: "统计数据加载失败了 (っ °Д °;) っ",
-            type: "😭",
-            position: "top-right",
-        });
-    } finally {
-        // 延迟一下让动画生效
-        setTimeout(() => {
-            pieDataLoading.value = false;
-        }, 100);
-    }
-};
-
-/**
- * 加载柱状图数据（好感度 top10 和金币 top10）
- */
-const loadBarChartData = async () => {
-    try {
-        // 获取好感度 top10
-        const favorabilityRes = await analyticsApi.getFavorabilityTop10();
-        if (favorabilityRes?.success && favorabilityRes?.data) {
-            favorabilityData.value = {
-                labels: favorabilityRes.data.map(
-                    (item: FavorabilityRank) => item.user_name,
-                ),
-                datasets: [
-                    {
-                        data: favorabilityRes.data.map(
-                            (item: FavorabilityRank) =>
-                                Number(item.favorability),
-                        ),
-                        ...createBarDatasetStyle("pink"),
-                    },
-                ],
-            };
-        }
-
-        // 获取金币 top10
-        const goldRes = await analyticsApi.getGoldTop10();
-        if (goldRes?.success && goldRes?.data) {
-            goldData.value = {
-                labels: goldRes.data.map((item: GoldRank) => item.user_name),
-                datasets: [
-                    {
-                        data: goldRes.data.map((item: GoldRank) =>
-                            Number(item.gold),
-                        ),
-                        ...createBarDatasetStyle("amber"),
-                    },
-                ],
-            };
-        }
-    } catch (error) {
-        console.error("加载柱状图数据失败:", error);
-    }
-};
-
-/**
- * 加载统计数据和趋势
- */
-const loadStats = async () => {
-    try {
-        // 设置默认时间范围（最近 30 天）
-        setDefaultTimeRange(30 * 24);
-
-        // 获取聊天统计数据（用于顶部卡片）
-        const chatRes = await mainApi.getChatStatistics();
-        if (chatRes?.success && chatRes?.data) {
-            stats.value = {
-                chat_num: chatRes.data.all ?? 0,
-                chat_week: chatRes.data.week ?? 0,
-                chat_month: chatRes.data.month ?? 0,
-                chat_year: chatRes.data.year ?? 0,
-                call_num: 0,
-                call_week: 0,
-                call_month: 0,
-                call_year: 0,
-            };
-        }
-
-        // 获取插件调用统计数据
-        const pluginRes = await mainApi.getPluginStatistics();
         if (pluginRes?.success && pluginRes?.data) {
-            stats.value.call_week = pluginRes.data.week ?? 0;
-            stats.value.call_month = pluginRes.data.month ?? 0;
-            stats.value.call_year = pluginRes.data.year ?? 0;
-            stats.value.call_num =
-                pluginRes.data.all ?? pluginRes.data.week ?? 0;
+            hotPlugins.value = pluginRes.data as HotPlugin[];
         }
-
-        // 加载真实趋势数据
-        await loadTrendData();
-
-        // 加载饼图数据
-        await loadPieChartData();
     } catch (error) {
-        console.error("加载统计数据失败:", error);
-        ZXNotification({
-            title: "呜呼～",
-            message: "统计数据加载失败了 (っ °Д °;) っ",
-            type: "😭",
-            position: "top-right",
-        });
+        console.error("加载榜单失败:", error);
+    } finally {
+        isRankLoading.value = false;
     }
 };
 
-// 时间范围类型（用于饼图）
-const currentDateType = ref<"all" | "day" | "week" | "month" | "year">("all");
-
-/**
- * 切换时间范围（只刷新饼图数据）
- */
-const handleDateTypeChange = (type: typeof currentDateType.value) => {
-    currentDateType.value = type;
-    loadPieChartData();
+const loadEconomy = async () => {
+    try {
+        isEconomyLoading.value = true;
+        const [favRes, goldRes] = await Promise.all([
+            analyticsApi.getFavorabilityTop10(),
+            analyticsApi.getGoldTop10(),
+        ]);
+        if (favRes?.success && favRes?.data) favorability.value = favRes.data;
+        if (goldRes?.success && goldRes?.data) goldRanks.value = goldRes.data;
+    } catch (error) {
+        console.error("加载经济榜单失败:", error);
+    } finally {
+        isEconomyLoading.value = false;
+    }
 };
 
-/**
- * 获取趋势图数据（转换为 Chart.js 格式）
- */
-const chartData = computed(() => {
-    if (!trendDataApi.value) return null;
+const refreshAll = async () => {
+    if (!startTime.value || !endTime.value) {
+        analyticsStore.setDefaultTimeRange(30 * 24);
+    }
+    await Promise.all([
+        loadOverview(),
+        loadTrendData(),
+        loadHeatmap(),
+        loadDetailStatistics(),
+        loadRankData(),
+    ]);
+};
 
-    const labels = trendDataApi.value.data_points.map((point) => {
-        const date = new Date(point.timestamp);
-        if (granularity.value === "hour") {
-            return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:00`;
-        } else if (granularity.value === "week") {
-            return `第${Math.ceil(date.getDate() / 7)}周`;
-        } else if (granularity.value === "month") {
-            return `${date.getFullYear()}年${date.getMonth() + 1}月`;
-        }
-        return `${date.getMonth() + 1}/${date.getDate()}`;
-    });
+const refreshManual = async () => {
+    await Promise.all([refreshAll(), loadEconomy()]);
+};
 
-    return {
-        labels,
-        datasets: [
-            {
-                label: "消息数量",
-                ...createLineDatasetStyle("blue"),
-                data: trendDataApi.value.data_points.map(
-                    (p) => p.message_count,
-                ),
-                yAxisID: "y",
-            },
-            {
-                label: "调用次数",
-                ...createLineDatasetStyle("pink"),
-                data: trendDataApi.value.data_points.map(
-                    (p) => p.plugin_call_count,
-                ),
-                yAxisID: "y1",
-            },
-        ],
-    };
+watch(refreshSignal, () => {
+    void refreshAll();
 });
 
 onMounted(() => {
-    loadStats();
-    loadDetailedStatistics();
-    loadBarChartData();
+    void refreshManual();
+});
+
+onActivated(() => {
+    if (overview.value) {
+        void refreshAll();
+    }
 });
 </script>
 
 <template>
-    <div class="flex h-full w-full flex-col space-y-3 sm:space-y-4">
-        <!-- 头部操作：快捷时间范围 / 时间粒度 -->
+    <div class="flex h-full w-full flex-col gap-3 overflow-y-auto sm:gap-4">
+        <!-- 工具栏 -->
         <div
-            class="flex flex-col space-y-3 rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:space-y-0"
-            v-if="!globalStore.isDesktopMode"
+            v-if="!globalStore.isDesktopMode || showCustomRange"
+            class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
         >
             <div
-                class="flex flex-col items-start space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-3"
+                class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             >
-                <!-- 快捷时间范围选择 -->
-                <div class="flex items-center space-x-1">
-                    <div
-                        class="flex items-center space-x-1 rounded-2xl bg-gray-100 p-1"
-                    >
+                <div
+                    v-if="!globalStore.isDesktopMode"
+                    class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3"
+                >
+                    <div class="flex items-center gap-1 rounded-2xl border bg-gray-100 p-1">
                         <button
                             v-for="range in quickTimeRanges"
                             :key="range.value"
-                            @click="
-                                selectedQuickRange = range.value;
-                                setDefaultTimeRange(range.hours || 30 * 24);
-                                loadTrendData();
-                                loadDetailedStatistics();
-                                loadPieChartData();
-                            "
-                            class="btn-touch rounded-2xl px-3 py-1.5 text-xs font-medium transition-all duration-200"
-                            :class="[
+                            type="button"
+                            class="btn-touch rounded-xl px-3 py-1.5 text-xs font-medium transition-all"
+                            :class="
                                 selectedQuickRange === range.value
-                                    ? 'bg-white text-gray-800 shadow-sm'
-                                    : 'text-gray-500 hover:bg-gray-200/50 hover:text-gray-700',
-                            ]"
+                                    ? 'bg-white text-zx-primary shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            "
+                            @click="handleQuickRange(range)"
                         >
                             {{ range.label }}
                         </button>
                     </div>
-                </div>
-
-                <!-- 时间粒度选择 -->
-                <div class="flex items-center space-x-1">
-                    <div
-                        class="flex items-center space-x-1 rounded-2xl bg-gray-100 p-1"
-                    >
+                    <div class="flex items-center gap-1 rounded-2xl border bg-gray-100 p-1">
                         <button
                             v-for="opt in granularityOptions"
                             :key="opt.value"
-                            @click="
-                                granularity = opt.value;
-                                loadTrendData();
-                            "
-                            class="btn-touch rounded-2xl px-3 py-1.5 text-xs font-medium transition-all duration-200"
-                            :class="[
+                            type="button"
+                            class="btn-touch rounded-xl px-3 py-1.5 text-xs font-medium transition-all"
+                            :class="
                                 granularity === opt.value
-                                    ? 'bg-white text-gray-800 shadow-sm'
-                                    : 'text-gray-500 hover:bg-gray-200/50 hover:text-gray-700',
-                            ]"
+                                    ? 'bg-white text-zx-primary shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                            "
+                            @click="handleGranularity(opt.value)"
                         >
                             {{ opt.label }}
                         </button>
                     </div>
                 </div>
+
+                <div
+                    v-if="showCustomRange"
+                    class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3"
+                >
+                    <label class="flex items-center gap-2 text-sm text-zx-text-muted">
+                        起始
+                        <input
+                            v-model="startTimeLocal"
+                            type="datetime-local"
+                            step="1"
+                            class="w-[190px] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-zx-text transition-colors focus:bg-white focus:outline-none"
+                        />
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-zx-text-muted">
+                        结束
+                        <input
+                            v-model="endTimeLocal"
+                            type="datetime-local"
+                            step="1"
+                            class="w-[190px] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-zx-text transition-colors focus:bg-white focus:outline-none"
+                        />
+                    </label>
+                    <ZxButton size="sm" @click="applyCustomRange">应用</ZxButton>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <span v-if="rangeLabel" class="text-xs text-zx-text-subtle">
+                        {{ rangeLabel }}
+                    </span>
+                    <ZxButton
+                        variant="ghost"
+                        size="sm"
+                        :disabled="isRefreshing"
+                        @click="refreshManual"
+                    >
+                        <RefreshCw
+                            class="h-4 w-4"
+                            :class="isRefreshing ? 'animate-spin' : ''"
+                        />
+                        刷新
+                    </ZxButton>
+                </div>
             </div>
         </div>
 
-        <!-- 自定义时间范围选择器 -->
+        <div v-else class="flex items-center justify-end gap-3 px-1">
+            <span v-if="rangeLabel" class="text-xs text-zx-text-subtle">
+                {{ rangeLabel }}
+            </span>
+            <ZxButton
+                variant="ghost"
+                size="sm"
+                :disabled="isRefreshing"
+                @click="refreshManual"
+            >
+                <RefreshCw
+                    class="h-4 w-4"
+                    :class="isRefreshing ? 'animate-spin' : ''"
+                />
+                刷新
+            </ZxButton>
+        </div>
+
+        <!-- 顶部：榜单 ×2 + 右侧竖排 KPI，填满高度 -->
         <div
-            v-if="selectedQuickRange === 'custom'"
-            class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"
+            class="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_minmax(200px,240px)]"
         >
             <div
-                class="flex flex-col items-start space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4"
+                class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
             >
-                <div class="flex items-center space-x-2">
-                    <Clock class="h-4 w-4 text-gray-500" />
-                    <label class="text-sm text-gray-600">起始时间:</label>
-                    <input
-                        v-model="startTimeLocal"
-                        type="datetime-local"
-                        step="1"
-                        placeholder="选择起始时间"
-                        class="w-[200px] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-gray-700 transition-colors focus:bg-white focus:outline-none"
-                    />
-                </div>
-                <div class="flex items-center space-x-2">
-                    <Calendar class="h-4 w-4 text-gray-500" />
-                    <label class="text-sm text-gray-600">结束时间:</label>
-                    <input
-                        v-model="endTimeLocal"
-                        type="datetime-local"
-                        step="1"
-                        placeholder="选择结束时间"
-                        class="w-[200px] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-gray-700 transition-colors focus:bg-white focus:outline-none"
-                    />
-                </div>
-                <button
-                    @click="
-                        loadTrendData();
-                        loadDetailedStatistics();
-                        loadPieChartData();
-                    "
-                    class="rounded-2xl bg-zx-primary px-4 py-1.5 text-sm text-white transition-colors hover:bg-zx-primary-hover"
-                >
-                    应用
-                </button>
-            </div>
-        </div>
-
-        <!-- 统计卡片 -->
-        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
-            <!-- 全部消息 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-            >
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <div
-                        class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
-                    >
-                        <MessageSquare class="h-8 w-8 text-zx-primary" />
-                    </div>
-                    <div class="min-w-0">
-                        <div
-                            class="truncate text-xl font-bold text-gray-800 sm:text-2xl"
-                        >
-                            {{ stats.chat_num }}
-                        </div>
-                        <div class="truncate text-xs text-gray-500">
-                            全部消息
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 一周消息 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-            >
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <div
-                        class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
-                    >
-                        <MessageSquare class="h-8 w-8 text-zx-primary" />
-                    </div>
-                    <div class="min-w-0">
-                        <div
-                            class="truncate text-xl font-bold text-gray-800 sm:text-2xl"
-                        >
-                            {{ stats.chat_week }}
-                        </div>
-                        <div class="truncate text-xs text-gray-500">
-                            一周消息
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 一月消息 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-            >
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <div
-                        class="flex h-8 h-10 w-8 w-10 flex-shrink-0 items-center justify-center rounded-full"
-                    >
-                        <MessageSquare class="h-8 w-8 text-zx-primary" />
-                    </div>
-                    <div class="min-w-0">
-                        <div
-                            class="truncate text-xl font-bold text-gray-800 sm:text-2xl"
-                        >
-                            {{ stats.chat_month }}
-                        </div>
-                        <div class="truncate text-xs text-gray-500">
-                            一月消息
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 一年消息 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-            >
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <div
-                        class="flex h-8 h-10 w-8 w-10 flex-shrink-0 items-center justify-center rounded-full"
-                    >
-                        <MessageSquare class="h-8 w-8 text-zx-primary" />
-                    </div>
-                    <div class="min-w-0">
-                        <div
-                            class="truncate text-xl font-bold text-gray-800 sm:text-2xl"
-                        >
-                            {{ stats.chat_year }}
-                        </div>
-                        <div class="truncate text-xs text-gray-500">
-                            一年消息
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 全部调用 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-            >
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <div
-                        class="flex h-8 h-10 w-8 w-10 flex-shrink-0 items-center justify-center rounded-full"
-                    >
-                        <Activity class="h-8 w-8 text-zx-primary" />
-                    </div>
-                    <div class="min-w-0">
-                        <div
-                            class="truncate text-xl font-bold text-gray-800 sm:text-2xl"
-                        >
-                            {{ stats.call_num }}
-                        </div>
-                        <div class="truncate text-xs text-gray-500">
-                            全部调用
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 一周调用 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-            >
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <div
-                        class="flex h-8 h-10 w-8 w-10 flex-shrink-0 items-center justify-center rounded-full"
-                    >
-                        <Activity class="h-8 w-8 text-zx-primary" />
-                    </div>
-                    <div class="min-w-0">
-                        <div
-                            class="truncate text-xl font-bold text-gray-800 sm:text-2xl"
-                        >
-                            {{ stats.call_week }}
-                        </div>
-                        <div class="truncate text-xs text-gray-500">
-                            一周调用
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 一月调用 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-            >
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <div
-                        class="flex h-8 h-10 w-8 w-10 flex-shrink-0 items-center justify-center rounded-full"
-                    >
-                        <Activity class="h-8 w-8 text-zx-primary" />
-                    </div>
-                    <div class="min-w-0">
-                        <div
-                            class="truncate text-xl font-bold text-gray-800 sm:text-2xl"
-                        >
-                            {{ stats.call_month }}
-                        </div>
-                        <div class="truncate text-xs text-gray-500">
-                            一月调用
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 一年调用 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-            >
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <div
-                        class="flex h-8 h-10 w-8 w-10 flex-shrink-0 items-center justify-center rounded-full"
-                    >
-                        <Activity class="h-8 w-8 text-zx-primary" />
-                    </div>
-                    <div class="min-w-0">
-                        <div
-                            class="truncate text-xl font-bold text-gray-800 sm:text-2xl"
-                        >
-                            {{ stats.call_year }}
-                        </div>
-                        <div class="truncate text-xs text-gray-500">
-                            一年调用
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 图表区域 -->
-        <div class="flex flex-col space-y-3 sm:space-y-4">
-            <!-- 合并趋势图（全宽） -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4"
-            >
-                <div class="mb-3 flex items-center justify-between p-2 sm:mb-4">
-                    <h3
-                        class="text-sm font-semibold text-gray-800 sm:text-base"
-                    >
-                        消息与调用趋势
-                        <span
-                            v-if="trendDataApi"
-                            class="ml-2 text-xs font-normal text-gray-500"
-                        >
-                            ({{ trendDataApi.data_points.length }} 个数据点 ·
-                            {{
-                                granularityOptions.find(
-                                    (o) => o.value === granularity,
-                                )?.label
-                            }})
-                        </span>
+                <div class="mb-3 flex items-baseline justify-between gap-2">
+                    <h3 class="text-sm font-semibold text-zx-text-strong">
+                        活跃群组
                     </h3>
-                    <div class="text-xs text-gray-500">
-                        总消息：{{ trendDataApi?.total_message_count ?? 0 }} |
-                        总调用：{{ trendDataApi?.total_plugin_call_count ?? 0 }}
+                    <span class="text-[11px] text-zx-text-subtle">消息</span>
+                </div>
+                <FunnelBarList
+                    :items="activeGroupItems"
+                    :loading="isRankLoading"
+                    :max="10"
+                    list-height="320px"
+                    empty-text="暂无活跃群组"
+                />
+            </div>
+
+            <div
+                class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+            >
+                <div class="mb-3 flex items-baseline justify-between gap-2">
+                    <h3 class="text-sm font-semibold text-zx-text-strong">
+                        热门插件
+                    </h3>
+                    <span class="text-[11px] text-zx-text-subtle">调用</span>
+                </div>
+                <FunnelBarList
+                    :items="hotPluginItems"
+                    :loading="isRankLoading"
+                    :max="10"
+                    list-height="320px"
+                    :show-avatar="false"
+                    empty-text="暂无插件调用"
+                />
+            </div>
+
+            <!-- KPI 竖排 4 条，贴满上排高度 -->
+            <div
+                class="flex flex-col gap-3 md:col-span-2 xl:col-span-1 xl:gap-2"
+            >
+                <div
+                    v-for="card in kpiCards"
+                    :key="card.key"
+                    class="flex flex-1 flex-col justify-center rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-5"
+                >
+                    <div class="text-[11px] text-zx-text-muted">
+                        {{ card.label }}
+                    </div>
+                    <div
+                        class="mt-0.5 truncate text-xl font-bold tabular-nums text-zx-text-strong sm:text-2xl"
+                    >
+                        <span
+                            v-if="
+                                (isOverviewLoading && !overview) ||
+                                (isTrendLoading && !trendData)
+                            "
+                            class="inline-block h-6 w-14 animate-pulse rounded bg-slate-100"
+                        ></span>
+                        <template v-else>{{ card.value }}</template>
+                    </div>
+                    <div
+                        class="mt-0.5 flex min-h-4 items-center gap-1.5 text-[11px]"
+                    >
+                        <span
+                            v-if="
+                                card.delta !== null && card.delta !== undefined
+                            "
+                            class="inline-flex items-center gap-0.5 font-semibold tabular-nums"
+                            :class="
+                                card.delta >= 0
+                                    ? 'text-emerald-600'
+                                    : 'text-rose-500'
+                            "
+                        >
+                            <component
+                                :is="
+                                    card.delta >= 0 ? TrendingUp : TrendingDown
+                                "
+                                class="h-3 w-3"
+                            />
+                            {{ Math.abs(card.delta).toFixed(1) }}%
+                        </span>
+                        <span
+                            v-if="card.hint"
+                            class="truncate text-zx-text-subtle"
+                        >
+                            {{ card.hint }}
+                        </span>
                     </div>
                 </div>
-                <div class="relative h-48 sm:h-64">
+            </div>
+        </div>
+
+        <!-- 左：热力图；右：趋势 -->
+        <div class="grid grid-cols-1 gap-3 sm:gap-4 xl:grid-cols-[auto_minmax(0,1fr)]">
+            <div
+                class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+            >
+                <div class="mb-1">
+                    <h3 class="text-sm font-semibold text-zx-text-strong sm:text-base">
+                        消息活跃时段
+                    </h3>
+                </div>
+                <ActivityHeatmap :data="heatmap" :loading="isHeatmapLoading" />
+            </div>
+
+            <div
+                class="min-w-0 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
+            >
+                <div
+                    class="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-4"
+                >
+                    <div>
+                        <h3 class="text-sm font-semibold text-zx-text-strong sm:text-base">
+                            消息与调用趋势
+                        </h3>
+                        <p class="mt-0.5 text-xs text-zx-text-subtle">
+                            {{
+                                granularityOptions.find((o) => o.value === granularity)
+                                    ?.label
+                            }}
+                            粒度 · 虚线为上一等长周期
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button
+                            type="button"
+                            class="btn-touch rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                            :class="
+                                showMessages
+                                    ? 'border-blue-500 bg-blue-500 text-white'
+                                    : 'border-slate-200 text-zx-text-muted hover:border-blue-300'
+                            "
+                            @click="toggleSeries('msg')"
+                        >
+                            消息
+                        </button>
+                        <button
+                            type="button"
+                            class="btn-touch rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                            :class="
+                                showCalls
+                                    ? 'border-pink-500 bg-pink-500 text-white'
+                                    : 'border-slate-200 text-zx-text-muted hover:border-pink-300'
+                            "
+                            @click="toggleSeries('call')"
+                        >
+                            调用
+                        </button>
+                        <button
+                            type="button"
+                            class="btn-touch rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                            :class="
+                                showPrevPeriod
+                                    ? 'border-slate-600 bg-slate-600 text-white'
+                                    : 'border-slate-200 text-zx-text-muted hover:border-slate-400'
+                            "
+                            @click="showPrevPeriod = !showPrevPeriod"
+                        >
+                            上期
+                        </button>
+                    </div>
+                </div>
+                <div class="relative h-56 sm:h-72">
                     <div
                         v-if="isTrendLoading"
                         class="absolute inset-0 flex items-center justify-center"
                     >
                         <div
-                            class="h-8 w-8 animate-spin rounded-full border-b-2 border-zx-primary"
+                            class="h-7 w-7 animate-spin rounded-full border-2 border-zx-primary border-b-transparent"
                         ></div>
                     </div>
-                    <Line
-                        v-else-if="
-                            chartData && chartData.datasets[0].data.length > 0
-                        "
+                    <Bar
+                        v-else-if="chartData && chartData.datasets.length > 0"
                         :data="chartData"
                         :options="chartOptions"
                     />
                     <div
                         v-else
-                        class="flex h-full items-center justify-center text-gray-400"
+                        class="flex h-full items-center justify-center text-sm text-zx-text-subtle"
                     >
-                        <Activity class="mr-2 h-12 w-12 opacity-50" />
-                        <span>暂无趋势数据</span>
+                        暂无趋势数据
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- 饼图区域 -->
-            <div class="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
-                <!-- 活跃群组饼图 -->
-                <div
-                    class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-                >
-                    <h3
-                        class="mb-3 text-sm font-semibold text-gray-800 sm:mb-4 sm:text-base"
-                    >
-                        活跃群组 Top10
+        <!-- 经济榜 -->
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-2 sm:gap-4">
+            <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div class="mb-4 flex items-baseline gap-2">
+                    <h3 class="text-sm font-semibold text-zx-text-strong sm:text-base">
+                        好感度排行
                     </h3>
-                    <div
-                        class="relative flex h-48 items-center justify-center sm:h-64"
-                    >
-                        <Pie
-                            v-if="
-                                !pieDataLoading &&
-                                activeGroupData.labels.length > 0
-                            "
-                            :data="activeGroupData"
-                            :options="pieOptions"
-                        />
-                        <div
-                            v-if="pieDataLoading"
-                            class="absolute inset-0 flex items-center justify-center"
-                        >
-                            <div
-                                class="h-8 w-8 animate-spin rounded-full border-b-2 border-zx-primary"
-                            ></div>
-                        </div>
-                        <div
-                            v-if="
-                                !pieDataLoading &&
-                                activeGroupData.labels.length === 0
-                            "
-                            class="text-center text-gray-400"
-                        >
-                            <Users class="mx-auto mb-2 h-12 w-12 opacity-50" />
-                            <p class="text-sm">暂无数据</p>
-                        </div>
-                    </div>
+                    <span class="text-xs text-zx-text-subtle">Top 10</span>
                 </div>
+                <RankList
+                    :items="favorabilityItems"
+                    :loading="isEconomyLoading"
+                    tone="pink"
+                    :max="10"
+                    empty-text="暂无好感度数据"
+                />
+            </div>
 
-                <!-- 热门插件饼图 -->
-                <div
-                    class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-                >
-                    <h3
-                        class="mb-3 text-sm font-semibold text-gray-800 sm:mb-4 sm:text-base"
-                    >
-                        热门插件 Top10
+            <div class="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div class="mb-4 flex items-baseline gap-2">
+                    <h3 class="text-sm font-semibold text-zx-text-strong sm:text-base">
+                        金币排行
                     </h3>
-                    <div
-                        class="relative flex h-48 items-center justify-center sm:h-64"
-                    >
-                        <Pie
-                            v-if="
-                                !pieDataLoading &&
-                                hotPluginData.labels.length > 0
-                            "
-                            :data="hotPluginData"
-                            :options="pieOptions"
-                        />
-                        <div
-                            v-if="pieDataLoading"
-                            class="absolute inset-0 flex items-center justify-center"
-                        >
-                            <div
-                                class="h-8 w-8 animate-spin rounded-full border-b-2 border-zx-primary"
-                            ></div>
-                        </div>
-                        <div
-                            v-if="
-                                !pieDataLoading &&
-                                hotPluginData.labels.length === 0
-                            "
-                            class="text-center text-gray-400"
-                        >
-                            <TrendingUp
-                                class="mx-auto mb-2 h-12 w-12 opacity-50"
-                            />
-                            <p class="text-sm">暂无数据</p>
-                        </div>
-                    </div>
+                    <span class="text-xs text-zx-text-subtle">Top 10</span>
                 </div>
+                <RankList
+                    :items="goldItems"
+                    :loading="isEconomyLoading"
+                    tone="amber"
+                    :max="10"
+                    empty-text="暂无金币数据"
+                />
             </div>
         </div>
 
-        <!-- 柱状图区域 -->
-        <div class="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
-            <!-- 好感度 Top10 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-                <h3
-                    class="mb-3 flex items-center text-sm font-semibold text-gray-800 sm:mb-4 sm:text-base"
-                >
-                    <Heart class="mr-2 h-4 w-4 text-zx-primary" />
-                    好感度 Top10
-                </h3>
-                <div class="relative h-64 sm:h-80">
-                    <Bar
-                        v-if="favorabilityData.labels.length > 0"
-                        :data="favorabilityData"
-                        :options="barOptions"
-                    />
-                    <div
-                        v-else
-                        class="flex h-full items-center justify-center text-gray-400"
-                    >
-                        <Heart class="mr-2 h-12 w-12 opacity-50" />
-                        <span>暂无数据</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 金币 Top10 -->
-            <div
-                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-            >
-                <h3
-                    class="mb-3 flex items-center text-sm font-semibold text-gray-800 sm:mb-4 sm:text-base"
-                >
-                    <DollarSign class="mr-2 h-4 w-4 text-zx-primary" />
-                    金币 Top10
-                </h3>
-                <div class="relative h-64 sm:h-80">
-                    <Bar
-                        v-if="goldData.labels.length > 0"
-                        :data="goldData"
-                        :options="barOptions"
-                    />
-                    <div
-                        v-else
-                        class="flex h-full items-center justify-center text-gray-400"
-                    >
-                        <DollarSign class="mr-2 h-12 w-12 opacity-50" />
-                        <span>暂无数据</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 详细统计数据 - 群组/好友消息和调用情况 -->
-        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div class="flex items-center justify-between">
-                <h3
-                    class="flex items-center space-x-2 text-base font-bold text-gray-800 sm:text-lg"
-                >
-                    <Activity class="h-4 w-4 text-zx-primary sm:h-5 sm:w-5" />
-                    <span>详细统计</span>
-                </h3>
-                <button
-                    @click="loadDetailedStatistics"
-                    :disabled="isLoadingStats"
-                    class="btn-touch flex-shrink-0 rounded-2xl bg-gray-100 p-2 transition-colors hover:bg-gray-200"
-                    title="刷新统计数据"
-                >
-                    <RefreshCw
-                        :class="isLoadingStats ? 'animate-spin' : ''"
-                        class="h-4 w-4 text-gray-600"
-                    />
-                </button>
-            </div>
-
-            <!-- Tab 切换 -->
-            <div class="mb-1 border-b border-gray-200">
-                <div class="flex space-x-4">
-                    <button
-                        @click="changeTab('groups')"
-                        :class="
-                            activeTab === 'groups'
-                                ? 'border-zx-primary text-zx-primary'
-                                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                        "
-                        class="flex items-center space-x-1 border-b-2 px-1 py-2 text-sm font-medium transition-colors"
-                    >
-                        <Hash class="h-4 w-4" />
-                        <span>群组统计</span>
-                        <span
-                            class="ml-1 rounded-full bg-zx-primary-soft px-2 py-0.5 text-xs text-zx-primary"
-                            >{{ groupStats.length }}</span
-                        >
-                    </button>
-                    <button
-                        @click="changeTab('friends')"
-                        :class="
-                            activeTab === 'friends'
-                                ? 'border-zx-primary text-zx-primary'
-                                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
-                        "
-                        class="flex items-center space-x-1 border-b-2 px-1 py-2 text-sm font-medium transition-colors"
-                    >
-                        <User class="h-4 w-4" />
-                        <span>好友统计</span>
-                        <span
-                            class="ml-1 rounded-full bg-zx-primary-soft px-2 py-0.5 text-xs text-zx-primary"
-                            >{{ friendStats.length }}</span
-                        >
-                    </button>
-                </div>
-            </div>
-
-            <!-- 加载状态 -->
-            <div
-                v-if="isLoadingStats"
-                class="flex items-center justify-center py-12"
-            >
-                <RefreshCw class="h-8 w-8 animate-spin text-gray-400" />
-                <span class="ml-2 text-gray-500">加载中...</span>
-            </div>
-
-            <!-- 群组统计表格 -->
-            <div v-else-if="activeTab === 'groups'" class="overflow-x-auto">
-                <div
-                    v-if="groupStats.length === 0"
-                    class="py-12 text-center text-gray-500"
-                >
-                    <Users class="mx-auto mb-2 h-12 w-12 text-gray-300" />
-                    <p>暂无群组数据</p>
-                </div>
-                <table v-else class="w-full table-fixed text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-200">
-                            <th
-                                class="w-16 px-2 py-3 text-left font-medium text-gray-600"
-                            >
-                                排名
-                            </th>
-                            <th
-                                class="px-2 py-3 text-left font-medium text-gray-600"
-                            >
-                                群组名称
-                            </th>
-                            <th
-                                class="w-40 px-2 py-3 text-left font-medium text-gray-600"
-                            >
-                                群组 ID
-                            </th>
-                            <th
-                                class="w-32 px-2 py-3 text-center font-medium text-gray-600"
-                            >
-                                消息数量
-                            </th>
-                            <th
-                                class="w-32 px-2 py-3 text-center font-medium text-gray-600"
-                            >
-                                插件调用
-                            </th>
-                            <th
-                                class="w-40 px-2 py-3 text-center font-medium text-gray-600"
-                            >
-                                消息占比
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="(group, index) in paginatedGroupStats"
-                            :key="group.group_id"
-                            class="border-b border-gray-100 transition-colors hover:bg-gray-50"
-                        >
-                            <td class="px-2 py-3">
-                                <span
-                                    :class="
-                                        getRankClass(
-                                            index +
-                                                1 +
-                                                (currentPage - 1) * pageSize,
-                                        )
-                                    "
-                                    class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold"
-                                >
-                                    {{
-                                        index + 1 + (currentPage - 1) * pageSize
-                                    }}
-                                </span>
-                            </td>
-                            <td
-                                class="truncate px-2 py-3 font-medium text-gray-800"
-                                :title="group.group_name"
-                            >
-                                {{ group.group_name }}
-                            </td>
-                            <td
-                                class="truncate px-2 py-3 text-xs text-gray-500"
-                                :title="group.group_id"
-                            >
-                                {{ group.group_id }}
-                            </td>
-                            <td class="px-2 py-3 text-center">
-                                <span
-                                    class="inline-flex items-center rounded-full bg-zx-primary-soft px-2 py-1 font-medium text-zx-primary"
-                                >
-                                    <MessageSquare class="mr-1 h-3 w-3" />
-                                    {{ group.message_count }}
-                                </span>
-                            </td>
-                            <td class="px-2 py-3 text-center">
-                                <span
-                                    class="inline-flex items-center rounded-full bg-zx-primary-soft px-2 py-1 font-medium text-zx-primary"
-                                >
-                                    <Plug class="mr-1 h-3 w-3" />
-                                    {{ group.plugin_call_count }}
-                                </span>
-                            </td>
-                            <td class="px-2 py-3 text-center">
-                                <div
-                                    class="flex items-center justify-center space-x-2"
-                                >
-                                    <div
-                                        class="h-2 w-20 flex-shrink-0 overflow-hidden rounded-full bg-gray-200"
-                                    >
-                                        <div
-                                            class="h-full rounded-full bg-zx-primary"
-                                            :style="{
-                                                width: `${getMessagePercentage(group.message_count)}%`,
-                                            }"
-                                        ></div>
-                                    </div>
-                                    <span
-                                        class="w-10 flex-shrink-0 text-xs text-gray-600"
-                                        >{{
-                                            getMessagePercentage(
-                                                group.message_count,
-                                            ).toFixed(1)
-                                        }}%</span
-                                    >
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <!-- 分页控件 -->
-                <div
-                    v-if="groupTotalPages > 1"
-                    class="mt-4 flex items-center justify-between border-t border-gray-200 pt-4"
-                >
-                    <div class="text-sm text-gray-500">
-                        {{ currentPageRangeText }}
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <button
-                            @click="currentPage = 1"
-                            :disabled="currentPage === 1"
-                            class="rounded-2xl border border-gray-300 px-3 py-1 text-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            首页
-                        </button>
-                        <button
-                            @click="currentPage = Math.max(1, currentPage - 1)"
-                            :disabled="currentPage === 1"
-                            class="rounded-2xl border border-gray-300 px-3 py-1 text-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            上一页
-                        </button>
-                        <span class="px-3 py-1 text-sm text-gray-600">
-                            第 {{ currentPage }} / {{ groupTotalPages }} 页
-                        </span>
-                        <button
-                            @click="
-                                currentPage = Math.min(
-                                    groupTotalPages,
-                                    currentPage + 1,
-                                )
-                            "
-                            :disabled="currentPage === groupTotalPages"
-                            class="rounded-2xl border border-gray-300 px-3 py-1 text-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            下一页
-                        </button>
-                        <button
-                            @click="currentPage = groupTotalPages"
-                            :disabled="currentPage === groupTotalPages"
-                            class="rounded-2xl border border-gray-300 px-3 py-1 text-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            末页
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 好友统计表格 -->
-            <div v-else-if="activeTab === 'friends'" class="overflow-x-auto">
-                <div
-                    v-if="friendStats.length === 0"
-                    class="py-12 text-center text-gray-500"
-                >
-                    <Users class="mx-auto mb-2 h-12 w-12 text-gray-300" />
-                    <p>暂无好友数据</p>
-                </div>
-                <table v-else class="w-full table-fixed text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-200">
-                            <th
-                                class="w-16 px-2 py-3 text-left font-medium text-gray-600"
-                            >
-                                排名
-                            </th>
-                            <th
-                                class="px-2 py-3 text-left font-medium text-gray-600"
-                            >
-                                用户名称
-                            </th>
-                            <th
-                                class="w-40 px-2 py-3 text-left font-medium text-gray-600"
-                            >
-                                用户 ID
-                            </th>
-                            <th
-                                class="w-32 px-2 py-3 text-center font-medium text-gray-600"
-                            >
-                                消息数量
-                            </th>
-                            <th
-                                class="w-32 px-2 py-3 text-center font-medium text-gray-600"
-                            >
-                                插件调用
-                            </th>
-                            <th
-                                class="w-40 px-2 py-3 text-center font-medium text-gray-600"
-                            >
-                                消息占比
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr
-                            v-for="(friend, index) in paginatedFriendStats"
-                            :key="friend.user_id"
-                            class="border-b border-gray-100 transition-colors hover:bg-gray-50"
-                        >
-                            <td class="px-2 py-3">
-                                <span
-                                    :class="
-                                        getRankClass(
-                                            index +
-                                                1 +
-                                                (currentPage - 1) * pageSize,
-                                        )
-                                    "
-                                    class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold"
-                                >
-                                    {{
-                                        index + 1 + (currentPage - 1) * pageSize
-                                    }}
-                                </span>
-                            </td>
-                            <td
-                                class="truncate px-2 py-3 font-medium text-gray-800"
-                                :title="friend.user_name"
-                            >
-                                {{ friend.user_name }}
-                            </td>
-                            <td
-                                class="truncate px-2 py-3 text-xs text-gray-500"
-                                :title="friend.user_id"
-                            >
-                                {{ friend.user_id }}
-                            </td>
-                            <td class="px-2 py-3 text-center">
-                                <span
-                                    class="inline-flex items-center rounded-full bg-zx-primary-soft px-2 py-1 font-medium text-zx-primary"
-                                >
-                                    <MessageSquare class="mr-1 h-3 w-3" />
-                                    {{ friend.message_count }}
-                                </span>
-                            </td>
-                            <td class="px-2 py-3 text-center">
-                                <span
-                                    class="inline-flex items-center rounded-full bg-zx-primary-soft px-2 py-1 font-medium text-zx-primary"
-                                >
-                                    <Plug class="mr-1 h-3 w-3" />
-                                    {{ friend.plugin_call_count }}
-                                </span>
-                            </td>
-                            <td class="px-2 py-3 text-center">
-                                <div
-                                    class="flex items-center justify-center space-x-2"
-                                >
-                                    <div
-                                        class="h-2 w-20 flex-shrink-0 overflow-hidden rounded-full bg-gray-200"
-                                    >
-                                        <div
-                                            class="h-full rounded-full bg-zx-primary"
-                                            :style="{
-                                                width: `${getMessagePercentage(friend.message_count)}%`,
-                                            }"
-                                        ></div>
-                                    </div>
-                                    <span
-                                        class="w-10 flex-shrink-0 text-xs text-gray-600"
-                                        >{{
-                                            getMessagePercentage(
-                                                friend.message_count,
-                                            ).toFixed(1)
-                                        }}%</span
-                                    >
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <!-- 分页控件 -->
-                <div
-                    v-if="friendTotalPages > 1"
-                    class="mt-4 flex items-center justify-between border-t border-gray-200 pt-4"
-                >
-                    <div class="text-sm text-gray-500">
-                        {{ currentPageRangeText }}
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <button
-                            @click="currentPage = 1"
-                            :disabled="currentPage === 1"
-                            class="rounded-2xl border border-gray-300 px-3 py-1 text-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            首页
-                        </button>
-                        <button
-                            @click="currentPage = Math.max(1, currentPage - 1)"
-                            :disabled="currentPage === 1"
-                            class="rounded-2xl border border-gray-300 px-3 py-1 text-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            上一页
-                        </button>
-                        <span class="px-3 py-1 text-sm text-gray-600">
-                            第 {{ currentPage }} / {{ friendTotalPages }} 页
-                        </span>
-                        <button
-                            @click="
-                                currentPage = Math.min(
-                                    friendTotalPages,
-                                    currentPage + 1,
-                                )
-                            "
-                            :disabled="currentPage === friendTotalPages"
-                            class="rounded-2xl border border-gray-300 px-3 py-1 text-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            下一页
-                        </button>
-                        <button
-                            @click="currentPage = friendTotalPages"
-                            :disabled="currentPage === friendTotalPages"
-                            class="rounded-2xl border border-gray-300 px-3 py-1 text-sm transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            末页
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- 明细表 -->
+        <DetailStatsTable
+            :groups="groupStats"
+            :friends="friendStats"
+            :loading="isDetailLoading"
+        />
     </div>
 </template>
-
-<style scoped></style>
