@@ -7,6 +7,7 @@ import { pluginApi } from '@/utils/api-next'
 import { ZXNotification } from '@/services/ui'
 import { ZXDropdown } from '@/components/zxcomponent/ZXDropdown'
 import type { PluginDetailConfig, PluginDetail } from '@/types/plugin.types'
+import { OVERLAY_ID, useZxOverlay } from "@/composables/useOverlayStack";
 
 interface Props {
     module: string
@@ -23,6 +24,13 @@ const emit = defineEmits<{
 
 // 本地 visible 状态
 const internalVisible = ref(false)
+const rootRef = ref<HTMLElement | null>(null)
+useZxOverlay({
+    id: OVERLAY_ID.pluginConfig,
+    open: internalVisible,
+    el: () => rootRef.value,
+    onClose: () => handleClose(),
+})
 
 // 加载状态
 const loading = ref(false)
@@ -419,12 +427,10 @@ const getPlaceholder = (config: PluginDetailConfig) => {
         <Transition :css="false" @enter="modalJelly.onEnter" @leave="modalJelly.onLeave">
             <div
                 v-if="internalVisible"
+                ref="rootRef"
                 class="fixed inset-0 z-50 flex items-center justify-center"
             >
-                <div
-                    class="glass-overlay absolute h-full w-full"
-                    @click.self="handleClose"
-                ></div>
+                <div class="glass-overlay absolute h-full w-full"></div>
                 <div
                     class="modal-content relative z-1 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl max-sm:mx-4"
                 >
@@ -768,7 +774,7 @@ const getPlaceholder = (config: PluginDetailConfig) => {
                                 取消
                             </button>
                             <button
-                                class="btn-touch flex cursor-pointer items-center gap-1.5 rounded-full bg-zx-primary px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-zx-primary-hover disabled:opacity-50"
+                                class="btn-touch flex cursor-pointer items-center gap-1.5 rounded-full bg-zx-primary px-5 py-2 text-sm font-medium text-[color:var(--zx-color-on-primary)] transition-colors hover:bg-zx-primary-hover disabled:opacity-50"
                                 :disabled="loading || saving"
                                 type="button"
                                 @click="handleSave"

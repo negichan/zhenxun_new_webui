@@ -254,7 +254,7 @@ const handleOpenConfig = (event: Event) => {
                         :class="
                             isInstalled && !hasUpdate
                                 ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                : 'bg-zx-primary text-white hover:bg-zx-primary-hover'
+                                : 'bg-zx-primary text-[color:var(--zx-color-on-primary)] hover:bg-zx-primary-hover'
                         "
                     >
                         {{ isInstalled ? (hasUpdate ? "有更新" : "更新") : "安装" }}
@@ -326,7 +326,10 @@ const handleOpenConfig = (event: Event) => {
         </div>
 
         <!-- 底部操作栏 -->
-        <div class="flex items-center gap-3 px-4 pb-1">
+        <div
+            class="flex items-center gap-3 px-4"
+            :class="type === 'local' ? 'pb-1' : 'pb-3.5'"
+        >
             <!-- 本地：开关 + 配置 -->
             <template v-if="type === 'local'">
                 <div
@@ -385,7 +388,7 @@ const handleOpenConfig = (event: Event) => {
                     :class="
                         isInstalled && !hasUpdate
                             ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                            : 'bg-zx-primary text-white hover:bg-zx-primary-hover'
+                            : 'bg-zx-primary text-[color:var(--zx-color-on-primary)] hover:bg-zx-primary-hover'
                     "
                 >
                     <RotateCw v-if="isInstalled" class="h-4 w-4" />

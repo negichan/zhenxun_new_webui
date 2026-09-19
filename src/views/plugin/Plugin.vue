@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from "vue";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import {
     Anchor,
     Blocks,
@@ -54,8 +54,11 @@ const { togglePinned, toggleResident } = pluginStore;
 const { loading: storeLoading, storeData } = storeToRefs(storeStore);
 const { loadStoreData } = storeStore;
 
-// 移动 / 平板：筛选与统计默认收起，点「筛选」展开
-const filtersExpanded = ref(false);
+// 移动 / 平板：筛选默认收起，点「筛选」展开；桌面默认展开
+const filtersExpanded = ref(true);
+onMounted(() => {
+    if (!globalStore.isDesktopMode) filtersExpanded.value = false;
+});
 
 const activeView = ref<"local" | "market">(
     route.query.tab === "market" ? "market" : "local",
@@ -501,10 +504,30 @@ const onMarketLeave = () => {
     frameRef.value?.hide();
 };
 
-const animateCardsIn = () => {
+/** 视图胶片是否在滑动：期间禁止卡片 y 入场，否则 x+y 会叠成斜线 */
+let viewTransitioning = false;
+let pendingCardAnim = false;
+let skipViewAnimation = false;
+
+const activeViewEl = () => {
     const el = contentRef.value;
-    if (!el) return;
-    const cards = el.querySelectorAll(".grid > *");
+    if (!el) return null;
+    return (
+        (Array.from(el.querySelectorAll("[data-view]")).find(
+            (n) => (n as HTMLElement).dataset.leaving !== "1",
+        ) as HTMLElement | undefined) ?? null
+    );
+};
+
+const animateCardsIn = () => {
+    // 胶片滑动中卡片随视图一起走，禁止再叠 y 入场（x+y 会看起来斜着飞）
+    if (viewTransitioning) {
+        pendingCardAnim = true;
+        return;
+    }
+    const viewEl = activeViewEl();
+    if (!viewEl) return;
+    const cards = Array.from(viewEl.children);
     if (!cards.length) return;
     // 卡片自带 transition-all，先禁用避免和 GSAP 补间打架，结束后还原
     gsap.fromTo(
@@ -538,39 +561,82 @@ watch(filtersExpanded, async (expanded) => {
 });
 
 // ==================== gsap 驱动的胶片式视图切换（横向版，同侧边栏切页） ====================
+// 只动 xPercent，显式钉死 y/yPercent，避免残留竖向位移叠成斜线
 const onViewEnter = (el: Element, done: () => void) => {
+    if (skipViewAnimation) {
+        gsap.killTweensOf(el);
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.position = "";
+        htmlEl.style.pointerEvents = "";
+        delete htmlEl.dataset.leaving;
+        gsap.set(el, { clearProps: "transform" });
+        viewTransitioning = false;
+        done();
+        return;
+    }
+    viewTransitioning = true;
     gsap.killTweensOf(el);
-    const style = (el as HTMLElement).style;
-    style.position = "";
-    style.pointerEvents = "";
+    const htmlEl = el as HTMLElement;
+    htmlEl.style.position = "";
+    htmlEl.style.pointerEvents = "";
+    delete htmlEl.dataset.leaving;
     gsap.fromTo(
         el,
-        { xPercent: activeView.value === "market" ? 100 : -100 },
+        {
+            xPercent: activeView.value === "market" ? 100 : -100,
+            y: 0,
+            yPercent: 0,
+        },
         {
             xPercent: 0,
+            y: 0,
+            yPercent: 0,
             duration: 0.55,
             ease: "power4.out",
             onComplete: () => {
                 gsap.set(el, { clearProps: "transform" });
+                viewTransitioning = false;
                 done();
+                if (pendingCardAnim) {
+                    pendingCardAnim = false;
+                    nextTick(animateCardsIn);
+                }
             },
             // 被下一次切换打断时也要释放，否则 Transition 会一直等 done
-            onInterrupt: () => done(),
+            onInterrupt: () => {
+                viewTransitioning = false;
+                done();
+            },
         },
     );
 };
 
 const onViewLeave = (el: Element, done: () => void) => {
+    if (skipViewAnimation) {
+        gsap.killTweensOf(el);
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.position = "";
+        htmlEl.style.pointerEvents = "";
+        delete htmlEl.dataset.leaving;
+        gsap.set(el, { clearProps: "transform" });
+        viewTransitioning = false;
+        done();
+        return;
+    }
+    viewTransitioning = true;
     gsap.killTweensOf(el);
     // 退场视图绝对定位脱离文档流，与新视图同屏叠放成胶片带
-    const style = (el as HTMLElement).style;
-    style.position = "absolute";
-    style.top = "0";
-    style.left = "0";
-    style.width = "100%";
-    style.pointerEvents = "none";
+    const htmlEl = el as HTMLElement;
+    htmlEl.style.position = "absolute";
+    htmlEl.style.top = "0";
+    htmlEl.style.left = "0";
+    htmlEl.style.width = "100%";
+    htmlEl.style.pointerEvents = "none";
+    htmlEl.dataset.leaving = "1";
     gsap.to(el, {
         xPercent: activeView.value === "market" ? -100 : 100,
+        y: 0,
+        yPercent: 0,
         duration: 0.55,
         ease: "power4.out",
         onComplete: done,
@@ -589,6 +655,11 @@ const toggleViewMode = () => {
     localStorage.setItem(VIEW_MODE_KEY, viewMode.value);
 };
 
+/** 移动端强制列表布局（不改用户的持久化偏好，回到桌面/平板自动还原） */
+const effectiveViewMode = computed(() =>
+    globalStore.isMobileMode ? "list" : viewMode.value,
+);
+
 const switchView = (view: "local" | "market") => {
     if (activeView.value === view) return;
     activeView.value = view;
@@ -598,17 +669,79 @@ const switchView = (view: "local" | "market") => {
     frameRef.value?.hide();
 };
 
+// 路由守卫：精准区分【页内切换】与【跨页导航】
+// 1. 从外部页面（如首页/联系人）切入 /plugin：立即静默落位到目标视图，严禁触发内部横向动效，确保只播放全局纵向滑入
+// 2. 已经在 /plugin 内部，在「本地插件」与「插件市场」之间切换：正常播放横向胶片滑动动效
+const removeRouteGuard = router.beforeEach((to, from) => {
+    if (to.path === "/plugin") {
+        const targetView = to.query.tab === "market" ? "market" : "local";
+        if (from.path === "/plugin") {
+            // 页内子项切换：允许播放横向滑动
+            skipViewAnimation = false;
+            if (activeView.value !== targetView) {
+                switchView(targetView);
+            }
+        } else {
+            // 跨页面进入：静默就位，不播放横向动效
+            skipViewAnimation = true;
+            activeView.value = targetView;
+        }
+    } else if (from.path === "/plugin") {
+        // 离开插件页：禁止任何内部横向动画
+        skipViewAnimation = true;
+    }
+});
+
 watch(activeView, (view) => {
-    router.replace({
-        path: "/plugin",
-        query: view === "market" ? { tab: "market" } : {},
-    });
+    if (route.path !== "/plugin") return;
+    const targetSubKey = view === "market" ? "plugin-market" : "plugin-local";
+    if (route.query.tab !== view || route.query.subKey !== targetSubKey) {
+        router.replace({
+            path: "/plugin",
+            query: {
+                tab: view,
+                subKey: targetSubKey,
+            },
+        });
+    }
 
     if (view === "market" && storeSource.value === "nonebot") {
         if (!nbPlugins.value.length) loadNbStore();
     } else if (view === "market" && !storeData.value) {
         loadStoreData();
     }
+});
+
+// 从其他页面切换进入 /plugin 页面时：若目标 tab 与当前 activeView 不一致，静默就位而不播放横向动效
+onActivated(() => {
+    if (route.path !== "/plugin") return;
+    const targetView = route.query.tab === "market" ? "market" : "local";
+    if (activeView.value !== targetView) {
+        skipViewAnimation = true;
+        activeView.value = targetView;
+    }
+    nextTick(() => {
+        skipViewAnimation = false;
+    });
+});
+
+onBeforeRouteLeave(() => {
+    clearFrameTimers();
+    frameRef.value?.hide();
+    viewTransitioning = false;
+    skipViewAnimation = true;
+    if (contentRef.value) {
+        const views = contentRef.value.querySelectorAll("[data-view]");
+        views.forEach((v) => {
+            gsap.killTweensOf(v);
+            gsap.set(v, { clearProps: "transform" });
+            delete (v as HTMLElement).dataset.leaving;
+        });
+    }
+});
+
+onUnmounted(() => {
+    removeRouteGuard();
 });
 
 // 处理插件状态变化
@@ -761,6 +894,29 @@ onMounted(() => {
         loadStoreData();
     }
 });
+
+// KeepAlive 切走时掐掉未完成的视图补间，避免残留 x/y 叠进下一次页面滑动
+onDeactivated(() => {
+    viewTransitioning = false;
+    pendingCardAnim = false;
+    const el = contentRef.value;
+    if (el) {
+        gsap.killTweensOf(el);
+        el.querySelectorAll("[data-view]").forEach((node) => {
+            gsap.killTweensOf(node);
+            const htmlNode = node as HTMLElement;
+            delete htmlNode.dataset.leaving;
+            htmlNode.style.position = "";
+            htmlNode.style.top = "";
+            htmlNode.style.left = "";
+            htmlNode.style.width = "";
+            htmlNode.style.pointerEvents = "";
+        });
+        gsap.set(el.querySelectorAll("[data-view]"), {
+            clearProps: "transform",
+        });
+    }
+});
 </script>
 
 <template>
@@ -770,76 +926,89 @@ onMounted(() => {
             ref="headerRef"
             class="flex flex-col items-stretch gap-3 rounded-3xl border-1 border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-3 sm:p-4"
         >
-            <!-- 视图切换 + 刷新（非桌面把刷新并入；桌面无此卡由搜索过滤条独立呈现） -->
-            <div
-                class="flex items-center gap-2"
-                :class="
-                    globalStore.isDesktopMode
-                        ? 'flex-shrink-0'
-                        : globalStore.isMobileMode
-                          ? 'min-w-0 flex-1'
-                          : 'w-fit flex-shrink-0'
+            <!-- 手机端刷新按钮（桌面/平板由 Island 呈现） -->
+            <button
+                v-if="globalStore.isMobileMode"
+                class="btn-touch flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700 disabled:opacity-50"
+                title="刷新列表"
+                type="button"
+                :disabled="currentLoading"
+                @click="
+                    activeView === 'local'
+                        ? loadPlugins()
+                        : storeSource === 'nonebot'
+                          ? loadNbStore()
+                          : loadStoreData()
                 "
             >
-                <div class="flex min-w-0 flex-1 rounded-2xl border border-slate-200 bg-gray-100 p-1">
-                <button
-                    @click="switchView('local')"
-                    :class="
-                        activeView === 'local'
-                            ? 'bg-white text-blue-700 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
-                    "
-                    class="btn-touch flex items-center gap-1 whitespace-nowrap rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
-                >
-                    <Blocks class="h-4 w-4" />
-                    <span>本地插件</span>
-                </button>
-                <button
-                    @click="switchView('market')"
-                    :class="
-                        activeView === 'market'
-                            ? 'bg-white text-blue-700 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
-                    "
-                    class="btn-touch flex items-center gap-1 whitespace-nowrap rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
-                >
-                    <Package class="h-4 w-4" />
-                    <span>插件市场</span>
-                </button>
-                </div>
-                <button
-                    v-if="!globalStore.isDesktopMode"
-                    class="btn-touch flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700 disabled:opacity-50"
-                    title="刷新列表"
-                    type="button"
-                    :disabled="currentLoading"
-                    @click="
-                        activeView === 'local'
-                            ? loadPlugins()
-                            : storeSource === 'nonebot'
-                              ? loadNbStore()
-                              : loadStoreData()
-                    "
-                >
-                    <svg
-                        class="h-4 w-4"
-                        :class="{ 'animate-spin': currentLoading }"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                    </svg>
-                </button>
+                <RotateCw
+                    class="h-4 w-4"
+                    :class="{ 'animate-spin': currentLoading }"
+                />
+            </button>
+
+            <!-- 统计文字条：手机全量；平板市场视图补充（Island 统计是本地插件数，且 xl 才全量） -->
+            <div
+                v-if="globalStore.isMobileMode || (globalStore.isTableMode && activeView === 'market')"
+                class="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs text-zx-text-muted"
+            >
+                <template v-if="activeView === 'local'">
+                    <span class="whitespace-nowrap"
+                        >总数
+                        <span
+                            v-odometer="pluginStats.total"
+                            class="font-black text-blue-500"
+                        ></span
+                    ></span>
+                    <span class="whitespace-nowrap"
+                        >已启用
+                        <span
+                            v-odometer="pluginStats.active"
+                            class="font-black text-green-500"
+                        ></span
+                    ></span>
+                    <span class="whitespace-nowrap"
+                        >已禁用
+                        <span
+                            v-odometer="pluginStats.inactive"
+                            class="font-black text-slate-500"
+                        ></span
+                    ></span>
+                    <span class="whitespace-nowrap"
+                        >内置
+                        <span
+                            v-odometer="pluginStats.builtin"
+                            class="font-black text-purple-500"
+                        ></span
+                    ></span>
+                </template>
+                <template v-else>
+                    <span class="whitespace-nowrap"
+                        >总数
+                        <span
+                            v-odometer="storeStats.total"
+                            class="font-black text-blue-500"
+                        ></span
+                    ></span>
+                    <span class="whitespace-nowrap"
+                        >已安装
+                        <span
+                            v-odometer="storeStats.installed"
+                            class="font-black text-green-500"
+                        ></span
+                    ></span>
+                    <span class="whitespace-nowrap"
+                        >可安装
+                        <span
+                            v-odometer="storeStats.available"
+                            class="font-black text-purple-500"
+                        ></span
+                    ></span>
+                </template>
             </div>
 
-            <!-- 搜索框 + 筛选开关（移动/平板把筛选嵌进搜索框右侧；空间不足时整块换行占满一行，避免输入区被挤瘪） -->
-            <div class="flex min-w-[220px] flex-1 items-center gap-2">
+            <!-- 搜索框 + 筛选开关 -->
+            <div class="flex min-w-[200px] flex-1 items-center gap-2 sm:max-lg:basis-full">
                 <!-- 市场源切换（下拉只显示当前源；NoneBot 源暂未实现） -->
                 <ZXDropdown
                     v-if="activeView === 'market'"
@@ -898,81 +1067,92 @@ onMounted(() => {
                         <SlidersHorizontal class="h-4 w-4" />
                     </button>
                 </div>
+                <!-- 网格/列表切换（本地与市场共用；并入搜索行右端，移动端不再独占一行；移动端强制列表故隐藏） -->
+                <button
+                    v-if="!globalStore.isMobileMode"
+                    class="btn-touch flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-gray-100 text-zx-text-muted transition-colors hover:bg-gray-200 hover:text-zx-text"
+                    :title="viewMode === 'grid' ? '切换列表视图' : '切换网格视图'"
+                    type="button"
+                    @click="toggleViewMode"
+                >
+                    <List v-if="viewMode === 'grid'" class="h-4 w-4" />
+                    <LayoutGrid v-else class="h-4 w-4" />
+                </button>
             </div>
 
             <!-- 状态 / 类型过滤（移动/平板默认收起，点「筛选」展开） -->
             <div
                 v-if="activeView === 'local'"
-                                :class="!filtersExpanded ? 'hidden' : ''"
+                :class="!filtersExpanded ? 'hidden' : ''"
                 class="filter-row flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2"
             >
                 <div class="flex items-center gap-1">
-                <span class="flex-shrink-0 text-sm text-gray-600">状态:</span>
-                <button
-                    @click="statusFilter = 'all'"
-                    :class="
-                        statusFilter === 'all'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    "
-                    class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
-                >
-                    全部
-                </button>
-                <button
-                    @click="statusFilter = 'active'"
-                    :class="
-                        statusFilter === 'active'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    "
-                    class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
-                >
-                    启用
-                </button>
-                <button
-                    @click="statusFilter = 'inactive'"
-                    :class="
-                        statusFilter === 'inactive'
-                            ? 'bg-gray-300 text-gray-700'
-                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    "
-                    class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
-                >
-                    禁用
-                </button>
-            </div>
+                    <span class="flex-shrink-0 text-sm text-gray-600">状态:</span>
+                    <button
+                        @click="statusFilter = 'all'"
+                        :class="
+                            statusFilter === 'all'
+                                ? 'bg-zx-primary text-[color:var(--zx-color-on-primary)] shadow-2xs'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        "
+                        class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
+                    >
+                        全部
+                    </button>
+                    <button
+                        @click="statusFilter = 'active'"
+                        :class="
+                            statusFilter === 'active'
+                                ? 'bg-[#22c55e] text-white shadow-2xs'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        "
+                        class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
+                    >
+                        启用
+                    </button>
+                    <button
+                        @click="statusFilter = 'inactive'"
+                        :class="
+                            statusFilter === 'inactive'
+                                ? 'bg-[#9ca3af] text-white shadow-2xs'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        "
+                        class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
+                    >
+                        禁用
+                    </button>
+                </div>
 
                 <div class="flex items-center gap-1">
-                <span class="flex-shrink-0 text-sm text-gray-600">类型:</span>
-                <button
-                    @click="showBuiltin = !showBuiltin"
-                    :class="
-                        showBuiltin
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    "
-                    class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
-                >
-                    内置
-                </button>
-                <button
-                    @click="showThird = !showThird"
-                    :class="
-                        showThird
-                            ? 'bg-orange-100 text-orange-700'
-                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    "
-                    class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
-                >
-                    三方
-                </button>
+                    <span class="flex-shrink-0 text-sm text-gray-600">类型:</span>
+                    <button
+                        @click="showBuiltin = !showBuiltin"
+                        :class="
+                            showBuiltin
+                                ? 'bg-[#8b5cf6] text-white shadow-2xs'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        "
+                        class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
+                    >
+                        内置
+                    </button>
+                    <button
+                        @click="showThird = !showThird"
+                        :class="
+                            showThird
+                                ? 'bg-[#f59e0b] text-white shadow-2xs'
+                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        "
+                        class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
+                    >
+                        三方
+                    </button>
                 </div>
             </div>
 
             <div
                 v-else
-                                :class="!filtersExpanded ? 'hidden' : ''"
+                :class="!filtersExpanded ? 'hidden' : ''"
                 class="filter-row flex w-full flex-wrap items-center gap-1"
             >
                 <span class="flex-shrink-0 text-sm text-gray-600">状态:</span>
@@ -980,7 +1160,7 @@ onMounted(() => {
                     @click="storeFilterType = 'all'"
                     :class="
                         storeFilterType === 'all'
-                            ? 'bg-blue-100 text-blue-700'
+                            ? 'bg-zx-primary text-[color:var(--zx-color-on-primary)] shadow-2xs'
                             : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     "
                     class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
@@ -991,7 +1171,7 @@ onMounted(() => {
                     @click="storeFilterType = 'installed'"
                     :class="
                         storeFilterType === 'installed'
-                            ? 'bg-green-100 text-green-700'
+                            ? 'bg-[#22c55e] text-white shadow-2xs'
                             : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     "
                     class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
@@ -1002,7 +1182,7 @@ onMounted(() => {
                     @click="storeFilterType = 'not-installed'"
                     :class="
                         storeFilterType === 'not-installed'
-                            ? 'bg-gray-300 text-gray-700'
+                            ? 'bg-[#9ca3af] text-white shadow-2xs'
                             : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     "
                     class="btn-touch cursor-pointer rounded-2xl px-3 py-1.5 text-xs font-medium transition-colors"
@@ -1011,16 +1191,6 @@ onMounted(() => {
                 </button>
             </div>
 
-            <!-- 网格/列表切换（本地与市场共用，放工具栏最后） -->
-            <button
-                class="btn-touch flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-700"
-                :title="viewMode === 'grid' ? '切换列表视图' : '切换网格视图'"
-                type="button"
-                @click="toggleViewMode"
-            >
-                <List v-if="viewMode === 'grid'" class="h-4 w-4" />
-                <LayoutGrid v-else class="h-4 w-4" />
-            </button>
         </div>
 
         <!-- 插件网格 -->
@@ -1071,8 +1241,9 @@ onMounted(() => {
                 <div
                     v-if="activeView === 'local'"
                     key="local"
+                    data-view="local"
                     :class="
-                        viewMode === 'grid'
+                        effectiveViewMode === 'grid'
                             ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
                             : 'flex flex-col gap-2'
                     "
@@ -1080,7 +1251,7 @@ onMounted(() => {
                     <PluginCard
                         v-for="plugin in pagedLocalPlugins"
                         :key="plugin.module"
-                        :layout="viewMode"
+                        :layout="effectiveViewMode"
                         type="local"
                         :name="plugin.name"
                         :module="plugin.module"
@@ -1101,8 +1272,9 @@ onMounted(() => {
                 <div
                     v-else
                     key="market"
+                    data-view="market"
                     :class="
-                        viewMode === 'grid'
+                        effectiveViewMode === 'grid'
                             ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
                             : 'flex flex-col gap-2'
                     "
@@ -1110,7 +1282,7 @@ onMounted(() => {
                     <PluginCard
                         v-for="plugin in pagedMarketCards"
                         :key="plugin.module"
-                        :layout="viewMode"
+                        :layout="effectiveViewMode"
                         type="market"
                         class="market-card"
                         :name="plugin.name"
@@ -1155,7 +1327,7 @@ onMounted(() => {
                     class="btn-touch h-8 min-w-8 cursor-pointer rounded-full px-2 text-sm transition-colors"
                     :class="
                         page === currentPage
-                            ? 'bg-zx-primary font-medium text-white'
+                            ? 'bg-zx-primary font-medium text-[color:var(--zx-color-on-primary)]'
                             : 'text-gray-500 hover:bg-gray-100'
                     "
                     type="button"
