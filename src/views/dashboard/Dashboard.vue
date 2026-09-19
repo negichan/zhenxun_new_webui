@@ -85,6 +85,7 @@ onBeforeUnmount(() => {
             />
 
             <LogCard
+                :loading="loading"
                 class="col-span-1 max-2xl:max-h-96 max-lg:max-h-80 lg:col-span-2 2xl:col-span-2 2xl:row-start-3 2xl:h-full 2xl:min-h-0"
             />
         </div>

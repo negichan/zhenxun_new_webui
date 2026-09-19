@@ -2,10 +2,33 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { LogEntry } from "@/types/log.types";
 
-const props = defineProps<{
-    logs: LogEntry[];
-    autoScroll?: boolean;
-}>();
+const props = withDefaults(
+    defineProps<{
+        logs: LogEntry[];
+        autoScroll?: boolean;
+        loading?: boolean;
+    }>(),
+    {
+        autoScroll: true,
+        loading: false,
+    },
+);
+
+// 骨架屏模拟行（不同宽度模拟不同长度的等级、模块名与消息，更加自然）
+const SKELETON_ROWS = [
+    { moduleWidth: "3.2rem", msgWidth: "55%" },
+    { moduleWidth: "4.2rem", msgWidth: "75%" },
+    { moduleWidth: "2.8rem", msgWidth: "40%" },
+    { moduleWidth: "", msgWidth: "65%" },
+    { moduleWidth: "3.6rem", msgWidth: "50%" },
+    { moduleWidth: "3rem", msgWidth: "80%" },
+    { moduleWidth: "", msgWidth: "45%" },
+    { moduleWidth: "3.5rem", msgWidth: "70%" },
+    { moduleWidth: "2.5rem", msgWidth: "35%" },
+    { moduleWidth: "4rem", msgWidth: "60%" },
+    { moduleWidth: "3.2rem", msgWidth: "78%" },
+    { moduleWidth: "", msgWidth: "52%" },
+];
 
 // ==================== 固定行高虚拟滚动 ====================
 // 日志会以每秒多条的频率持续推送，全量渲染上千行会把主线程拖死：
@@ -64,7 +87,7 @@ onMounted(() => {
         });
         resizeObserver.observe(el);
     }
-    if (props.autoScroll) scrollToBottom();
+    if (props.autoScroll && !props.loading) scrollToBottom();
 });
 
 onBeforeUnmount(() => {
@@ -79,7 +102,18 @@ onBeforeUnmount(() => {
 watch(
     () => props.logs.length,
     () => {
-        if (props.autoScroll) scrollToBottom();
+        if (props.autoScroll && !props.loading) scrollToBottom();
+    },
+    { flush: "post" },
+);
+
+// 骨架屏结束加载后若有日志且开启自动滚动，立即置底
+watch(
+    () => props.loading,
+    (isLoading) => {
+        if (!isLoading && props.autoScroll) {
+            scrollToBottom();
+        }
     },
     { flush: "post" },
 );
@@ -119,10 +153,44 @@ const levelClass = (level: LogEntry["level"]) => {
         class="h-full min-h-0 flex-1 overflow-x-auto overflow-y-auto pr-2 font-mono text-xs sm:pr-5"
         @scroll.passive="onScroll"
     >
+        <!-- 加载骨架屏 -->
+        <div
+            v-if="loading"
+            class="w-full space-y-0.5 overflow-hidden py-0.5"
+        >
+            <div
+                v-for="(row, i) in SKELETON_ROWS"
+                :key="i"
+                class="grid h-6 w-full grid-cols-[2.5rem_2.6rem_minmax(0,1fr)] items-center gap-1 rounded-lg px-1 sm:grid-cols-[3rem_3rem_minmax(0,1fr)] sm:gap-1.5 sm:px-2"
+            >
+                <div class="flex items-center">
+                    <div
+                        class="h-2.5 w-7 animate-pulse rounded bg-slate-200 sm:h-3 sm:w-9"
+                    ></div>
+                </div>
+                <div class="flex items-center justify-center">
+                    <div
+                        class="h-3 w-6 animate-pulse rounded bg-slate-200 sm:h-3.5 sm:w-7"
+                    ></div>
+                </div>
+                <div class="flex min-w-0 items-center gap-2">
+                    <div
+                        v-if="row.moduleWidth"
+                        class="h-3 shrink-0 animate-pulse rounded bg-slate-200"
+                        :style="{ width: row.moduleWidth }"
+                    ></div>
+                    <div
+                        class="h-3 shrink-0 animate-pulse rounded bg-slate-200/70"
+                        :style="{ width: row.msgWidth }"
+                    ></div>
+                </div>
+            </div>
+        </div>
+
         <!-- 内容按真实宽度展开，日志长消息可横向滚动（虚拟滚动的总高/偏移
              按行高计算，与横向宽度无关，不受影响） -->
         <div
-            v-if="logs.length === 0"
+            v-else-if="logs.length === 0"
             class="flex h-full items-center justify-center text-gray-400"
         >
             <span class="text-sm">暂无日志</span>

@@ -21,28 +21,25 @@ export const mainRoutes: MockRoute[] = [
     {
         method: 'get',
         url: '/main/chat-statistics',
-        // 近 7 天聊天量
-        response: () => {
-            const result: Record<string, number> = {}
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date()
-                d.setDate(d.getDate() - i)
-                const key = d.toISOString().slice(0, 10)
-                result[key] = rand(400, 1800)
-            }
-            return result
-        },
+        // 与真实后端 QueryCount 口径对齐：all/day/week/month/year
+        response: () => ({
+            all: 58241,
+            day: rand(400, 1800),
+            week: rand(3500, 9000),
+            month: rand(14000, 32000),
+            year: 58241,
+        }),
     },
     {
         method: 'get',
         url: '/main/plugin-statistics',
-        response: () => {
-            const result: Record<string, number> = {}
-            mockPlugins.forEach(p => {
-                result[p.name] = rand(5, 800)
-            })
-            return result
-        },
+        response: () => ({
+            all: 25861,
+            day: rand(80, 420),
+            week: rand(600, 2800),
+            month: rand(3000, 9000),
+            year: 25861,
+        }),
     },
     {
         method: 'get',

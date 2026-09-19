@@ -2,7 +2,7 @@
  * Mock 模式 - 类型定义
  */
 
-export type MockMethod = 'get' | 'post' | 'put' | 'delete'
+export type MockMethod = 'get' | 'post' | 'put' | 'patch' | 'delete'
 
 /** 请求上下文，交给各路由的 response 函数使用 */
 export interface MockContext {

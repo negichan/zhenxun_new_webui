@@ -140,7 +140,7 @@ onBeforeUnmount(() => {
                 @click="autoScroll = !autoScroll"
                 :class="
                     autoScroll
-                        ? 'bg-zx-primary text-white'
+                        ? 'bg-zx-primary text-[color:var(--zx-color-on-primary)]'
                         : 'bg-gray-100 text-gray-600'
                 "
                 class="btn-touch flex-shrink-0 rounded-2xl px-3 py-1.5 text-sm font-medium transition-colors"

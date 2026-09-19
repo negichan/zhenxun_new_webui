@@ -273,6 +273,30 @@ export interface ArchiveExtractResult {
     file_count: number
 }
 
+export interface FileSearchMatch {
+    line_number: number
+    /** 命中起始列（1 起，相对原始行，用于跳转） */
+    column: number
+    length: number
+    /** 展示切片（超长行截窗） */
+    line_text: string
+    /** 切片在原始行中的 0 起偏移（计算高亮位置用） */
+    context_offset: number
+}
+
+export interface FileSearchGroup {
+    path: string
+    name: string
+    matches: FileSearchMatch[]
+}
+
+export interface FileSearchResult {
+    results: FileSearchGroup[]
+    total_matches: number
+    scanned_files: number
+    truncated: boolean
+}
+
 // ==================== 配置相关 ====================
 
 export interface EnvFileContent {
@@ -297,6 +321,14 @@ export interface YamlConfigSaveRequest {
 
 // ==================== 数据库相关 ====================
 
+export interface TableColumn {
+    name: string
+    type: string
+    nullable: boolean
+    default?: string | null
+    primary_key?: boolean
+}
+
 export interface TableRowData {
     id: number | string
     data: Record<string, any>
@@ -318,18 +350,46 @@ export interface SqlExecuteRequest {
 export interface SqlExecuteResult {
     success: boolean
     message: string
-    data?: Record<string, any>[]
-    rows_affected?: number
+    data?: Record<string, any>[] | null
+    rows_affected?: number | null
 }
 
-export interface SqlLog {
+export interface SqlLogItem {
     id: number
     sql: string
-    result?: string
-    executed_at: string
-    duration?: number
-    is_success?: boolean
-    created_at?: string
+    is_success: boolean
+    message: string
+    created_at: string
+}
+
+export interface SqlLogListResult {
+    items: SqlLogItem[]
+    total: number
+}
+
+export interface RowUpdateRequest {
+    data: Record<string, any>
+}
+
+export interface RowInsertRequest {
+    data: Record<string, any>
+}
+
+export interface RowMutationResult {
+    success: boolean
+    message: string
+    rows_affected: number
+}
+
+export interface SqlFileItem {
+    name: string
+    content: string
+    updated_at: number
+}
+
+export interface SqlFileListResult {
+    items: SqlFileItem[]
+    total: number
 }
 
 // ==================== 日志相关 ====================
@@ -384,6 +444,7 @@ export interface GroupStatistics {
     group_name: string
     message_count: number
     plugin_call_count: number
+    ava_url?: string
 }
 
 export interface FriendStatistics {
@@ -391,6 +452,7 @@ export interface FriendStatistics {
     user_name: string
     message_count: number
     plugin_call_count: number
+    ava_url?: string
 }
 
 export interface DetailedStatistics {
@@ -434,6 +496,7 @@ export interface GroupStatisticsTimeRange {
     group_name: string
     message_count: number
     plugin_call_count: number
+    ava_url?: string
 }
 
 /**
@@ -444,6 +507,33 @@ export interface FriendStatisticsTimeRange {
     user_name: string
     message_count: number
     plugin_call_count: number
+    ava_url?: string
+}
+
+/**
+ * 区间概览 KPI（相对所选时间范围，含上一等长周期对比）
+ */
+export interface AnalyticsOverview {
+    message_count: number
+    plugin_call_count: number
+    avg_daily_messages: number
+    peak_message_count: number
+    peak_date: string
+    active_group_count: number
+    active_user_count: number
+    prev_message_count: number
+    prev_plugin_call_count: number
+}
+
+/**
+ * 消息热力图：matrix[weekday][hour]，weekday 0=周一
+ */
+export interface MessageHeatmap {
+    weekdays: string[]
+    hours: number[]
+    matrix: number[][]
+    max_count: number
+    total: number
 }
 
 /**

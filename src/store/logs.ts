@@ -3,6 +3,7 @@ import { ref } from "vue";
 import {
     connectLogsWebSocket,
     disconnectLogsWebSocket,
+    onConnectionStateChange,
     onLogMessage,
 } from "@/utils/api-next/websocket-logs";
 import type { LogEntry } from "@/types/log.types";
@@ -11,6 +12,7 @@ export const useLogsStore = defineStore("logs", () => {
     const logs = ref<LogEntry[]>([]);
     const maxLogs = 1000; // 最大存储日志条数
     const wsInitialized = ref(false);
+    const loading = ref(true);
 
     // 是否启用自动滚动
     const autoScroll = ref(true);
@@ -20,6 +22,7 @@ export const useLogsStore = defineStore("logs", () => {
      */
     const addLog = (log: LogEntry) => {
         logs.value.push(log);
+        loading.value = false;
 
         // 限制日志数量，防止内存溢出
         if (logs.value.length > maxLogs) {
@@ -45,6 +48,17 @@ export const useLogsStore = defineStore("logs", () => {
         onLogMessage((log) => {
             addLog(log);
         });
+        onConnectionStateChange((isOpen) => {
+            if (isOpen && logs.value.length === 0) {
+                setTimeout(() => {
+                    loading.value = false;
+                }, 500);
+            }
+        });
+        // 兜底：若连接未建立或未推送日志，1.5 秒后解除 loading
+        setTimeout(() => {
+            loading.value = false;
+        }, 1500);
         wsInitialized.value = true;
     };
 
@@ -85,6 +99,7 @@ export const useLogsStore = defineStore("logs", () => {
         logs,
         maxLogs,
         wsInitialized,
+        loading,
         autoScroll,
         addLog,
         clearLogs,

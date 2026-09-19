@@ -108,6 +108,10 @@ export const api = {
         return apiClient.put(url, data, options)
     },
 
+    patch<T>(url: string, data?: any, options?: Record<string, any>): Promise<APIResponse<T>> {
+        return apiClient.patch(url, data, options)
+    },
+
     delete<T>(url: string, params?: Record<string, any>, options?: Record<string, any>): Promise<APIResponse<T>> {
         return apiClient.delete(url, { params, ...options })
     },

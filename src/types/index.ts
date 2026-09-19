@@ -48,8 +48,16 @@ export type {
     YamlConfigSaveRequest
 } from './api-next.types'
 
-// 数据库相关（使用独立模块，避免与 api-next.types 中的 SqlLog 冲突）
-export type { TableInfo, ColumnInfo, TableRow } from './database.types'
+// 数据库相关（定义在 api-next.types，此处兼容导出）
+export type {
+    SqlExecuteRequest,
+    SqlExecuteResult,
+    SqlLogItem,
+    SqlLogListResult,
+    TableColumn,
+    TableDataResult,
+    TableRowData,
+} from './database.types'
 
 // 日志相关（使用独立模块）
 export type { LogLevel, LogEntry } from './log.types'

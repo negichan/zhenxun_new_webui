@@ -5,10 +5,25 @@ import LogEntries from "./LogEntries.vue";
 import LogPanelHeader from "./LogPanelHeader.vue";
 import { useLogFullscreen } from "@/views/dashboard/composables/useLogFullscreen";
 
+const props = withDefaults(
+    defineProps<{
+        /** 首屏数据加载中：显示骨架屏 */
+        loading?: boolean;
+    }>(),
+    {
+        loading: false,
+    },
+);
+
 const logsStore = useLogsStore();
 defineOptions({ inheritAttrs: false });
 
 const attrs = useAttrs();
+
+// 当 Dashboard 传入 loading 为 true，或 logsStore 尚在首次连接且未接收到任何日志时展示骨架
+const isLogLoading = computed(
+    () => props.loading || (logsStore.loading && logsStore.logs.length === 0),
+);
 
 // 自动滚动：滚动与跟随逻辑都在 LogEntries（虚拟滚动）内部
 const autoScroll = ref(true);
@@ -83,7 +98,11 @@ onBeforeUnmount(() => {
         />
 
         <!-- 日志列表（虚拟滚动） -->
-        <LogEntries :logs="filteredLogs" :auto-scroll="autoScroll" />
+        <LogEntries
+            :logs="filteredLogs"
+            :auto-scroll="autoScroll"
+            :loading="isLogLoading"
+        />
     </div>
 
     <Teleport to="body">
@@ -103,7 +122,11 @@ onBeforeUnmount(() => {
                 @toggle-all="enableAllLevels"
             />
 
-            <LogEntries :logs="filteredLogs" :auto-scroll="autoScroll" />
+            <LogEntries
+                :logs="filteredLogs"
+                :auto-scroll="autoScroll"
+                :loading="isLogLoading"
+            />
         </div>
     </Teleport>
 </template>

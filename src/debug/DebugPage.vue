@@ -264,6 +264,15 @@ watch(
 const myUserId = ref(loadSetting("myUserId", ""));
 const botId = ref(loadSetting("botId", ""));
 
+/** 会话 key 必须带 bot 身份：同一群下换 bot 视角不串消息 */
+const conversationKeyFor = (
+    type: "group" | "bot",
+    id?: string | number | null,
+) => {
+    const bid = botId.value || "anon";
+    return type === "group" ? `${bid}:group:${id ?? ""}` : `${bid}:bot`;
+};
+
 // 身份选择：打开时本地已有值就用本地，绝不被云端覆盖；本地每次改动都
 // 推送云端，保证云端始终是最近一次的设置——本地为空的新端打开时拿到
 // 的也是最新值，而不是停留在某次初期的旧选择
@@ -271,6 +280,12 @@ watch([myUserId, botId], () => {
     localStorage.setItem(STORAGE_PREFIX + "myUserId", myUserId.value);
     localStorage.setItem(STORAGE_PREFIX + "botId", botId.value);
     persistStateMeta();
+});
+
+// 换 bot 身份后清空当前会话，避免串到上一视角的气泡
+watch(botId, () => {
+    selectedContact.value = null;
+    conversations.value = {};
 });
 
 // 身份选择变更时使用：全量状态 + my_user_id/bot_id
@@ -409,8 +424,8 @@ const connect = async () => {
             onBotMessage: info => {
                 const key =
                     info.messageType === "group"
-                        ? `group:${info.groupId ?? ""}`
-                        : "bot";
+                        ? conversationKeyFor("group", info.groupId)
+                        : conversationKeyFor("bot");
                 appendBubble(key, {
                     from: "bot",
                     parts: toBubbleParts(info.message, info.text),
@@ -432,8 +447,11 @@ const connect = async () => {
                 if (!senderId) return;
                 const key =
                     (event as any).message_type === "group"
-                        ? `group:${(event as any).group_id ?? ""}`
-                        : "bot";
+                        ? conversationKeyFor(
+                              "group",
+                              (event as any).group_id,
+                          )
+                        : conversationKeyFor("bot");
                 const sender = users.value.find(
                     u => String(u.user_id) === senderId,
                 );
@@ -673,8 +691,8 @@ const dissolveGroup = () => {
     simState.groups.splice(idx, 1);
     delete simState.members[group.group_id];
     persistGroups();
-    clearCachedBubbles(`group:${group.group_id}`);
-    delete conversations.value[`group:${group.group_id}`];
+    clearCachedBubbles(conversationKeyFor("group", group.group_id));
+    delete conversations.value[conversationKeyFor("group", group.group_id)];
     managedGroupId.value = null;
     if (selectedContact.value?.id === String(group.group_id)) {
         selectedContact.value = null;
@@ -691,8 +709,8 @@ const removeContact = (contact: DebugContact) => {
         delete simState.members[Number(contact.id)];
         persistGroups();
     }
-    clearCachedBubbles(`group:${contact.id}`);
-    delete conversations.value[`group:${contact.id}`];
+    clearCachedBubbles(conversationKeyFor("group", contact.id));
+    delete conversations.value[conversationKeyFor("group", contact.id)];
     if (selectedContact.value?.id === contact.id) {
         selectedContact.value = null;
     }
@@ -956,8 +974,9 @@ let bubbleSeq = 0;
 const conversationKey = computed(() => {
     const contact = selectedContact.value;
     if (!contact) return "";
-    // 机器人私聊用固定 key，切换机器人身份后记录仍保留
-    return contact.type === "bot" ? "bot" : `group:${contact.id}`;
+    return contact.type === "bot"
+        ? conversationKeyFor("bot")
+        : conversationKeyFor("group", contact.id);
 });
 
 const currentMessages = computed(

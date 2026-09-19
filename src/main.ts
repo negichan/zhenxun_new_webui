@@ -9,6 +9,7 @@ import { initTileGlowAuto, vTileGlow } from "@/directives/tileGlow";
 import { vImageViewer } from "@/directives/imageViewer";
 import { useThemeStore } from "@/store/theme";
 import { useGlobalStore } from "@/store/global.ts";
+import { installOverlayStack } from "@/composables/useOverlayStack";
 
 const app = createApp(App);
 const pinia = createPinia();
@@ -20,6 +21,9 @@ useThemeStore(pinia).initTheme();
 // 提前实例化 global store：动画开关的 html class 同步要在登录页等
 // 尚无人使用该 store 的页面也生效
 useGlobalStore(pinia);
+
+// 全局浮层栈：多层弹窗点外部/Esc 只关最上层
+installOverlayStack();
 
 app.directive("odometer", vOdometer);
 app.directive("tile-glow", vTileGlow);
@@ -38,3 +42,5 @@ if (navigator.userAgent.includes("Edg/")) {
         return;
     };
 }
+
+

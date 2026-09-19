@@ -261,13 +261,87 @@ export const manageRoutes: MockRoute[] = [
 export const analyticsRoutes: MockRoute[] = [
     {
         method: 'get',
+        url: '/analytics/overview',
+        response: ({ query }) => {
+            const start = query.start_time
+                ? new Date(String(query.start_time))
+                : new Date(Date.now() - 30 * 86400000)
+            const end = query.end_time
+                ? new Date(String(query.end_time))
+                : new Date()
+            const days = Math.max(
+                1,
+                Math.round((end.getTime() - start.getTime()) / 86400000),
+            )
+            const messageCount = rand(days * 280, days * 1600)
+            const pluginCount = Math.floor(messageCount * rand(12, 28) / 100)
+            return {
+                message_count: messageCount,
+                plugin_call_count: pluginCount,
+                avg_daily_messages: Math.round(messageCount / days),
+                peak_message_count: Math.round(messageCount / days * rand(140, 220) / 100),
+                peak_date: new Date(
+                    start.getTime() +
+                        (end.getTime() - start.getTime()) * 0.62,
+                )
+                    .toISOString()
+                    .slice(0, 10),
+                active_group_count: rand(8, Math.min(42, groups.length + 20)),
+                active_user_count: rand(40, 360),
+                prev_message_count: Math.round(messageCount * rand(72, 118) / 100),
+                prev_plugin_call_count: Math.round(pluginCount * rand(72, 118) / 100),
+            }
+        },
+    },
+    {
+        method: 'get',
+        url: '/analytics/heatmap',
+        response: () => {
+            const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+            const hours = Array.from({ length: 24 }, (_, i) => i)
+            const matrix = weekdays.map((_, d) =>
+                hours.map((h) => {
+                    // 工作日白天/晚间更活跃，周末略不同
+                    const isWeekend = d >= 5
+                    const dayFactor = isWeekend ? 0.75 : 1
+                    let hourFactor = 0.15
+                    if (h >= 9 && h <= 12) hourFactor = 0.7
+                    else if (h >= 14 && h <= 18) hourFactor = 0.85
+                    else if (h >= 19 && h <= 23) hourFactor = 1
+                    else if (h >= 0 && h <= 6) hourFactor = 0.2
+                    return Math.round(rand(0, 40) * dayFactor * hourFactor)
+                }),
+            )
+            const maxCount = Math.max(...matrix.flat(), 1)
+            const total = matrix.flat().reduce((s, v) => s + v, 0)
+            return { weekdays, hours, matrix, max_count: maxCount, total }
+        },
+    },
+    {
+        method: 'get',
         url: '/analytics/trend',
         response: ({ query }) => {
             const granularity = query.granularity || 'day'
-            const points = Array.from({ length: 14 }, (_, i) => ({
-                timestamp: new Date(Date.now() - (13 - i) * 86400000).toISOString(),
-                message_count: rand(200, 1800),
-                plugin_call_count: rand(50, 600),
+            const start = query.start_time
+                ? new Date(String(query.start_time))
+                : new Date(Date.now() - 14 * 86400000)
+            const end = query.end_time ? new Date(String(query.end_time)) : new Date()
+            const spanMs = Math.max(end.getTime() - start.getTime(), 3600000)
+            const bucketMs =
+                granularity === 'hour'
+                    ? 3600000
+                    : granularity === 'week'
+                      ? 7 * 86400000
+                      : granularity === 'month'
+                        ? 30 * 86400000
+                        : 86400000
+            const count = Math.min(90, Math.max(2, Math.ceil(spanMs / bucketMs)))
+            const points = Array.from({ length: count }, (_, i) => ({
+                timestamp: new Date(
+                    start.getTime() + (spanMs * i) / Math.max(count - 1, 1),
+                ).toISOString(),
+                message_count: rand(120, 2200),
+                plugin_call_count: rand(20, 680),
             }))
             return {
                 data_points: points,
@@ -283,17 +357,19 @@ export const analyticsRoutes: MockRoute[] = [
         method: 'get',
         url: '/analytics/statistics',
         response: () => ({
-            groups: groups.slice(0, 5).map(g => ({
+            groups: groups.slice(0, 8).map(g => ({
                 group_id: g.group_id,
                 group_name: g.group_name,
                 message_count: rand(100, 5000),
                 plugin_call_count: rand(50, 900),
+                ava_url: g.ava_img || defaultAva,
             })),
-            friends: friends.slice(0, 5).map(f => ({
+            friends: friends.slice(0, 8).map(f => ({
                 user_id: f.user_id,
                 user_name: f.nickname,
                 message_count: rand(10, 800),
                 plugin_call_count: rand(5, 300),
+                ava_url: f.ava_url || defaultAva,
             })),
             start_time: new Date(Date.now() - 14 * 86400000).toISOString(),
             end_time: now(),
