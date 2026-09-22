@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, ref } from "vue";
+import { computed, h, markRaw, ref } from "vue";
 import { GroupIcon, LogOut, Pencil, Trash2, Users } from "lucide-vue-next";
 import { useChatStore } from "@/store/chat.ts";
 import { storeToRefs } from "pinia";
@@ -25,9 +25,27 @@ const {
 } = storeToRefs(chatStore);
 const { selectContact, clearSelection, loadContacts } = chatStore;
 
-// 联系人列表虚拟滚动：行高固定 48px（头像 32 + 上下内边距 16）
-const friendList = useVirtualList(() => friends.value.length, 48);
-const groupList = useVirtualList(() => groups.value.length, 48);
+const contactTabOptions = computed(() => [
+    {
+        label: "好友",
+        value: "friend" as const,
+        icon: markRaw(Users),
+        badge: friends.value.length,
+    },
+    {
+        label: "群聊",
+        value: "group" as const,
+        icon: markRaw(GroupIcon),
+        badge: groups.value.length,
+    },
+]);
+
+// 联系人列表虚拟滚动：卡片高 48（头像 32 + 上下内边距 16），行间留 8px gap
+const ROW_H = 48;
+const ROW_GAP = 8;
+const ROW_STRIDE = ROW_H + ROW_GAP;
+const friendList = useVirtualList(() => friends.value.length, ROW_STRIDE);
+const groupList = useVirtualList(() => groups.value.length, ROW_STRIDE);
 
 onMounted(async () => {
     // 获取并保存当前 bot 信息
@@ -289,70 +307,11 @@ const doRemove = async () => {
     >
         <!-- 标签页切换 -->
         <div class="px-2 pb-3">
-            <div
-                class="grid h-11 grid-cols-2 rounded-2xl bg-slate-100 p-1 shadow-inner shadow-slate-200/60"
-            >
-                <button
-                    type="button"
-                    :class="[
-                        'group flex min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-2xl px-2 text-sm font-medium transition-all',
-                        activeTab === 'friend'
-                            ? 'bg-white text-zx-primary shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700',
-                    ]"
-                    @click="activeTab = 'friend'"
-                >
-                    <Users
-                        :class="[
-                            'h-4 w-4 transition-colors',
-                            activeTab === 'friend'
-                                ? 'text-slate-700'
-                                : 'text-slate-400 group-hover:text-slate-500',
-                        ]"
-                    />
-                    <span class="truncate">好友</span>
-                    <span
-                        :class="[
-                            'text-[10px] leading-none transition-colors',
-                            activeTab === 'friend'
-                                ? 'font-bold text-zx-primary'
-                                : 'text-slate-400',
-                        ]"
-                    >
-                        {{ friends.length }}
-                    </span>
-                </button>
-                <button
-                    type="button"
-                    :class="[
-                        'group flex min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-2xl px-2 text-sm font-medium transition-all',
-                        activeTab === 'group'
-                            ? 'bg-white text-zx-primary shadow-sm'
-                            : 'text-slate-500 hover:text-slate-700',
-                    ]"
-                    @click="activeTab = 'group'"
-                >
-                    <GroupIcon
-                        :class="[
-                            'h-4 w-4 transition-colors',
-                            activeTab === 'group'
-                                ? 'text-slate-700'
-                                : 'text-slate-400 group-hover:text-slate-500',
-                        ]"
-                    />
-                    <span class="truncate">群聊</span>
-                    <span
-                        :class="[
-                            'text-[10px] leading-none transition-colors',
-                            activeTab === 'group'
-                                ? 'font-bold text-zx-primary'
-                                : 'text-slate-400',
-                        ]"
-                    >
-                        {{ groups.length }}
-                    </span>
-                </button>
-            </div>
+            <ZxSegmented
+                v-model="activeTab"
+                :options="contactTabOptions"
+                block
+            />
         </div>
 
         <!-- 好友列表（虚拟滚动） -->
@@ -374,8 +333,8 @@ const doRemove = async () => {
                     )"
                     :key="friend.user_id"
                     :style="{
-                        top: `${(friends.indexOf(friend)) * 48}px`,
-                        height: '48px',
+                        top: `${friends.indexOf(friend) * ROW_STRIDE}px`,
+                        height: `${ROW_H}px`,
                     }"
                     @click="
                         selectContact(
@@ -393,19 +352,11 @@ const doRemove = async () => {
                     "
                     class="absolute left-0 right-0 btn-touch flex cursor-pointer items-center gap-3 rounded-2xl p-2 transition-colors"
                 >
-                    <img
-                        v-if="friend.ava_url"
+                    <ZxAvatar
                         :src="friend.ava_url"
-                        referrerpolicy="no-referrer"
-                        class="h-8 w-8 flex-shrink-0 rounded-full object-cover"
-                        @error="friend.ava_url = ''"
+                        :name="friend.remark || friend.nickname || '友'"
+                        size="sm"
                     />
-                    <div
-                        v-else
-                        class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zx-primary-soft text-sm font-bold text-zx-primary"
-                    >
-                        {{ (friend.remark || friend.nickname || "友").charAt(0) }}
-                    </div>
                     <span class="min-w-0 flex-1 truncate text-sm text-gray-700"
                         >{{ friend.remark || friend.nickname || "未知好友" }}
                         <span class="text-xs text-gray-500"
@@ -420,12 +371,11 @@ const doRemove = async () => {
             >
                 加载中...
             </div>
-            <div
+            <ZxEmptyState
                 v-if="!loadingContacts && friends.length === 0"
-                class="py-2 text-center text-xs text-gray-400"
-            >
-                {{ botStore.selectedBot ? "暂无好友" : "Bot 未接入，暂无好友" }}
-            </div>
+                :text="botStore.selectedBot ? '暂无好友' : 'Bot 未接入，暂无好友'"
+                size="sm"
+            />
         </div>
 
         <!-- 群组列表（虚拟滚动） -->
@@ -447,8 +397,8 @@ const doRemove = async () => {
                     )"
                     :key="group.group_id"
                     :style="{
-                        top: `${groups.indexOf(group) * 48}px`,
-                        height: '48px',
+                        top: `${groups.indexOf(group) * ROW_STRIDE}px`,
+                        height: `${ROW_H}px`,
                     }"
                     @click="selectContact('group', group.group_id, group.group_name)"
                     @contextmenu.prevent.stop="openContactMenu($event, 'group', group)"
@@ -459,19 +409,11 @@ const doRemove = async () => {
                     "
                     class="absolute left-0 right-0 btn-touch flex cursor-pointer items-center gap-3 rounded-2xl p-2 transition-colors"
                 >
-                    <img
-                        v-if="group.ava_url"
+                    <ZxAvatar
                         :src="group.ava_url"
-                        referrerpolicy="no-referrer"
-                        class="h-8 w-8 flex-shrink-0 rounded-full object-cover"
-                        @error="group.ava_url = ''"
+                        :name="group.group_name"
+                        size="sm"
                     />
-                    <div
-                        v-else
-                        class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-zx-primary-soft text-sm font-bold text-zx-primary"
-                    >
-                        {{ group.group_name.charAt(0) }}
-                    </div>
                     <span class="min-w-0 flex-1 truncate text-sm text-gray-700"
                         >{{ group.group_name }}
                         <span class="text-xs text-gray-500"
@@ -486,12 +428,11 @@ const doRemove = async () => {
             >
                 加载中...
             </div>
-            <div
+            <ZxEmptyState
                 v-if="!loadingContacts && groups.length === 0"
-                class="py-2 text-center text-xs text-gray-400"
-            >
-                {{ botStore.selectedBot ? "暂无群组" : "Bot 未接入，暂无群组" }}
-            </div>
+                :text="botStore.selectedBot ? '暂无群组' : 'Bot 未接入，暂无群组'"
+                size="sm"
+            />
         </div>
 
     </div>

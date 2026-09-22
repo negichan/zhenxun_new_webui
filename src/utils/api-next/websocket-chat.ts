@@ -248,6 +248,88 @@ export function sendMessage(
 }
 
 /**
+ * 合并转发：一次发送归一节点，后端转成 OneBot node 段
+ * @param bot - Bot 信息
+ * @param groupId - 群 ID（群聊时传）
+ * @param userId - 好友 ID（私聊时传）
+ * @param nodes - [{name, uin, segments:[{type, content}]}]，图片/语音 content 为 base64://
+ */
+export function sendForwardMessage(
+    bot: { self_id: string; name?: string },
+    groupId: string | null,
+    userId: string | null,
+    nodes: Array<{
+        name: string
+        uin: string
+        segments: Array<{ type: string; content: string }>
+    }>
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (MOCK_MODE) {
+            console.debug('[Mock] sendForwardMessage:', bot, groupId, userId, nodes)
+            resolve()
+            return
+        }
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            reject(new Error('WebSocket 未连接'))
+            return
+        }
+        try {
+            ws.send(
+                JSON.stringify({
+                    self_id: bot.self_id,
+                    group_id: groupId,
+                    user_id: userId,
+                    mode: 'forward',
+                    nodes,
+                })
+            )
+            resolve()
+        } catch (error) {
+            reject(error)
+        }
+    })
+}
+
+/**
+ * 逐条转发：以结构化段数组发送，后端用 nonebot MessageSegment 全量构造
+ * （覆盖 text/image/record/video/face/at/json/xml/node，比 zxmsg 文本通道更全）
+ * @param segments - [{type, content}]，图片/语音 content 为 base64://，视频为 url
+ */
+export function sendSegmentsMessage(
+    bot: { self_id: string; name?: string },
+    groupId: string | null,
+    userId: string | null,
+    segments: Array<{ type: string; content: string }>
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (MOCK_MODE) {
+            console.debug('[Mock] sendSegmentsMessage:', bot, groupId, userId, segments)
+            resolve()
+            return
+        }
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            reject(new Error('WebSocket 未连接'))
+            return
+        }
+        try {
+            ws.send(
+                JSON.stringify({
+                    self_id: bot.self_id,
+                    group_id: groupId,
+                    user_id: userId,
+                    mode: 'segments',
+                    segments,
+                })
+            )
+            resolve()
+        } catch (error) {
+            reject(error)
+        }
+    })
+}
+
+/**
  * 检查连接状态（兼容旧 API）
  */
 export function isConnected(): boolean {

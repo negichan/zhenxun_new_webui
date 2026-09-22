@@ -84,7 +84,7 @@ export const useChatStore = defineStore("chat", () => {
                 ZXNotification({
                     title: "呜呼～",
                     message: "还没有找到可用的 Bot 哦 (っ °Д °;) っ",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
                 return;
@@ -205,11 +205,12 @@ export const useChatStore = defineStore("chat", () => {
         await removeMessage(selectedContact.value, selectedId.value, messageId);
     };
 
-    /** 后端段类型 -> 本地消息类型（后端 chat WS 目前推 text/img/at，其余预留） */
+    /** 后端段类型 -> 本地消息类型 */
     const SEGMENT_TYPE_MAP: Record<string, MessageType> = {
         img: "image",
         image: "image",
         face: "face",
+        at: "at",
         record: "record",
         voice: "record",
         video: "video",
@@ -268,14 +269,15 @@ export const useChatStore = defineStore("chat", () => {
                     parts.push({
                         type: mapped,
                         content: payload || TYPE_PLACEHOLDER[mapped] || "",
+                        // at 段保留真实目标 QQ，转发时可还原为 at 段而非纯文本
+                        ...(mapped === "at"
+                            ? { qq: String(item.qq ?? segData.qq ?? "") }
+                            : {}),
                     });
                     continue;
                 }
                 if (item.type === "text") {
                     pushText(item.msg || item.data?.text || "");
-                } else if (item.type === "at") {
-                    // 后端 at 段的 msg 已是 "@昵称" 文本
-                    pushText(item.msg || `@${segData.qq ?? ""}`);
                 }
                 // 其余未知类型跳过
             }
@@ -406,6 +408,7 @@ export const useChatStore = defineStore("chat", () => {
 
         selectContact,
         clearSelection,
+        appendMessage,
         appendCurrentMessage,
         appendIncomingMessage,
         removeCurrentMessage,

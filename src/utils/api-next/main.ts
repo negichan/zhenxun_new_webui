@@ -116,4 +116,41 @@ export const mainApi = {
             end_time: endTime,
         });
     },
+
+    /**
+     * 获取合并转发消息的逐条节点
+     */
+    getForward(
+        forwardId: string,
+        botId?: string,
+    ): Promise<
+        APIResponse<
+            Array<{
+                user_id: string;
+                nickname: string;
+                time?: number | string | null;
+                segments: Array<{ type: string; content: string }>;
+            }>
+        >
+    > {
+        return api.get(`/main/forward/${encodeURIComponent(forwardId)}`, {
+            bot_id: botId,
+        });
+    },
+
+    /**
+     * 查询前端本地版本与最新 Release 版本
+     */
+    getWebuiVersion(): Promise<
+        APIResponse<{ local: string | null; latest: string | null; has_update: boolean }>
+    > {
+        return api.get("/main/webui/version");
+    },
+
+    /**
+     * 更新前端到最新 Release（后端强制重拉并热替换 dist）
+     */
+    updateWebui(): Promise<APIResponse<null>> {
+        return api.post("/main/webui/update");
+    },
 };

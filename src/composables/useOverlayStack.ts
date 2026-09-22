@@ -181,4 +181,5 @@ export const OVERLAY_ID = {
     newItemDialog: "zx-overlay-new-item",
     chatHistory: "zx-overlay-chat-history",
     archivePreview: "zx-overlay-archive",
+    forward: "zx-overlay-forward",
 } as const;

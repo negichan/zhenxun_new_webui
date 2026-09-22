@@ -17,11 +17,21 @@ export type MessageType =
     | 'location'
 
 /**
+ * 表情显示档：emoji = QQ 默认小表情（随字号缩放到很小的脸）；
+ * sticker = 表情包贴纸（对标 QQ 贴纸，随气泡宽度自适应）
+ */
+export type StickerKind = 'emoji' | 'sticker'
+
+/**
  * 混合消息的内容段（文本/图片等按原始顺序）
  */
 export interface ChatMessagePart {
     type: MessageType
     content: string
+    /** 图片段若来自表情选择器，标注显示档用于自适应缩放 */
+    sticker?: StickerKind
+    /** at 段的真实目标 QQ（接收侧从后端 qq 字段带入，转发时还原为 at 段） */
+    qq?: string
 }
 
 /**
@@ -40,6 +50,8 @@ export interface ChatMessage {
     group_name?: string
     /** 混合消息的内容段；单类型消息不设，仍走 message/message_type */
     parts?: ChatMessagePart[]
+    /** 单段图片消息的表情显示档 */
+    sticker?: StickerKind
 }
 
 /**
@@ -74,6 +86,20 @@ export interface ChatWebSocketMessage {
 }
 
 /**
+ * 合并转发查看器的段与节点（后端归一后的可展示结构）
+ */
+export interface ForwardSegment {
+    type: string
+    content: string
+}
+export interface ForwardNode {
+    user_id: string
+    nickname: string
+    time?: number | string | null
+    segments: ForwardSegment[]
+}
+
+/**
  * 好友类型
  */
 export interface Friend {
@@ -82,7 +108,6 @@ export interface Friend {
     remark?: string
     ava_url: string
 }
-
 /**
  * 群组类型
  */

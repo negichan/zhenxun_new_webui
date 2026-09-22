@@ -65,8 +65,11 @@ export type { LogLevel, LogEntry } from './log.types'
 // 聊天相关（使用独立模块）
 export type {
     MessageType,
+    StickerKind,
     ChatMessage,
     ChatMessagePart,
+    ForwardSegment,
+    ForwardNode,
     SendMessageParam,
     MessageItem,
     ChatWebSocketMessage,
