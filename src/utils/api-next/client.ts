@@ -72,23 +72,30 @@ apiClient.interceptors.response.use(
             return Promise.reject(error)
         }
 
-        const showNotification = (title: string, message: string, type: string) => {
-            ZXNotification({ title, message, type, position: 'top-right' as const })
+        const showNotification = (
+            title: string,
+            message: string,
+            type: 'success' | 'error' | 'warning' | 'info',
+            sticker?: string
+        ) => {
+            ZXNotification({ title, message, type, sticker, position: 'top-right' as const })
         }
 
         if (error.code === 'ECONNABORTED') {
-            showNotification("哇啊啊啊", "小真寻被超时了இ௰இ", '😭')
+            showNotification("请求超时", "小真寻等得都要升华了……(இ௰இ)", 'error', '33')
+        } else if (!error.response || error.code === 'ERR_NETWORK') {
+            showNotification("连接断开", "连不上后端服务器了……小真寻陷入了沉思", 'error', '33')
         } else if (error.response?.status === 401) {
-            showNotification("状态失效", "验证状态失效啦~返回登录 (っ °Д °;) っ", '🥲')
+            showNotification("状态失效", "验证状态失效啦~返回登录 (っ °Д °;) っ", 'warning')
             auth.logout()
             await navigateTo({ name: 'Login' })
         } else if (error.response?.status === 400) {
             const errorMsg = error.response?.data?.message || error.response?.data?.info || '请求失败'
-            showNotification("请求错误", errorMsg, '😟')
+            showNotification("请求错误", errorMsg, 'error')
         } else if (error.response?.status >= 400 && error.response?.status < 500) {
-            showNotification("对不起", "服务器被小真寻吃掉惹 (っ °Д °;) っ", '😭')
+            showNotification("对不起", "服务器被小真寻吃掉惹 (っ °Д °;) っ", 'error')
         } else if (error.response?.status >= 500) {
-            showNotification("哎呀", "服务器好像被小真寻玩坏惹 (*/ω＼*)", '😋')
+            showNotification("哎呀", "服务器好像被小真寻玩坏惹 (*/ω＼*)", 'error', '03')
         }
 
         return Promise.reject(error)

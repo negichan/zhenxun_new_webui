@@ -11,6 +11,7 @@ export type ZXNotificationFn = {
 
 // 🔧 通知配置类型
 export interface ZXNotificationOptions {
+    title?: string
     message?: string
     duration?: number
     position?: 'top-center' | 'top-left' | 'top-right' | 'bottom-center' | 'bottom-left' | 'bottom-right'
@@ -21,5 +22,7 @@ export interface ZXNotificationOptions {
     avatar?: string
     /** 头像模式：标题下方的副标题（如 bot 的 self_id） */
     subtitle?: string
+    /** 表情包模式：左侧展示真寻表情包（支持编号如 "33" 或完整路径/文件名） */
+    sticker?: string
     [key: string]: any // 扩展字段
 }

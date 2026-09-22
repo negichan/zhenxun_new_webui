@@ -4,6 +4,7 @@ import { ZXNotificationFn, ZXNotificationOptions } from './types'
 
 // 🔧 默认设置
 const defaultOptions: Required<ZXNotificationOptions> = {
+    title: '',
     duration: 3000,
     position: 'top-right',
     type: 'info',
@@ -12,6 +13,7 @@ const defaultOptions: Required<ZXNotificationOptions> = {
     message: '',
     avatar: '',
     subtitle: '',
+    sticker: '',
 }
 
 let vm: ComponentInternalInstance | null = null
@@ -77,12 +79,16 @@ ZXNotification.setDefaultOptions = (opts: Partial<ZXNotificationOptions>) => {
 // ✅ 重置默认值
 ZXNotification.resetDefaultOptions = () => {
     Object.assign(defaultOptions, {
+        title: '',
         duration: 3000,
         position: 'top-right',
         type: 'info',
         customClass: '',
         confetti: false,
         message: '',
+        avatar: '',
+        subtitle: '',
+        sticker: '',
     })
 }
 

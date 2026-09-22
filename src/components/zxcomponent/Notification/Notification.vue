@@ -33,6 +33,17 @@
                                 class="size-12 shrink-0 rounded-full object-cover"
                                 @error="onAvatarError"
                             />
+                            <!--表情包模式（如 33 宇宙真寻升华等生动反馈）-->
+                            <div
+                                v-else-if="item.stickerUrl"
+                                class="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-50 p-0.5 shadow-xs border border-slate-100"
+                            >
+                                <img
+                                    :src="item.stickerUrl"
+                                    :alt="item.title || 'sticker'"
+                                    class="h-full w-full object-contain select-none pointer-events-none transition-transform hover:scale-105"
+                                />
+                            </div>
                             <!--info-->
                             <div v-else-if="item.type === 'info'">
                                 <svg
@@ -202,10 +213,11 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import gsap from "gsap";
 import { ZXConfetti } from "components/zxcomponent/Confetti/index.ts";
 import defaultAva from "@/assets/img/avatar.jpg";
+import { resolveStickerUrl } from "@/utils/stickers";
 
 // 头像加载失败回退默认头像
 function onAvatarError(e) {
@@ -241,6 +253,7 @@ function addNotification(config) {
         confetti = false,
         avatar = "",
         subtitle = "",
+        sticker = "",
     } = config;
 
     const list = notifications.value.filter((n) => n.position === position);
@@ -248,6 +261,8 @@ function addNotification(config) {
         const first = list[0];
         removeNotification(first.id, first.onClose);
     }
+
+    const stickerUrl = sticker ? resolveStickerUrl(sticker) : "";
 
     const notification = {
         id,
@@ -264,6 +279,7 @@ function addNotification(config) {
         confetti,
         avatar,
         subtitle,
+        stickerUrl,
     };
 
     notifications.value.push(notification);
