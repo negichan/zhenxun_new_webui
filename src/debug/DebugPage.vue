@@ -26,6 +26,7 @@ import {
     LogOut,
     X,
 } from "lucide-vue-next";
+import { onClickOutside } from "@vueuse/core";
 import ZXInput from "@/components/zxcomponent/ZXInput.vue";
 import ZXNotification from "@/components/zxcomponent/Notification";
 import { openContextMenu } from "@/components/zxcomponent/ContextMenu";
@@ -1263,6 +1264,178 @@ const insertInlineImage = (dataUrl: string) => {
     imageBase64Map.set(dataUrl, dataUrl.split(",")[1] ?? "");
 };
 
+// ==================== @ 群成员（输入 @ 就地弹；parseMessage 把 @qq/@all 转 at 段） ====================
+const atOpen = ref(false);
+const atRef = ref<HTMLElement | null>(null);
+const atKeyword = ref("");
+const mentionActive = ref(false);
+const mentionIndex = ref(0);
+const mentionPos = ref({ x: 0, y: 0 });
+const mentionListRef = ref<HTMLElement | null>(null);
+
+onClickOutside(atRef, () => {
+    atOpen.value = false;
+});
+
+watch(mentionIndex, () => {
+    nextTick(() => {
+        mentionListRef.value
+            ?.querySelectorAll("button")[mentionIndex.value]
+            ?.scrollIntoView({ block: "nearest" });
+    });
+});
+
+const currentGroupId = computed(() => {
+    const c = selectedContact.value;
+    return c?.type === "group" ? Number(c.id) : NaN;
+});
+
+const atMemberName = (m: SimMember) => m.card || m.nickname || String(m.user_id);
+
+const atList = computed<SimMember[]>(() => {
+    if (Number.isNaN(currentGroupId.value)) return [];
+    const kw = atKeyword.value.trim().toLowerCase();
+    return (simState.members[currentGroupId.value] ?? [])
+        .filter(
+            (m) =>
+                !kw ||
+                atMemberName(m).toLowerCase().includes(kw) ||
+                String(m.user_id).includes(kw),
+        )
+        .slice(0, 80);
+});
+
+const mentionLeft = computed(() => {
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+    return Math.max(8, Math.min(mentionPos.value.x, vw - 248));
+});
+
+const getTrailingMentionQuery = (): string | null => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return null;
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return null;
+    const before = (node.textContent ?? "").slice(0, range.startOffset);
+    const m = /@([^\s@]*)$/.exec(before);
+    return m ? m[1] : null;
+};
+
+const updateMentionPos = () => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    if (rect && (rect.left || rect.top)) {
+        mentionPos.value = { x: rect.left, y: rect.top };
+    } else {
+        const box = editorRef.value?.getBoundingClientRect();
+        if (box) mentionPos.value = { x: box.left + 12, y: box.top };
+    }
+};
+
+const deleteTrailingMention = () => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    const offset = range.startOffset;
+    const before = (node.textContent ?? "").slice(0, offset);
+    const m = /@[^\s@]*$/.exec(before);
+    if (!m) return;
+    const del = document.createRange();
+    del.setStart(node, offset - m[0].length);
+    del.setEnd(node, offset);
+    del.deleteContents();
+    del.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(del);
+};
+
+const onEditorInput = () => {
+    const q = getTrailingMentionQuery();
+    if (q !== null && currentGroupId.value !== undefined && !Number.isNaN(currentGroupId.value)) {
+        atKeyword.value = q;
+        mentionActive.value = true;
+        mentionIndex.value = 0;
+        updateMentionPos();
+        atOpen.value = true;
+    } else if (mentionActive.value) {
+        mentionActive.value = false;
+        atOpen.value = false;
+    }
+};
+
+const closeMention = () => {
+    atOpen.value = false;
+    mentionActive.value = false;
+};
+
+// rAF 合并连按，避免原生方向键重复快过渲染导致高亮错位/闪烁
+let mentionNavDelta = 0;
+let mentionNavScheduled = false;
+const stepMention = (delta: number) => {
+    mentionNavDelta += delta;
+    if (mentionNavScheduled) return;
+    mentionNavScheduled = true;
+    requestAnimationFrame(() => {
+        mentionNavScheduled = false;
+        const d = mentionNavDelta;
+        mentionNavDelta = 0;
+        const len = atList.value.length;
+        if (len > 0) {
+            mentionIndex.value = Math.min(
+                Math.max(mentionIndex.value + d, 0),
+                len - 1,
+            );
+        }
+    });
+};
+
+const onEditorKeydown = (e: KeyboardEvent) => {
+    const len = atList.value.length;
+    if (atOpen.value && len > 0) {
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            stepMention(1);
+            return;
+        }
+        if (e.key === "ArrowUp") {
+            e.preventDefault();
+            stepMention(-1);
+            return;
+        }
+        if (e.key === "Enter" && !e.isComposing) {
+            e.preventDefault();
+            pickAt(atList.value[mentionIndex.value]);
+            return;
+        }
+        if (e.key === "Escape") {
+            e.preventDefault();
+            closeMention();
+            return;
+        }
+    }
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        handleSendMessage();
+    }
+};
+
+// 在光标处插入 @qq 文本（发送时由 parseMessage 解析为 at 段）
+const insertAtText = (qq: string | number) => {
+    const editor = editorRef.value;
+    if (!editor) return;
+    if (mentionActive.value) deleteTrailingMention();
+    editor.focus();
+    document.execCommand("insertText", false, `@${qq} `);
+    atOpen.value = false;
+    mentionActive.value = false;
+};
+
+const pickAt = (m: SimMember) => insertAtText(m.user_id);
+
 /** 选择/粘贴/拖拽来的图片统一从这里进编辑器（类型/大小校验） */
 const enqueueImages = async (files: File[]) => {
     for (const file of files) {
@@ -1532,6 +1705,7 @@ const sendSegments = (messageSegments: import('@/utils/onebot/types').MessageCon
             title: "发送失败",
             message: "连接已经断开了",
             type: "error",
+            sticker: "33",
         });
         return false;
     }
@@ -1644,6 +1818,7 @@ const sendFriendRequest = () => {
             title: "发送失败",
             message: "连接已经断开了",
             type: "error",
+            sticker: "33",
         });
     }
 };
@@ -2732,8 +2907,9 @@ const removeRole = (user: SimUser) => {
                         contenteditable="true"
                         data-placeholder="输入消息，Enter 发送；@QQ号 / CQ 码 / JSON 段数组"
                         class="rich-editor max-h-32 min-h-12 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-sm leading-5 text-slate-700 focus:outline-none"
+                        @input="onEditorInput"
+                        @keydown="onEditorKeydown"
                         @paste="handlePaste"
-                        @keydown.enter.exact.prevent="handleSendMessage"
                     ></div>
                     <ZxButton
                         circle
@@ -3805,6 +3981,62 @@ const removeRole = (user: SimUser) => {
                     </div>
                 </div>
             </Transition>
+        </Teleport>
+
+        <!-- @ 提及成员浮层：贴光标、随主题、↑↓/Enter 选择 -->
+        <Teleport to="body">
+            <div
+                v-if="atOpen && selectedContact?.type === 'group'"
+                ref="atRef"
+                class="fixed z-[9999] w-60 select-none overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                :style="{
+                    left: mentionLeft + 'px',
+                    top: mentionPos.y - 8 + 'px',
+                    transform: 'translateY(-100%)',
+                }"
+                @contextmenu.prevent.stop
+                @selectstart.prevent
+            >
+                <div
+                    ref="mentionListRef"
+                    class="flex max-h-60 flex-col gap-1 overflow-y-auto p-1.5"
+                >
+                    <div
+                        v-if="atList.length === 0"
+                        class="px-3 py-4 text-center text-xs text-zx-text-muted"
+                    >
+                        没有匹配的成员
+                    </div>
+                    <button
+                        v-for="(m, i) in atList"
+                        :key="m.user_id"
+                        type="button"
+                        class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2 py-1.5 text-left"
+                        :class="
+                            i === mentionIndex
+                                ? 'bg-zx-primary-soft'
+                                : 'hover:bg-zx-primary-soft/60'
+                        "
+                        @mousedown.prevent
+                        @click="pickAt(m)"
+                    >
+                        <img
+                            :src="`http://q1.qlogo.cn/g?b=qq&nk=${m.user_id}&s=64`"
+                            class="h-7 w-7 shrink-0 rounded-full bg-slate-100 object-cover"
+                            referrerpolicy="no-referrer"
+                            @error="
+                                ($event.target as HTMLImageElement).style.visibility =
+                                    'hidden'
+                            "
+                        />
+                        <span class="min-w-0 flex-1">
+                            <span class="block truncate text-sm text-zx-text">{{
+                                atMemberName(m)
+                            }}</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
         </Teleport>
     </div>
 </template>
