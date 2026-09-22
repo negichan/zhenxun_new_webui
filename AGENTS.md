@@ -27,6 +27,8 @@
    - 确认弹窗统一使用 `ZXMessageBox`；
    - 下拉菜单统一使用 `ZXDropdown`；
    - 严禁手写拼装非标样式类。
+4. **克制现代，严禁滥用 Emoji**：
+   - 严禁在 UI 界面、功能按钮、状态标签或弹窗通知（`ZXNotification` 的 `type`）中传入 Emoji 替代标准矢量图标（头部问候语与粒子动效等明确豁免场景除外，详见 `DESIGN.md`）。
 
 👉 **完整的设计系统、颜色 Token、组件规范、卡片圆角与布局陷阱详见：[DESIGN.md](./DESIGN.md)**。
 

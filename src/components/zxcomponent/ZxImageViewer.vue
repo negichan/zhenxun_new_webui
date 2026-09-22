@@ -196,7 +196,7 @@ const onImageContextMenu = (event: MouseEvent, img: HTMLImageElement) => {
                     ZXNotification({
                         title: ok ? "已复制" : "复制失败",
                         message: ok ? "图片已复制到剪贴板" : "剪贴板不可用",
-                        type: ok ? "🥳" : "😭",
+                        type: ok ? "success" : "error",
                         position: "top-right",
                     });
                 },
@@ -224,7 +224,7 @@ const onImageContextMenu = (event: MouseEvent, img: HTMLImageElement) => {
                         ZXNotification({
                             title: "保存失败",
                             message: "无法读取图片数据",
-                            type: "😭",
+                            type: "error",
                             position: "top-right",
                         });
                         return;

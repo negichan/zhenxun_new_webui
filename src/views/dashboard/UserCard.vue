@@ -32,7 +32,7 @@ const handleRestart = async () => {
             ZXNotification({
                 title: "重启成功",
                 message: "Bot 正在重启中，请稍后刷新页面...",
-                type: "✅",
+                type: "success",
                 position: "top-right",
                 duration: 3000,
             });
@@ -40,7 +40,7 @@ const handleRestart = async () => {
             ZXNotification({
                 title: "重启失败",
                 message: res?.message || "重启失败，请稍后重试",
-                type: "❌",
+                type: "error",
                 position: "top-right",
             });
         }
@@ -49,7 +49,7 @@ const handleRestart = async () => {
         ZXNotification({
             title: "呜呼～",
             message: "重启失败 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }

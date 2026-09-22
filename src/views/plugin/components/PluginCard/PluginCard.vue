@@ -136,7 +136,7 @@ const handleToggleStatus = (newStatus: boolean) => {
                     ZXNotification({
                         title: "成功啦~",
                         message: `插件 "${props.name}" 已${newStatus ? "启用" : "禁用"} ♪(´▽｀)`,
-                        type: "🥳",
+                        type: "success",
                         position: "top-right",
                         confetti: true,
                     });
@@ -147,7 +147,7 @@ const handleToggleStatus = (newStatus: boolean) => {
                         title: "哎呀~",
                         message:
                             res.message || "操作失败了，请再试一次 (´；ω；`)",
-                        type: "😭",
+                        type: "error",
                         position: "top-right",
                     });
                 }
@@ -158,7 +158,7 @@ const handleToggleStatus = (newStatus: boolean) => {
                 ZXNotification({
                     title: "哎呀~",
                     message: "操作失败了，请再试一次 (´；ω；`)",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
             })

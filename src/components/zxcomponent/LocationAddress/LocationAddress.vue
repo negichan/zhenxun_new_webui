@@ -62,8 +62,9 @@
                             </button>
                         </div>
                         <div class="warning mb-8">
-                            <div class="title font-bold text-2xl text-red-400 mb-4">
-                                ⚠注意事项
+                            <div class="title font-bold text-2xl text-red-400 mb-4 flex items-center gap-2">
+                                <AlertCircle class="h-6 w-6 shrink-0" />
+                                <span>注意事项</span>
                             </div>
                             <ul class="content space-y-2">
                                 <li class="flex space-x-2"><p>1.</p>
@@ -107,6 +108,7 @@ import ZXNotification from "components/zxcomponent/Notification";
 import { throttle } from "@/utils/util.ts";
 import { useComponentStore } from "@/store/component.js";
 import { systemApi } from "@/utils/api-next";
+import { AlertCircle } from "lucide-vue-next";
 
 const componentStore = useComponentStore();
 
@@ -213,14 +215,14 @@ const onConfirm = async () => {
 function notificationConnect(state) {
     if (state) {
         ZXNotification({
-            title: "成功😉",
+            title: "成功",
             message: "连接测试成功ヾ(≧▽≦*)o",
             type: "success",
             confetti: true
         });
     } else {
         ZXNotification({
-            title: "失败🥲",
+            title: "失败",
             message: "连接测试失败（；´д｀）ゞ",
             type: "error"
         });
@@ -231,7 +233,7 @@ function notificationConnect(state) {
 function notificationModify(state) {
     if (state) {
         ZXNotification({
-            title: "成功🥳",
+            title: "成功",
             message: "地址修改成功╰(*°▽°*)╯",
             type: "success",
             position: "top-right",
@@ -240,7 +242,7 @@ function notificationModify(state) {
         return;
     }
     ZXNotification({
-        title: "失败😵‍💫",
+        title: "失败",
         message: "地址修改失败ヽ(*。>Д<)o゜",
         type: "error"
     });
@@ -416,7 +418,7 @@ const handleTestAddress = throttle(() => {
     }
 }, 1000, () => {
     ZXNotification({
-        title: "呜呜😭",
+        title: "提示",
         message: "点慢点o(TヘTo)",
         position: "top-right",
         type: "warning"

@@ -42,7 +42,7 @@ const saveSnippet = () => {
     ZXNotification({
         title: "已保存",
         message: "查询片段已保存到本地标签（开发中：接入后端 snippets）",
-        type: "🥳",
+        type: "success",
         position: "top-right",
     });
 };
@@ -75,7 +75,7 @@ const run = async () => {
             ZXNotification({
                 title: "执行失败",
                 message: message.value,
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
             return;
@@ -95,8 +95,8 @@ const run = async () => {
         }
         ZXNotification({
             title: "执行成功～",
-            message: message.value + " ✨",
-            type: "🎉",
+            message: message.value,
+            type: "success",
             position: "top-right",
         });
     } catch (e: any) {
@@ -106,7 +106,7 @@ const run = async () => {
         ZXNotification({
             title: "执行失败",
             message: message.value,
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {

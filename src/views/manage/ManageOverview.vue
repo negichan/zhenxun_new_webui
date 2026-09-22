@@ -184,7 +184,7 @@ const loadData = async (retried = false) => {
                 ZXNotification({
                     title: "呜呼~",
                     message: "群组列表加载失败了 (っ °Д °;) っ",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
             }
@@ -196,7 +196,7 @@ const loadData = async (retried = false) => {
                 ZXNotification({
                     title: "呜呼~",
                     message: "好友列表加载失败了 (っ °Д °;) っ",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
             }
@@ -225,7 +225,7 @@ const loadData = async (retried = false) => {
         ZXNotification({
             title: "呜呼~",
             message: "数据加载失败了 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -354,7 +354,7 @@ const togglePlugin = async (plugin: GroupPlugin) => {
             ZXNotification({
                 title: "成功啦~",
                 message: "插件设置更新成功 ♪(´▽｀)",
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
         }
@@ -363,7 +363,7 @@ const togglePlugin = async (plugin: GroupPlugin) => {
         ZXNotification({
             title: "对不起",
             message: "设置更新失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -427,7 +427,7 @@ const saveMemberEdit = async () => {
             ZXNotification({
                 title: "成功啦~",
                 message: "成员信息更新成功 ♪(´▽｀)",
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
             memberEditDialogOpen.value = false;
@@ -438,7 +438,7 @@ const saveMemberEdit = async () => {
         ZXNotification({
             title: "对不起",
             message: "更新失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -461,7 +461,7 @@ const toggleMemberBan = async (member: (typeof groupMembers.value)[number]) => {
             ZXNotification({
                 title: "成功啦~",
                 message: newBanStatus ? "已封禁该成员" : "已解封该成员",
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
         }
@@ -470,7 +470,7 @@ const toggleMemberBan = async (member: (typeof groupMembers.value)[number]) => {
         ZXNotification({
             title: "对不起",
             message: "操作失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -593,7 +593,7 @@ const saveFriendEdit = async () => {
             ZXNotification({
                 title: "成功啦~",
                 message: "好友数据更新成功 ♪(´▽｀)",
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
             friendEditDialogOpen.value = false;
@@ -601,7 +601,7 @@ const saveFriendEdit = async () => {
             ZXNotification({
                 title: "呜呼~",
                 message: res.message || "更新失败",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         }
@@ -610,7 +610,7 @@ const saveFriendEdit = async () => {
         ZXNotification({
             title: "对不起",
             message: "更新失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -730,7 +730,7 @@ const toggleGroupStatus = async (group: GroupType) => {
             ZXNotification({
                 title: "成功啦~",
                 message: "群组状态更新成功 ♪(´▽｀)",
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
         }
@@ -739,7 +739,7 @@ const toggleGroupStatus = async (group: GroupType) => {
         ZXNotification({
             title: "对不起",
             message: "群组状态更新失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -766,7 +766,7 @@ const confirmSendMessage = async () => {
             ZXNotification({
                 title: "成功啦~",
                 message: "消息发送成功 ♪(´▽｀)",
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
             sendMessageDialogOpen.value = false;
@@ -777,7 +777,7 @@ const confirmSendMessage = async () => {
         ZXNotification({
             title: "呜呼~",
             message: "消息发送失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -803,7 +803,7 @@ const deleteFriend = async (friend: Friend) => {
                     ZXNotification({
                         title: "成功~",
                         message: "已移除好友",
-                        type: "🥳",
+                        type: "success",
                         position: "top-right",
                     });
                 }
@@ -837,7 +837,7 @@ const chooseLevel = async (level: number, group: GroupType) => {
             ZXNotification({
                 title: "成功啦~",
                 message: "群等级更新成功 ♪(´▽｀)",
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
         }
@@ -846,7 +846,7 @@ const chooseLevel = async (level: number, group: GroupType) => {
         ZXNotification({
             title: "对不起",
             message: "群等级更新失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }

@@ -240,7 +240,7 @@ const notifyFail = (title: string, e: unknown) => {
     ZXNotification({
         title,
         message: (e as Error)?.message || "操作失败了 (´；ω；`)",
-        type: "😭",
+        type: "error",
         position: "top-right",
     });
 };
@@ -253,7 +253,7 @@ const commitEditing = async () => {
         ZXNotification({
             title: "名称不合法",
             message: "名称不能为空，且不能包含 \\ / : * ? \" < > | 字符",
-            type: "🤔",
+            type: "warning",
             position: "top-right",
         });
         return;
@@ -286,7 +286,7 @@ const commitEditing = async () => {
             ZXNotification({
                 title: "重命名成功～",
                 message: `已重命名为 ${name}`,
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
         } else {
@@ -308,7 +308,7 @@ const commitEditing = async () => {
             ZXNotification({
                 title: "创建成功～",
                 message: `${name} 创建成功！`,
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
         }
@@ -367,7 +367,7 @@ const confirmDelete = (node: TreeNode) => {
                 ZXNotification({
                     title: "删除成功～",
                     message: `${node.name} 已删除`,
-                    type: "🥳",
+                    type: "success",
                     position: "top-right",
                 });
             } catch (e) {
@@ -401,7 +401,7 @@ const notifyOk = (title: string, message: string) => {
     ZXNotification({
         title,
         message,
-        type: "🥳",
+        type: "success",
         position: "top-right",
     });
 };
@@ -1066,7 +1066,7 @@ defineExpose({
             ZXNotification({
                 title: "找不到文件",
                 message: "文件不在当前树里，刷新后重试 (´･_･`)",
-                type: "🤔",
+                type: "warning",
                 position: "top-right",
             });
     },
@@ -1079,7 +1079,7 @@ defineExpose({
             ZXNotification({
                 title: "找不到文件",
                 message: "文件不在当前树里，刷新后重试 (´･_･`)",
-                type: "🤔",
+                type: "warning",
                 position: "top-right",
             });
     },

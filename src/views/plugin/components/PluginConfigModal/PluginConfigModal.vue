@@ -159,7 +159,7 @@ const loadPluginDetail = async () => {
             ZXNotification({
                 title: '哎呀~',
                 message: '获取插件详情失败 (っ °Д °;) っ',
-                type: '😭',
+                type: 'error',
                 position: 'top-right'
             })
             emit('update:visible', false)
@@ -169,7 +169,7 @@ const loadPluginDetail = async () => {
         ZXNotification({
             title: '呜呼~',
             message: '网络请求失败 (´；ω；`)',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
         emit('update:visible', false)
@@ -286,7 +286,7 @@ const setConfigValue = (config: PluginDetailConfig, newValue: any) => {
             ZXNotification({
                 title: '格式错误',
                 message: 'JSON 格式不正确，请检查 (｡•́︿•̀｡)',
-                type: '😭',
+                type: 'error',
                 position: 'top-right'
             })
         }
@@ -324,7 +324,7 @@ const handleSave = async () => {
             ZXNotification({
                 title: '哎呀~',
                 message: settingsRes.message || '保存通用设置失败了，请再试一次 (´；ω；`)',
-                type: '😭',
+                type: 'error',
                 position: 'top-right'
             })
             return
@@ -357,7 +357,7 @@ const handleSave = async () => {
             ZXNotification({
                 title: '成功啦~',
                 message: '插件配置已保存 ♪(´▽｀)',
-                type: '🥳',
+                type: 'success',
                 position: 'top-right',
                 confetti: true
             })
@@ -367,7 +367,7 @@ const handleSave = async () => {
             ZXNotification({
                 title: '哎呀~',
                 message: res.message || '保存配置失败了，请再试一次 (´；ω；`)',
-                type: '😭',
+                type: 'error',
                 position: 'top-right'
             })
         }
@@ -375,7 +375,7 @@ const handleSave = async () => {
         ZXNotification({
             title: '呜呼~',
             message: '网络请求失败 (っ °Д °;) っ',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     } finally {
@@ -396,7 +396,7 @@ const handleReset = () => {
     ZXNotification({
         title: '已重置',
         message: '配置已恢复到原始值 (｡•̀ᴗ-)✧',
-        type: '😌',
+        type: 'info',
         position: 'top-right'
     })
 }

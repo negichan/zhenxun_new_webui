@@ -126,7 +126,7 @@ export const useSystemStore = defineStore("system", () => {
             // 可选：将统计数据缓存到本地，防止刷新丢失
             localStorage.setItem("chat_call_count", JSON.stringify(count));
         } catch (err) {
-            console.error("❌ 轮询获取统计失败:", err);
+            console.error("轮询获取统计失败:", err);
         }
     }
 
@@ -140,7 +140,7 @@ export const useSystemStore = defineStore("system", () => {
                 const parsed = JSON.parse(cached);
                 Object.assign(count, parsed);
             } catch (e) {
-                console.error("❌ 解析 chat_call_count 缓存失败:", e);
+                console.error("解析 chat_call_count 缓存失败:", e);
             }
         }
     }
@@ -155,7 +155,7 @@ export const useSystemStore = defineStore("system", () => {
                 const parsed = JSON.parse(cached);
                 Object.assign(systemStatus, parsed);
             } catch (e) {
-                console.error("❌ 解析 system_status 缓存失败:", e);
+                console.error("解析 system_status 缓存失败:", e);
             }
         }
     }
@@ -205,7 +205,7 @@ export const useSystemStore = defineStore("system", () => {
                 localStorage.setItem("chat_call_count", JSON.stringify(count));
             }
         } catch (err) {
-            console.error("❌ 获取聊天统计失败:", err);
+            console.error("获取聊天统计失败:", err);
         }
     }
     /**
@@ -230,7 +230,7 @@ export const useSystemStore = defineStore("system", () => {
                     message: isRetry
                         ? "提交记录自动重试后仍超时 (；′⌒`)"
                         : "提交记录请求超时，正在自动重试…",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
 
@@ -242,7 +242,7 @@ export const useSystemStore = defineStore("system", () => {
                 ZXNotification({
                     title: "加载失败",
                     message: "提交记录获取失败了 (っ °Д °;)っ",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
             }
@@ -272,7 +272,7 @@ export const useSystemStore = defineStore("system", () => {
                 localStorage.setItem("chat_call_count", JSON.stringify(count));
             }
         } catch (err) {
-            console.error("❌ 获取完整统计失败:", err);
+            console.error("获取完整统计失败:", err);
         }
     }
 

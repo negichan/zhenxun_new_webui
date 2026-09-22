@@ -96,7 +96,7 @@ const submitLogin = async () => {
         }
         setToken(formatToken(login.token_type, login.access_token));
         ZXNotification({
-            title: "🥳",
+            title: "登录成功",
             type: "success",
             message: res?.message || "登录成功",
         });

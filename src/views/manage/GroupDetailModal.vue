@@ -75,7 +75,7 @@ const loadGroupDetail = async () => {
             ZXNotification({
                 title: '呜呼~',
                 message: '加载群组详情失败了 (っ °Д °;) っ',
-                type: '😭',
+                type: 'error',
                 position: 'top-right'
             })
         }
@@ -84,7 +84,7 @@ const loadGroupDetail = async () => {
         ZXNotification({
             title: '呜呼~',
             message: '加载群组详情失败了 (っ °Д °;) っ',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     } finally {
@@ -104,7 +104,7 @@ const loadPlugins = async () => {
         ZXNotification({
             title: '呜呼~',
             message: '加载插件列表失败了 (っ °Д °;) っ',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     } finally {
@@ -125,7 +125,7 @@ const loadMembers = async () => {
         ZXNotification({
             title: '呜呼~',
             message: '加载成员列表失败了 (っ °Д °;) っ',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     } finally {
@@ -146,7 +146,7 @@ const updateGroupStatus = async () => {
         ZXNotification({
             title: '成功啦~',
             message: '群组设置更新成功 ♪(´▽｀)',
-            type: '🥳',
+            type: 'success',
             position: 'top-right'
         })
         emit('updated')
@@ -155,7 +155,7 @@ const updateGroupStatus = async () => {
         ZXNotification({
             title: '对不起',
             message: '群组设置更新失败了 (´；ω；`)',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
         loadGroupDetail()
@@ -173,7 +173,7 @@ const togglePlugin = async (plugin: GroupPlugin) => {
         ZXNotification({
             title: '成功啦~',
             message: '插件状态更新成功 ♪(´▽｀)',
-            type: '🥳',
+            type: 'success',
             position: 'top-right'
         })
         emit('updated')
@@ -182,7 +182,7 @@ const togglePlugin = async (plugin: GroupPlugin) => {
         ZXNotification({
             title: '对不起',
             message: '插件状态更新失败了 (´；ω；`)',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
         plugin.is_blocked = !plugin.is_blocked
@@ -205,7 +205,7 @@ const viewMemberDetail = async (member: GroupMember | MemberDetail) => {
         ZXNotification({
             title: '呜呼~',
             message: '加载成员详情失败了 (っ °Д °;) っ',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     }
@@ -223,7 +223,7 @@ const saveMemberData = async () => {
         ZXNotification({
             title: '成功啦~',
             message: '成员数据更新成功 ♪(´▽｀)',
-            type: '🥳',
+            type: 'success',
             position: 'top-right'
         })
     } catch (error) {
@@ -231,7 +231,7 @@ const saveMemberData = async () => {
         ZXNotification({
             title: '对不起',
             message: '成员数据更新失败了 (´；ω；`)',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     }

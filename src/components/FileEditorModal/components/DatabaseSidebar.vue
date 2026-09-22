@@ -277,7 +277,7 @@ const newSqlFile = async () => {
         ZXNotification({
             title: "已创建～",
             message: "SQL 文件已写入后端，双击打开",
-            type: "🥳",
+            type: "success",
             position: "top-right",
         });
     } catch {
@@ -315,7 +315,7 @@ const downloadSql = (f: SqlFileItem) => {
         ZXNotification({
             title: "下载失败",
             message: f.name,
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -349,14 +349,14 @@ const commitRename = async (oldName: string) => {
         ZXNotification({
             title: "已重命名～",
             message: `${oldName} → ${next}`,
-            type: "🥳",
+            type: "success",
             position: "top-right",
         });
     } catch (e: any) {
         ZXNotification({
             title: "重命名失败",
             message: e?.message || "",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -381,14 +381,14 @@ const confirmDeleteSql = async (f: SqlFileItem) => {
         ZXNotification({
             title: "已删除～",
             message: f.name,
-            type: "🎉",
+            type: "success",
             position: "top-right",
         });
     } catch (e: any) {
         ZXNotification({
             title: "删除失败",
             message: e?.message || "",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }

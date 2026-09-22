@@ -33,7 +33,7 @@ export const useManageStore = defineStore("manage", () => {
                 ZXNotification({
                     title: "呜呼~",
                     message: "请求列表加载失败了 (っ °Д °;) っ",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
             }

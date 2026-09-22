@@ -13,6 +13,7 @@
    - 遇到任何颜色不一致、样式冲突时，**绝对禁止修改 `UIStyle.vue` 中的标准语义定义**，必须以其为准去修改其他业务组件与样式！
 2. **饱和实底 + 纯白对比字**：状态标签、徽标以及高亮选中的筛选胶囊，必须使用**高饱和实色底 + 纯白文字 `#ffffff`**（品牌主色使用配套变量 `var(--zx-color-on-primary)`）。**严禁使用半透淡色底**（如 `bg-green-100 text-green-700`、`bg-blue-50` 等淡色块方案已被彻底否决）。
 3. **组件规范化**：跨页面通用控件必须复用 `src/components/zxcomponent/` 目录下的统一组件（`<ZxTag>`、`<ZxButton>`、`ZXMessageBox` 等），禁止手写拼接非标样式。
+4. **克制现代，严禁滥用 Emoji**：界面设计遵循克制、现代、整洁与统一的专业视觉标准。除明确豁免场景外，**严禁在正式 UI 界面、功能按钮、状态标签、日志等级及通知弹窗中使用 Emoji** 代替矢量图标或堆砌花哨表情。
 
 ---
 
@@ -92,6 +93,22 @@
 - **语义档**：`primary`（品牌强调/选中）、`success`（启用/完成/在线）、`warning`（注意/待处理/常驻）、`danger`（错误/删除/下线）、`info`（提示/版本/链接）、`neutral`（禁用/占位）、`purple`（内置/置顶）、`cyan`（字典/数据类）；
 - 自定义颜色：使用 `color` prop（实色底 + 亮度自动计算对比字）；
 - 群角色徽标：群主 `bg-red-500 text-white`、管理员 `bg-blue-500 text-white`、成员 `bg-gray-200 text-gray-500`。
+
+---
+
+## 图标与 Emoji 使用规范（严禁滥用 Emoji）
+
+1. **统一矢量图标体系**：
+   - 全局一律使用 **Lucide Vue 图标库**（如 `<CheckCircle2>`、`<AlertCircle>`、`<XCircle>`、`<Info>`、`<Bug>`、`<Clock>`、`<Trash2>` 等）；
+   - 图标颜色严格跟随语义或文本色彩 Token（`text-zx-text-muted`、`text-zx-primary` 等），禁止用彩色 Emoji 字符充当 UI 按钮或标识（如 `⚠️`、`❌`、`🐛`、`⏱`、`✨`、`📌` 等）。
+2. **通知弹窗（ZXNotification）语义规范**：
+   - `ZXNotification` 的 `type` 属性必须严格使用标准枚举：`type: "success" | "error" | "warning" | "info"`；
+   - **严禁向 `type` 传递 Emoji 字符串**（如 `type: "🥳"`、`type: "😭"`、`type: "🎉"`、`type: "🧹"` 等）；通知组件已内置标准矢量 SVG 图标与主题动画。
+3. **允许使用 Emoji 的严格例外场景**：
+   - **头部个性化问候语**：如 `HomeGreeting.vue`（“下午好，继续加油！”等时间段拟人化情境）；
+   - **趣味动效粒子**：如 `Confetti` 彩屑特效中的可配置趣味碎片；
+   - **用户生成内容（UGC）**：真实聊天消息气泡正文、QQ 昵称原生展示、第三方 API 原始返回正文。
+   除上述明确豁免场景外，业务代码、系统配置、设置面板与设计系统一律禁止引入 Emoji。
 
 ---
 

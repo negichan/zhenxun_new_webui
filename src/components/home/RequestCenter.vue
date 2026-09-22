@@ -106,7 +106,7 @@ const handleRequest = async (
                         : action === "refused"
                           ? "已拒绝请求"
                           : "已忽略请求",
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
             // 同意好友申请后联系人列表需要重载，新朋友才会出现
@@ -120,7 +120,7 @@ const handleRequest = async (
         ZXNotification({
             title: "对不起",
             message: "处理请求失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -141,7 +141,7 @@ const clearRequests = async (requestType: "friend" | "group") => {
                     ZXNotification({
                         title: "成功~",
                         message: "已清空过期请求",
-                        type: "🥳",
+                        type: "success",
                         position: "top-right",
                     });
                     await loadRequestList();

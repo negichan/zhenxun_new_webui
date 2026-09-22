@@ -102,7 +102,7 @@ const handleSubmitLogin = throttle(() => {
                 );
                 eventBus.emit("LOGIN:BOT");
                 ZXNotification({
-                    title: "🥳",
+                    title: "登录成功",
                     type: "success",
                     message: response?.message || "登录成功",
                     confetti: true,

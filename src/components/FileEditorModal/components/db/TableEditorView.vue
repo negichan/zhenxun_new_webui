@@ -193,7 +193,7 @@ const displayRows = computed<GridRow[]>(() => {
 const colTypeBadge = (col: TableColumn) => {
     const k = colEditKind(col);
     if (k === "number") return { text: "123", cls: "text-zx-primary" };
-    if (k === "datetime") return { text: "⏱", cls: "text-zx-text-subtle" };
+    if (k === "datetime") return { text: "DT", cls: "text-zx-text-subtle" };
     if (k === "boolean") return { text: "01", cls: "text-zx-info" };
     if (k === "json") return { text: "{}", cls: "text-zx-warning" };
     return { text: "AZ", cls: "text-zx-text-muted" };
@@ -1114,7 +1114,7 @@ const queueInsertAt = (
     ZXNotification({
         title: "已加入待插入",
         message: "新行显示在对应位置，保存后写入数据库",
-        type: "📌",
+        type: "info",
         position: "top-right",
     });
 };
@@ -1140,7 +1140,7 @@ const copyCellToClipboard = (row: TableRowData, index: number, col: string) => {
     ZXNotification({
         title: "已复制",
         message: `单元格「${col}」内容已复制`,
-        type: "🥳",
+        type: "success",
         position: "top-right",
     });
 };
@@ -1164,7 +1164,7 @@ const setCellNull = (row: TableRowData, index: number, col: string) => {
     ZXNotification({
         title: "已设为 NULL",
         message: `${targets.length} 个单元格待保存`,
-        type: "📌",
+        type: "info",
         position: "top-right",
     });
 };
@@ -1213,7 +1213,7 @@ const showColumnMenu = (e: MouseEvent, col: TableColumn) => {
                     ZXNotification({
                         title: "已复制",
                         message: col.name,
-                        type: "🥳",
+                        type: "success",
                         position: "top-right",
                     });
                 },
@@ -1363,7 +1363,7 @@ const saveAll = async () => {
             ZXNotification({
                 title: "保存成功～",
                 message: `已提交 ${ok} 项`,
-                type: "🎉",
+                type: "success",
                 position: "top-right",
             });
             discardAll();
@@ -1372,7 +1372,7 @@ const saveAll = async () => {
             ZXNotification({
                 title: "部分失败",
                 message: `成功 ${ok} · 失败 ${fail}`,
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
             loadTable();
@@ -1381,7 +1381,7 @@ const saveAll = async () => {
         ZXNotification({
             title: "保存失败",
             message: e?.message || "",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {

@@ -92,7 +92,7 @@ export const usePluginStore = defineStore("plugin", () => {
             ZXNotification({
                 title: "呜呼~",
                 message: "插件列表加载失败了 (っ °Д °;) っ",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         } finally {

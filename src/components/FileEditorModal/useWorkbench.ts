@@ -899,7 +899,7 @@ export const useWorkbench = () => {
                 ZXNotification({
                     title: "读取失败",
                     message: res?.message || "文件读取失败了 (´；ω；`)",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
             }
@@ -907,7 +907,7 @@ export const useWorkbench = () => {
             ZXNotification({
                 title: "读取失败",
                 message: "文件读取失败了 (´；ω；`)",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         } finally {
@@ -1304,7 +1304,7 @@ export const useWorkbench = () => {
                 ZXNotification({
                     title: "已保存～",
                     message: `${tab.name} 已写入后端 SQL 列表`,
-                    type: "🥳",
+                    type: "success",
                     position: "top-right",
                 });
                 return true;
@@ -1312,7 +1312,7 @@ export const useWorkbench = () => {
                 ZXNotification({
                     title: "保存失败",
                     message: e?.message || "SQL 文件保存失败",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
                 return false;
@@ -1325,7 +1325,7 @@ export const useWorkbench = () => {
             ZXNotification({
                 title: "只读视图",
                 message: `${tab.name} 是${tab.kind === "image" ? "图片" : "二进制"}文件，不支持保存 (´･_･\`)`,
-                type: "🫠",
+                type: "error",
                 position: "top-right",
             });
             return false;
@@ -1344,7 +1344,7 @@ export const useWorkbench = () => {
                     message: `${tab.name} 已按 ${
                         tab.encoding === "gbk" ? "GBK" : "UTF-8"
                     } 编码保存！`,
-                    type: "🥳",
+                    type: "success",
                     position: "top-right",
                 });
                 return true;
@@ -1352,14 +1352,14 @@ export const useWorkbench = () => {
             ZXNotification({
                 title: "保存失败",
                 message: res?.message || "文件保存失败了 (´；ω；`)",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         } catch {
             ZXNotification({
                 title: "保存失败",
                 message: "文件保存失败了 (´；ω；`)",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         }
@@ -1868,7 +1868,7 @@ export const useWorkbench = () => {
             ZXNotification({
                 title: "编辑器加载失败",
                 message: "monaco 加载失败了，请检查网络后重新打开 (´；ω；`)",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         }

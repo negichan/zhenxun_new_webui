@@ -160,7 +160,7 @@ const loadNbStore = async () => {
         ZXNotification({
             title: "呜呼~",
             message: "NoneBot 插件列表加载失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -790,7 +790,7 @@ const handleInstall = async (plugin: StorePlugin) => {
                             message:
                                 res.message ||
                                 `"${plugin.name}" 已经安装成功啦！重启Bot生效`,
-                            type: "🎉",
+                            type: "success",
                             position: "top-right",
                             confetti: true,
                         });
@@ -801,7 +801,7 @@ const handleInstall = async (plugin: StorePlugin) => {
                             message:
                                 res?.message ||
                                 "插件安装失败了，请再试一次 (´；ω；`)",
-                            type: "😭",
+                            type: "error",
                             position: "top-right",
                         });
                     }
@@ -819,7 +819,7 @@ const handleInstall = async (plugin: StorePlugin) => {
                     ZXNotification({
                         title: "安装成功~",
                         message: `"${plugin.name}" 已经安装成功啦！重启Bot生效`,
-                        type: "🎉",
+                        type: "success",
                         position: "top-right",
                         confetti: true,
                     });
@@ -828,7 +828,7 @@ const handleInstall = async (plugin: StorePlugin) => {
                 ZXNotification({
                     title: "安装失败",
                     message: "插件安装失败了，请再试一次 (´；ω；`)",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
             }
@@ -846,7 +846,7 @@ const handleUpdate = async (plugin: StorePlugin) => {
                     title: "更新成功~",
                     message:
                         res.message || `"${plugin.name}" 已经更新到最新版本啦！`,
-                    type: "🥳",
+                    type: "success",
                     position: "top-right",
                     confetti: true,
                 });
@@ -856,7 +856,7 @@ const handleUpdate = async (plugin: StorePlugin) => {
                     title: "更新失败",
                     message:
                         res?.message || "插件更新失败了 (´；ω；`)",
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
             }
@@ -867,7 +867,7 @@ const handleUpdate = async (plugin: StorePlugin) => {
             ZXNotification({
                 title: "更新成功~",
                 message: `"${plugin.name}" 已经更新到最新版本啦！`,
-                type: "🥳",
+                type: "success",
                 position: "top-right",
                 confetti: true,
             });
@@ -876,7 +876,7 @@ const handleUpdate = async (plugin: StorePlugin) => {
         ZXNotification({
             title: "更新失败",
             message: "插件更新失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }

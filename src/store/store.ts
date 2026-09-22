@@ -24,7 +24,7 @@ export const useStoreStore = defineStore("store", () => {
                 ZXNotification({
                     title: "成功啦~",
                     message: "插件商店数据加载成功 ♪(´▽｀)",
-                    type: "🥳",
+                    type: "success",
                     position: "top-right",
                 });
             }
@@ -32,7 +32,7 @@ export const useStoreStore = defineStore("store", () => {
             ZXNotification({
                 title: "呜呼~",
                 message: "插件商店数据加载失败了 (っ °Д °;) っ",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         } finally {

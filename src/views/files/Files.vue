@@ -137,7 +137,7 @@ const notifyOk = (title: string, message: string) => {
     ZXNotification({
         title,
         message,
-        type: "🥳",
+        type: "success",
         position: "top-right",
     });
 };
@@ -211,7 +211,7 @@ const pasteFiles = async (destDir?: string) => {
         ZXNotification({
             title: "粘贴失败",
             message: "没有项目被粘贴 (´；ω；`)，后端需支持 /file/copy 与 /file/move",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -248,7 +248,7 @@ const copyPathText = async (text: string, kind: string) => {
         ZXNotification({
             title: "复制地址失败",
             message: "剪贴板不可用 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -312,7 +312,7 @@ const loadFileList = async (path = "") => {
             ZXNotification({
                 title: "加载失败",
                 message: res?.message || "文件列表加载失败了 (っ °Д °;) っ",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         }
@@ -320,7 +320,7 @@ const loadFileList = async (path = "") => {
         ZXNotification({
             title: "呜呼～",
             message: "文件列表加载失败了 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -380,14 +380,14 @@ const handleDelete = async (files: FileItem[]) => {
                         files.length === 1
                             ? `"${files[0].name}" 已经删除成功啦！`
                             : `${files.length} 项已经全部删除啦！`,
-                    type: "👋",
+                    type: "info",
                     position: "top-right",
                 });
             } else {
                 ZXNotification({
                     title: "删除失败",
                     message: `有 ${failed} 项删除失败了 (´；ω；\`)`,
-                    type: "😭",
+                    type: "error",
                     position: "top-right",
                 });
             }
@@ -416,7 +416,7 @@ const openEditor = async (file: FileItem) => {
             ZXNotification({
                 title: "加载失败",
                 message: "图片加载失败了 (´；ω；`)",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         }
@@ -480,7 +480,7 @@ const handleNew = async () => {
             ZXNotification({
                 title: "新建成功～",
                 message: `${newItemType.value === "file" ? "文件" : "文件夹"} "${newItemName.value}" 创建成功啦！`,
-                type: "🎉",
+                type: "success",
                 position: "top-right",
                 confetti: true,
             });
@@ -492,7 +492,7 @@ const handleNew = async () => {
         ZXNotification({
             title: "创建失败",
             message: "创建失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -530,7 +530,7 @@ const handleRename = async () => {
             ZXNotification({
                 title: "重命名成功～",
                 message: `"${renamingFile.value.name}" 已成功重命名为 "${newName.value}" 啦！`,
-                type: "🎉",
+                type: "success",
                 position: "top-right",
             });
             showRenameDialog.value = false;
@@ -542,7 +542,7 @@ const handleRename = async () => {
         ZXNotification({
             title: "重命名失败",
             message: "重命名操作失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -576,7 +576,7 @@ const handleDownload = async (files: FileItem[]) => {
             title: "下载失败",
             message:
                 (error as Error)?.message || "下载失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -605,7 +605,7 @@ const handleExtractArchive = async (file?: FileItem) => {
             ZXNotification({
                 title: "解压成功～",
                 message: `已解压 ${res.data.file_count} 个文件到 "${res.data.dest_path.split(/[\\/]/).pop()}" ！`,
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
             showArchivePreview.value = false;
@@ -617,7 +617,7 @@ const handleExtractArchive = async (file?: FileItem) => {
             message:
                 (error as any)?.response?.data?.message ||
                 "解压操作失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -634,7 +634,7 @@ const handleCompress = async (files: FileItem[]) => {
             ZXNotification({
                 title: "压缩成功～",
                 message: `已打包 ${res.data.file_count} 个文件到 "${res.data.dest_path.split(/[\\/]/).pop()}" ！`,
-                type: "🥳",
+                type: "success",
                 position: "top-right",
             });
             loadFileList(currentPath.value);
@@ -645,7 +645,7 @@ const handleCompress = async (files: FileItem[]) => {
             message:
                 (error as any)?.response?.data?.message ||
                 "压缩操作失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
