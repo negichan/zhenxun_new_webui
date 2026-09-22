@@ -10,6 +10,8 @@ import type {
     ImportModelsDevRequest,
     ModelTestResponse,
     ModelsDevCatalogResponse,
+    ProtocolHijackStatusResponse,
+    TelemetryItem,
 } from "@/types/ai.types";
 
 export const aiApi = {
@@ -62,6 +64,36 @@ export const aiApi = {
      */
     importModelsDevProvider(data: ImportModelsDevRequest): Promise<APIResponse<boolean>> {
         return api.post<boolean>("/ai/models-dev/import", data);
+    },
+
+    /**
+     * 获取实验性协议劫持全局状态与支持协议
+     */
+    getProtocolHijackStatus(): Promise<APIResponse<ProtocolHijackStatusResponse>> {
+        return api.get<ProtocolHijackStatusResponse>("/ai/experimental/protocol-hijack");
+    },
+
+    /**
+     * 切换实验性协议劫持开关
+     */
+    updateProtocolHijackStatus(enabled: boolean): Promise<APIResponse<boolean>> {
+        return api.post<boolean>("/ai/experimental/protocol-hijack", { enabled });
+    },
+
+    /**
+     * 获取近期抓包遥测记录
+     */
+    getProtocolTelemetry(limit: number = 50): Promise<APIResponse<TelemetryItem[]>> {
+        return api.get<TelemetryItem[]>("/ai/experimental/telemetry", {
+            params: { limit },
+        });
+    },
+
+    /**
+     * 清空抓包遥测记录
+     */
+    clearProtocolTelemetry(): Promise<APIResponse<boolean>> {
+        return api.delete<boolean>("/ai/experimental/telemetry");
     },
 };
 

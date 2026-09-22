@@ -97,7 +97,7 @@ export const useAiStore = defineStore("ai", () => {
             ZXNotification({
                 title: "加载配置失败",
                 message: e?.message || "未能连接后端服务",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         } finally {
@@ -106,7 +106,7 @@ export const useAiStore = defineStore("ai", () => {
     };
 
     // 保存配置
-    const saveConfig = async () => {
+    const saveConfig = async (): Promise<boolean> => {
         saving.value = true;
         try {
             const res = await aiApi.saveConfig(aiConfig.value);
@@ -114,18 +114,21 @@ export const useAiStore = defineStore("ai", () => {
                 ZXNotification({
                     title: "保存成功",
                     message: "配置已更新并同步持久化至 models.json 与主配置文件！",
-                    type: "🎉",
+                    type: "success",
                     position: "top-right",
                 });
                 await fetchConfig();
+                return true;
             }
+            return false;
         } catch (e: any) {
             ZXNotification({
                 title: "保存失败",
                 message: e?.message || "网络请求异常",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
+            return false;
         } finally {
             saving.value = false;
         }

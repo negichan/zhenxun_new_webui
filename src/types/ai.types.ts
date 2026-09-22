@@ -163,3 +163,29 @@ export interface ImportModelsDevRequest {
     selected_model_names?: string[];
 }
 
+export interface TelemetryItem {
+    id: string;
+    timestamp: number;
+    api_type: string;
+    provider_name: string;
+    model_name: string;
+    endpoint?: string | null;
+    prompt_preview?: string | null;
+    response_preview?: string | null;
+    latency_ms?: number | null;
+    input_tokens?: number | null;
+    output_tokens?: number | null;
+    status: "success" | "error" | "pending";
+    error_message?: string | null;
+}
+
+export interface ProtocolHijackStatusResponse {
+    enabled: boolean;
+    supported_protocols: string[];
+    intercepted_count: number;
+}
+
+export interface UpdateProtocolHijackRequest {
+    enabled: boolean;
+}
+

@@ -15,7 +15,6 @@ import type { ProviderItem } from "@/types/ai.types";
 
 interface Props {
     provider: ProviderItem;
-    index?: number;
     testResult?: {
         loading?: boolean;
         success?: boolean;
@@ -30,7 +29,6 @@ const emit = defineEmits<{
     (e: "delete", providerName: string): void;
     (e: "test", provider: ProviderItem): void;
     (e: "clone", provider: ProviderItem): void;
-    (e: "toggle-enable", provider: ProviderItem, enabled: boolean): void;
 }>();
 
 interface LatencyBadgeState {
@@ -112,7 +110,8 @@ const copyEndpoint = async () => {
 
 <template>
     <div
-        class="group relative flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 pb-2 sm:pb-2.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+        class="group relative flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-4 sm:p-5 pb-2 sm:pb-2.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md cursor-pointer"
+        @click="emit('configure', provider)"
     >
         <!-- 顶部：品牌图标 + 渠道名与端点 + 右上角配置按钮 (主题色) -->
         <div class="flex items-start justify-between gap-3">
@@ -212,7 +211,7 @@ const copyEndpoint = async () => {
                         :variant="latencyBadge.variant"
                         :color="latencyBadge.color"
                         :title="latencyBadge.tooltip"
-                        class="font-mono select-none"
+                        class="select-none"
                     >
                         {{ latencyBadge.text }}
                     </ZxTag>
