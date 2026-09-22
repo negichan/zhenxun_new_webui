@@ -110,7 +110,7 @@ const saveRow = async (row: TableRowData, index: number) => {
             ZXNotification({
                 title: "保存成功～",
                 message: res.data?.message || "行已更新",
-                type: "🎉",
+                type: "success",
                 position: "top-right",
             });
             emit("refresh", props.page);
@@ -118,7 +118,7 @@ const saveRow = async (row: TableRowData, index: number) => {
             ZXNotification({
                 title: "保存失败",
                 message: res?.message || "更新失败了 (´；ω；`)",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         }
@@ -126,7 +126,7 @@ const saveRow = async (row: TableRowData, index: number) => {
         ZXNotification({
             title: "保存失败",
             message: e?.response?.data?.message || e?.message || "更新失败了",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -160,7 +160,7 @@ const deleteRow = async (row: TableRowData, index: number) => {
             ZXNotification({
                 title: "已删除～",
                 message: res.data?.message || "行已删除",
-                type: "🎉",
+                type: "success",
                 position: "top-right",
             });
             emit("refresh", props.page);
@@ -168,7 +168,7 @@ const deleteRow = async (row: TableRowData, index: number) => {
             ZXNotification({
                 title: "删除失败",
                 message: res?.message || "删除失败了",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         }
@@ -176,7 +176,7 @@ const deleteRow = async (row: TableRowData, index: number) => {
         ZXNotification({
             title: "删除失败",
             message: e?.response?.data?.message || e?.message || "删除失败了",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -223,7 +223,7 @@ const saveInsert = async () => {
             ZXNotification({
                 title: "插入成功～",
                 message: res.data?.message || "新行已插入",
-                type: "🎉",
+                type: "success",
                 position: "top-right",
                 confetti: true,
             });
@@ -232,7 +232,7 @@ const saveInsert = async () => {
             ZXNotification({
                 title: "插入失败",
                 message: res?.message || "插入失败了",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
         }
@@ -240,7 +240,7 @@ const saveInsert = async () => {
         ZXNotification({
             title: "插入失败",
             message: e?.response?.data?.message || e?.message || "插入失败了",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -310,15 +310,13 @@ const isLongText = (col: TableColumn) => {
                 <p>加载中...</p>
             </div>
         </div>
-        <div
+        <ZxEmptyState
             v-else-if="!inserting && rows.length === 0"
-            class="flex min-h-0 flex-1 items-center justify-center"
-        >
-            <div class="text-center text-gray-400">
-                <p>此表为空</p>
-                <p v-if="editMode" class="mt-1 text-sm">点「新增行」插入数据</p>
-            </div>
-        </div>
+            text="此表为空"
+            :sub-text="editMode ? '点「新增行」插入数据' : ''"
+            size="md"
+            class="flex-1 justify-center"
+        />
 
         <!-- 只读表格 -->
         <div v-else-if="!editMode" class="flex min-h-0 flex-1 flex-col">
@@ -328,33 +326,13 @@ const isLongText = (col: TableColumn) => {
                     :rows="rows.map((r) => r.data ?? {})"
                 />
             </div>
-            <div
-                class="flex flex-shrink-0 items-center justify-between gap-2 border-t border-gray-100 p-3"
-            >
-                <span class="text-sm text-gray-500">{{ pageInfo }}</span>
-                <div class="flex items-center gap-2">
-                    <ZxButton
-                        variant="ghost"
-                        circle
-                        size="sm"
-                        :disabled="page <= 1"
-                        @click="emit('change-page', -1)"
-                    >
-                        <ChevronLeft class="h-4 w-4" />
-                    </ZxButton>
-                    <span class="text-xs text-gray-500">
-                        {{ page }} / {{ totalPages }}
-                    </span>
-                    <ZxButton
-                        variant="ghost"
-                        circle
-                        size="sm"
-                        :disabled="page >= totalPages"
-                        @click="emit('change-page', 1)"
-                    >
-                        <ChevronRight class="h-4 w-4" />
-                    </ZxButton>
-                </div>
+            <div class="border-t border-gray-100 p-3">
+                <ZxPagination
+                    :page="page"
+                    :total-pages="totalPages"
+                    :summary-text="pageInfo"
+                    @change-delta="(delta) => emit('change-page', delta)"
+                />
             </div>
         </div>
 

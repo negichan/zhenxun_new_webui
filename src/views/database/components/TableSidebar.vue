@@ -39,17 +39,11 @@ const filtered = computed(() => {
         </div>
 
         <div v-if="tables.length > 6" class="border-b border-gray-100 p-2">
-            <div
-                class="flex items-center gap-2 rounded-full border border-transparent bg-slate-50 px-3 py-1.5 focus-within:border-zx-primary focus-within:bg-white"
-            >
-                <Search class="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
-                <input
-                    v-model="keyword"
-                    type="text"
-                    placeholder="搜索表名..."
-                    class="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
-                />
-            </div>
+            <ZxSearchInput
+                v-model="keyword"
+                placeholder="搜索表名..."
+                size="sm"
+            />
         </div>
 
         <div
@@ -84,19 +78,19 @@ const filtered = computed(() => {
                     <span class="truncate">{{ table }}</span>
                 </button>
             </div>
-            <div
+            <ZxEmptyState
                 v-if="tables.length === 0"
-                class="py-8 text-center text-gray-400"
-            >
-                <Table class="mx-auto mb-2 h-8 w-8 opacity-50" />
-                <p class="text-sm">暂无数据表</p>
-            </div>
-            <div
+                :icon="Table"
+                text="暂无数据表"
+                size="sm"
+            />
+            <ZxEmptyState
                 v-else-if="filtered.length === 0"
-                class="py-8 text-center text-gray-400"
-            >
-                <p class="text-sm">没有匹配的表</p>
-            </div>
+                :icon="Search"
+                text="未找到匹配的表"
+                sub-text="请尝试更换搜索关键字"
+                size="sm"
+            />
         </div>
     </aside>
 </template>

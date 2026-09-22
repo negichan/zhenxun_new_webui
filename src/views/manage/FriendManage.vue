@@ -50,7 +50,7 @@ const loadFriends = async () => {
         ZXNotification({
             title: '呜呼~',
             message: '好友列表加载失败了 (っ °Д °;) っ',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     } finally {
@@ -111,7 +111,7 @@ const confirmSendMessage = async () => {
             ZXNotification({
                 title: '成功啦~',
                 message: '消息发送成功 ♪(´▽｀)',
-                type: '🥳',
+                type: 'success',
                 position: 'top-right'
             })
             sendMessageDialogOpen.value = false
@@ -122,7 +122,7 @@ const confirmSendMessage = async () => {
         ZXNotification({
             title: '呜呼~',
             message: '消息发送失败了 (´；ω；`)',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     }
@@ -152,7 +152,7 @@ const deleteFriend = async (friend: Friend) => {
                     ZXNotification({
                         title: '成功~',
                         message: '已移除好友',
-                        type: '🥳',
+                        type: 'success',
                         position: 'top-right'
                     })
                 }
@@ -179,13 +179,10 @@ onMounted(() => {
             </div>
 
             <!-- 搜索框 -->
-            <div class="relative w-full sm:w-72">
-                <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
+            <div class="w-full sm:w-72">
+                <ZxSearchInput
                     v-model="searchQuery"
-                    type="text"
                     placeholder="搜索好友昵称或 ID..."
-                    class="w-full pl-10 pr-10 py-2 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-zx-primary focus:border-transparent"
                 />
             </div>
         </div>
@@ -211,13 +208,14 @@ onMounted(() => {
                         </div>
                     </div>
 
-                    <div v-else-if="filteredFriends.length === 0" class="flex items-center justify-center h-full">
-                        <div class="text-center text-gray-400">
-                            <Users class="w-16 h-16 mx-auto mb-4 opacity-50" />
-                            <p class="text-lg">没有找到好友</p>
-                            <p class="text-sm mt-2">尝试调整搜索条件</p>
-                        </div>
-                    </div>
+                    <ZxEmptyState
+                        v-else-if="filteredFriends.length === 0"
+                        :icon="Users"
+                        text="没有找到好友"
+                        sub-text="尝试调整搜索条件"
+                        size="md"
+                        class="h-full justify-center"
+                    />
 
                     <!-- 网格视图 -->
                     <div

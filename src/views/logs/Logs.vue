@@ -14,16 +14,15 @@ const { autoScroll } = storeToRefs(logsStore);
 // 日志级别配置
 const levelConfig: Record<
     LogLevel,
-    { color: string; icon: string; label: string }
+    { color: string; label: string }
 > = {
-    INFO: { color: "bg-blue-100 text-blue-700", icon: "ℹ️", label: "信息" },
+    INFO: { color: "bg-blue-100 text-blue-700", label: "信息" },
     WARNING: {
         color: "bg-yellow-100 text-yellow-700",
-        icon: "⚠️",
         label: "警告",
     },
-    ERROR: { color: "bg-red-100 text-red-700", icon: "❌", label: "错误" },
-    DEBUG: { color: "bg-gray-100 text-gray-700", icon: "🐛", label: "调试" },
+    ERROR: { color: "bg-red-100 text-red-700", label: "错误" },
+    DEBUG: { color: "bg-gray-100 text-gray-700", label: "调试" },
 };
 
 // 可选的日志级别（按严重程度排序：ERROR > WARNING > INFO > DEBUG）
@@ -160,23 +159,11 @@ onBeforeUnmount(() => {
             class="flex flex-col items-stretch space-y-3 rounded-3xl bg-white p-4 shadow-sm border border-slate-200 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-4"
         >
             <!-- 搜索框 -->
-            <div class="relative flex-1">
-                <Search
-                    class="absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2 transform text-gray-400"
-                />
-                <input
+            <div class="flex-1">
+                <ZxSearchInput
                     v-model="searchKeyword"
-                    type="text"
                     placeholder="搜索日志内容或模块..."
-                    class="w-full rounded-2xl border border-gray-200 py-2 pr-10 pl-10 text-sm focus:border-transparent focus:ring-2 focus:ring-zx-primary focus:outline-none"
                 />
-                <button
-                    v-if="searchKeyword"
-                    @click="searchKeyword = ''"
-                    class="btn-touch absolute top-1/2 right-3 -translate-y-1/2 transform text-gray-400 hover:text-gray-600"
-                >
-                    <X class="h-4 w-4" />
-                </button>
             </div>
 
             <!-- 级别过滤 -->
@@ -216,14 +203,14 @@ onBeforeUnmount(() => {
             class="min-h-0 flex-1 rounded-3xl bg-white p-4 pr-0.5 shadow-sm border border-slate-200"
         >
             <div class="h-full overflow-y-auto">
-                <div
+                <ZxEmptyState
                     v-if="filteredLogs.length === 0"
-                    class="flex h-full flex-col items-center justify-center text-gray-400"
-                >
-                    <FileText class="mb-4 h-16 w-16 opacity-50" />
-                    <p class="text-lg">暂无日志</p>
-                    <p class="mt-2 text-sm">等待系统日志输入...</p>
-                </div>
+                    sticker="21"
+                    text="暂无日志"
+                    sub-text="等待系统日志输入..."
+                    size="md"
+                    class="h-full justify-center"
+                />
 
                 <div v-else class="divide-y divide-gray-100">
                     <div

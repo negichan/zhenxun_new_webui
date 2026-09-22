@@ -49,7 +49,7 @@ const loadGroups = async () => {
             ZXNotification({
                 title: '呜呼~',
                 message: '群组列表加载失败了 (っ °Д °;) っ',
-                type: '😭',
+                type: 'error',
                 position: 'top-right'
             })
         }
@@ -58,7 +58,7 @@ const loadGroups = async () => {
         ZXNotification({
             title: '呜呼~',
             message: '群组列表加载失败了 (っ °Д °;) っ',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     } finally {
@@ -82,7 +82,7 @@ const toggleStatus = async (group: GroupType) => {
             ZXNotification({
                 title: '成功啦~',
                 message: '群组状态更新成功 ♪(´▽｀)',
-                type: '🥳',
+                type: 'success',
                 position: 'top-right'
             })
         }
@@ -91,7 +91,7 @@ const toggleStatus = async (group: GroupType) => {
         ZXNotification({
             title: '对不起',
             message: '群组状态更新失败了 (´；ω；`)',
-            type: '😭',
+            type: 'error',
             position: 'top-right'
         })
     }
@@ -116,7 +116,7 @@ const leaveGroup = async (group: GroupType) => {
                     ZXNotification({
                         title: '成功~',
                         message: '已退出群组',
-                        type: '🥳',
+                        type: 'success',
                         position: 'top-right'
                     })
                 }
@@ -143,13 +143,10 @@ onMounted(() => {
             </div>
 
             <!-- 搜索框 -->
-            <div class="relative w-full sm:w-72">
-                <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <input
+            <div class="w-full sm:w-72">
+                <ZxSearchInput
                     v-model="searchQuery"
-                    type="text"
                     placeholder="搜索群组名称或 ID..."
-                    class="w-full pl-10 pr-10 py-2 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-zx-primary focus:border-transparent"
                 />
             </div>
         </div>
@@ -183,13 +180,14 @@ onMounted(() => {
                 </div>
             </div>
 
-            <div v-else-if="filteredGroups.length === 0" class="flex items-center justify-center h-full">
-                <div class="text-center text-gray-400">
-                    <Group class="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p class="text-lg">没有找到群组</p>
-                    <p class="text-sm mt-2">尝试调整搜索条件</p>
-                </div>
-            </div>
+            <ZxEmptyState
+                v-else-if="filteredGroups.length === 0"
+                :icon="Group"
+                text="没有找到群组"
+                sub-text="尝试调整搜索条件"
+                size="md"
+                class="h-full justify-center"
+            />
 
             <!-- 网格视图 -->
             <div

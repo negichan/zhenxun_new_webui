@@ -3,11 +3,14 @@ import { ref } from "vue";
 import {
     Bell,
     Check,
+    Inbox,
     Pencil,
+    RotateCcw,
     Search,
     Settings,
     SlidersHorizontal,
     Trash2,
+    Users,
 } from "lucide-vue-next";
 import {
     ZXConfetti,
@@ -47,6 +50,25 @@ const dropdownOptions = [
     { label: "选项三", value: "c" },
 ];
 
+// 分段器演示
+const demoSegmented = ref("groups");
+const demoGranularity = ref("day");
+const demoAccent = ref("all");
+const segmentedTabOptions = [
+    { label: "群组", value: "groups", icon: Users, badge: 12 },
+    { label: "好友", value: "friends", badge: 48 },
+];
+const segmentedTimeOptions = [
+    { label: "按小时", value: "hour" },
+    { label: "按天", value: "day" },
+    { label: "按月", value: "month" },
+];
+const segmentedAccentOptions = [
+    { label: "全部", value: "all" },
+    { label: "已启用", value: "active" },
+    { label: "已停用", value: "inactive" },
+];
+
 const contextMenuItems = [
     {
         label: "编辑",
@@ -60,11 +82,19 @@ const contextMenuItems = [
     },
 ];
 
+const demoSearch = ref("");
+const demoModalVisible = ref(false);
+const demoPage = ref(1);
+
 // ==================== 侧边导航 ====================
 const navItems = [
     { id: "token-color", label: "语义色 Token" },
     { id: "zx-tag", label: "徽标 ZxTag" },
+    { id: "avatar", label: "头像 ZxAvatar" },
     { id: "button", label: "按钮 Button" },
+    { id: "segmented", label: "分段器 ZxSegmented" },
+    { id: "empty-state", label: "空状态 ZxEmptyState" },
+    { id: "pagination", label: "分页 ZxPagination" },
     { id: "input", label: "输入 Input" },
     { id: "dropdown", label: "下拉 ZXDropdown" },
     { id: "datepicker", label: "日期 MiniDatePicker" },
@@ -73,6 +103,7 @@ const navItems = [
     { id: "confetti", label: "彩带 ZXConfetti" },
     { id: "contextmenu", label: "右键菜单 ContextMenu" },
     { id: "messagebox", label: "确认框 ZXMessageBox" },
+    { id: "modal", label: "弹窗 ZxModal" },
     { id: "editor", label: "编辑器 ZXTextEditor" },
 ];
 
@@ -228,6 +259,42 @@ const demoDanger = () => {
                 </p>
             </section>
 
+            <!-- 头像 -->
+            <section
+                id="avatar"
+                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+                <h3 class="text-base font-bold text-gray-800">头像 ZxAvatar</h3>
+                <p class="mt-1 text-xs text-gray-400">
+                    统一全站头像加载、QQ 号直连头像、图片防盗链处理（referrerpolicy）与首字/缺省图标优雅兜底。
+                </p>
+                <div class="demo-area mt-4 space-y-4">
+                    <div>
+                        <p class="mb-2 text-xs font-semibold text-slate-500">
+                            尺寸档位（xs / sm / md / lg / xl）
+                        </p>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <ZxAvatar :name="'真寻'" size="xs" />
+                            <ZxAvatar :name="'真寻'" size="sm" />
+                            <ZxAvatar :name="'真寻'" size="md" />
+                            <ZxAvatar :name="'真寻'" size="lg" />
+                            <ZxAvatar :name="'真寻'" size="xl" />
+                        </div>
+                    </div>
+                    <div>
+                        <p class="mb-2 text-xs font-semibold text-slate-500">
+                            QQ 号头像解析与形状（圆形 / 平滑矩形）
+                        </p>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <ZxAvatar :qq="10001" size="md" />
+                            <ZxAvatar :qq="10001" shape="square" size="md" />
+                            <ZxAvatar :name="'Mio'" shape="square" size="md" />
+                            <ZxAvatar size="md" />
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- 按钮 -->
             <section
                 id="button"
@@ -260,6 +327,169 @@ const demoDanger = () => {
                 </div>
             </section>
 
+            <!-- 分段器 -->
+            <section
+                id="segmented"
+                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+                <h3 class="text-base font-bold text-gray-800">
+                    分段器 ZxSegmented
+                </h3>
+                <p class="mt-1 text-xs text-gray-400">
+                    统一 Tab 切换、时间粒度/周期筛选与视图模式切换。内置 btn-touch 触控反馈、图标、徽标计数及三种选中高亮风格。
+                </p>
+                <div class="demo-area mt-4 space-y-4">
+                    <div>
+                        <p class="mb-2 text-xs font-semibold text-slate-500">
+                            标准形态（图标 + 徽标计数）
+                        </p>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <ZxSegmented
+                                v-model="demoSegmented"
+                                :options="segmentedTabOptions"
+                            />
+                            <span class="text-xs text-slate-400">
+                                当前值：{{ demoSegmented }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="mb-2 text-xs font-semibold text-slate-500">
+                            尺寸档位（sm / md / lg）
+                        </p>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <ZxSegmented
+                                v-model="demoGranularity"
+                                :options="segmentedTimeOptions"
+                                size="sm"
+                            />
+                            <ZxSegmented
+                                v-model="demoGranularity"
+                                :options="segmentedTimeOptions"
+                                size="md"
+                            />
+                            <ZxSegmented
+                                v-model="demoGranularity"
+                                :options="segmentedTimeOptions"
+                                size="lg"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="mb-2 text-xs font-semibold text-slate-500">
+                            风格变体（accent="primary" / "neutral" / "filled-primary"）
+                        </p>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <ZxSegmented
+                                v-model="demoAccent"
+                                :options="segmentedAccentOptions"
+                                accent="primary"
+                            />
+                            <ZxSegmented
+                                v-model="demoAccent"
+                                :options="segmentedAccentOptions"
+                                accent="neutral"
+                            />
+                            <ZxSegmented
+                                v-model="demoAccent"
+                                :options="segmentedAccentOptions"
+                                accent="filled-primary"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="mb-2 text-xs font-semibold text-slate-500">
+                            自适应撑满父容器（block）
+                        </p>
+                        <div class="max-w-md">
+                            <ZxSegmented
+                                v-model="demoGranularity"
+                                :options="segmentedTimeOptions"
+                                block
+                            />
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 空状态 -->
+            <section
+                id="empty-state"
+                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+                <h3 class="text-base font-bold text-gray-800">
+                    空状态 ZxEmptyState
+                </h3>
+                <p class="mt-1 text-xs text-gray-400">
+                    统一全站缺省占位、图标规格、排版节奏与引导插槽。提供 sm / md / lg 三种尺度档位。
+                </p>
+                <div class="demo-area mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div
+                        class="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
+                    >
+                        <span class="mb-1 text-xs font-semibold text-slate-400">
+                            紧凑型（sm，如侧栏/卡片）
+                        </span>
+                        <ZxEmptyState
+                            :icon="Inbox"
+                            text="暂无数据表"
+                            size="sm"
+                        />
+                    </div>
+                    <div
+                        class="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
+                    >
+                        <span class="mb-1 text-xs font-semibold text-slate-400">
+                            标准型（md，如列表/明细）
+                        </span>
+                        <ZxEmptyState
+                            :icon="Search"
+                            text="未找到相关插件"
+                            sub-text="请尝试调整搜索关键词"
+                            size="md"
+                        />
+                    </div>
+                    <div
+                        class="flex flex-col items-center justify-center rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
+                    >
+                        <span class="mb-1 text-xs font-semibold text-slate-400">
+                            带操作插槽（支持按钮互动）
+                        </span>
+                        <ZxEmptyState
+                            text="加载已断开"
+                            sub-text="请检查网络或后端服务"
+                            size="sm"
+                        >
+                            <ZxButton variant="outline" size="sm">
+                                <RotateCcw class="h-3.5 w-3.5" />
+                                重试
+                            </ZxButton>
+                        </ZxEmptyState>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 分页 -->
+            <section
+                id="pagination"
+                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+                <h3 class="text-base font-bold text-gray-800">分页 ZxPagination</h3>
+                <p class="mt-1 text-xs text-gray-400">
+                    统一表格与列表翻页器，统一条目汇总文案、禁用边界与轻量图标圆钮翻页控制。
+                </p>
+                <div class="demo-area mt-4 max-w-xl">
+                    <ZxPagination
+                        v-model="demoPage"
+                        :total="128"
+                        :page-size="10"
+                    />
+                </div>
+            </section>
+
             <!-- 输入 -->
             <section
                 id="input"
@@ -276,14 +506,10 @@ const demoDanger = () => {
                             placeholder="ZXInput 输入框"
                         />
                     </div>
-                    <div
-                        class="flex min-w-0 flex-1 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 py-1.5 pl-3.5 pr-1.5 transition-colors focus-within:bg-white"
-                    >
-                        <Search class="h-4 w-4 shrink-0 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="搜索…"
-                            class="min-w-0 flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                    <div class="w-64">
+                        <ZxSearchInput
+                            v-model="demoSearch"
+                            placeholder="ZxSearchInput 搜索胶囊..."
                         />
                     </div>
                 </div>
@@ -444,6 +670,20 @@ const demoDanger = () => {
                         头像模式
                     </button>
                     <button
+                        class="btn-touch cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 transition-colors hover:border-slate-300"
+                        type="button"
+                        @click="
+                            ZXNotification({
+                                title: '连接断开',
+                                message: '连不上服务器了，小真寻陷入了宇宙思考',
+                                type: 'error',
+                                sticker: '33',
+                            })
+                        "
+                    >
+                        表情包 (宇宙真寻)
+                    </button>
+                    <button
                         class="btn-touch cursor-pointer rounded-full bg-zx-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zx-primary-hover"
                         type="button"
                         @click="
@@ -543,6 +783,45 @@ const demoDanger = () => {
                     >
                         危险确认框
                     </button>
+                </div>
+            </section>
+
+            <!-- 弹窗 -->
+            <section
+                id="modal"
+                class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+                <h3 class="text-base font-bold text-gray-800">
+                    弹窗 ZxModal
+                </h3>
+                <p class="mt-1 text-xs text-gray-400">
+                    统一全站弹窗规范，内置 GSAP 果冻进出场动效、全屏半透遮罩、Esc/遮罩快速关闭与尺寸档位支持。
+                </p>
+                <div class="demo-area mt-4 flex flex-wrap gap-3">
+                    <ZxButton @click="demoModalVisible = true">
+                        打开通用弹窗
+                    </ZxButton>
+                    <ZxModal
+                        v-model="demoModalVisible"
+                        title="通用弹窗示例"
+                        subtitle="由 ZxModal 统一驱动果冻动效与设计规范"
+                    >
+                        <div class="space-y-3 py-2 text-sm text-slate-600">
+                            <p>这是一个使用 ZxModal 封装的标准弹窗。</p>
+                            <p>内置标准标题区、关闭按钮、内容区域和底部动作插槽，支持 Esc 键与遮罩关闭。</p>
+                        </div>
+                        <template #footer>
+                            <ZxButton
+                                variant="ghost"
+                                @click="demoModalVisible = false"
+                            >
+                                取消
+                            </ZxButton>
+                            <ZxButton @click="demoModalVisible = false">
+                                确定
+                            </ZxButton>
+                        </template>
+                    </ZxModal>
                 </div>
             </section>
 

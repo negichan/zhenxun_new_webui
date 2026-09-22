@@ -17,6 +17,10 @@ type TabKey = "groups" | "friends";
 type SortKey = "message_count" | "plugin_call_count";
 
 const activeTab = ref<TabKey>("groups");
+const tabOptions = computed(() => [
+    { label: "群组", value: "groups" as const, badge: props.groups.length },
+    { label: "好友", value: "friends" as const, badge: props.friends.length },
+]);
 const searchQuery = ref("");
 const sortKey = ref<SortKey>("message_count");
 const currentPage = ref(1);
@@ -99,7 +103,7 @@ const exportCsv = () => {
         ZXNotification({
             title: "导出失败",
             message: "当前没有可导出的数据 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
         return;
@@ -136,7 +140,7 @@ const exportCsv = () => {
     ZXNotification({
         title: "已导出",
         message: `analytics-${activeTab.value}.csv`,
-        type: "✨",
+        type: "info",
         position: "top-right",
     });
 };
@@ -151,45 +155,21 @@ const exportCsv = () => {
                 <h3 class="text-sm font-semibold text-zx-text-strong sm:text-base">
                     明细统计
                 </h3>
-                <div class="flex items-center gap-1 rounded-2xl border bg-gray-100 p-1">
-                    <button
-                        type="button"
-                        class="btn-touch rounded-xl px-3 py-1 text-xs font-medium transition-all"
-                        :class="
-                            activeTab === 'groups'
-                                ? 'bg-white text-zx-primary shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                        "
-                        @click="activeTab = 'groups'"
-                    >
-                        群组 {{ groups.length }}
-                    </button>
-                    <button
-                        type="button"
-                        class="btn-touch rounded-xl px-3 py-1 text-xs font-medium transition-all"
-                        :class="
-                            activeTab === 'friends'
-                                ? 'bg-white text-zx-primary shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                        "
-                        @click="activeTab = 'friends'"
-                    >
-                        好友 {{ friends.length }}
-                    </button>
-                </div>
+                <ZxSegmented
+                    v-model="activeTab"
+                    :options="tabOptions"
+                    size="sm"
+                />
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <div
-                    class="relative min-w-0 flex-1 rounded-full border border-slate-200 bg-slate-50 py-1.5 pl-3.5 pr-3 focus-within:bg-white sm:w-48 sm:flex-none"
-                >
-                    <input
+                <div class="w-full sm:w-48">
+                    <ZxSearchInput
                         v-model="searchQuery"
-                        type="search"
                         :placeholder="
                             activeTab === 'groups' ? '搜索群名 / 群号' : '搜索昵称 / QQ'
                         "
-                        class="w-full bg-transparent text-sm text-zx-text placeholder:text-zx-text-subtle focus:outline-none"
+                        size="sm"
                     />
                 </div>
                 <ZxButton variant="outline" size="sm" :disabled="loading" @click="exportCsv">
@@ -236,12 +216,12 @@ const exportCsv = () => {
             ></div>
         </div>
 
-        <div
+        <ZxEmptyState
             v-else-if="rows.length === 0"
-            class="py-12 text-center text-sm text-zx-text-subtle"
-        >
-            {{ searchQuery ? "没有匹配的记录" : "该时间范围内暂无明细" }}
-        </div>
+            :text="searchQuery ? '没有匹配的记录' : '该时间范围内暂无明细'"
+            :sub-text="searchQuery ? '请尝试更换搜索关键字或切换群组/好友' : '可尝试切换上方时间范围进行查看'"
+            size="md"
+        />
 
         <template v-else>
             <div class="overflow-x-auto">

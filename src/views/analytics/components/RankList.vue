@@ -55,14 +55,14 @@ const copyId = async (id: string) => {
         ZXNotification({
             title: "已复制",
             message: id,
-            type: "✨",
+            type: "info",
             position: "top-right",
         });
     } catch {
         ZXNotification({
             title: "复制失败",
             message: "浏览器拒绝了剪贴板权限 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -80,12 +80,12 @@ const copyId = async (id: string) => {
             ></div>
         </div>
 
-        <div
+        <ZxEmptyState
             v-else-if="displayItems.length === 0"
-            class="flex flex-1 items-center justify-center py-10 text-sm text-zx-text-subtle"
-        >
-            {{ emptyText }}
-        </div>
+            :text="emptyText"
+            size="sm"
+            class="flex-1 justify-center"
+        />
 
         <ul v-else class="flex flex-col gap-2.5">
             <li v-for="(item, index) in displayItems" :key="item.id">
@@ -97,18 +97,11 @@ const copyId = async (id: string) => {
                         {{ index + 1 }}
                     </span>
 
-                    <img
-                        v-if="item.avatar"
+                    <ZxAvatar
                         :src="item.avatar"
-                        :alt="item.name"
-                        class="h-7 w-7 flex-shrink-0 rounded-full object-cover"
+                        :name="item.name"
+                        size="sm"
                     />
-                    <div
-                        v-else
-                        class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-zx-primary text-xs font-semibold text-[color:var(--zx-color-on-primary)]"
-                    >
-                        {{ item.name.slice(0, 1) }}
-                    </div>
 
                     <div class="min-w-0 flex-1">
                         <div class="flex items-baseline justify-between gap-2">

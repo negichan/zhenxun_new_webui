@@ -44,6 +44,11 @@ const sqlResult = ref<{ columns: string[]; rows: Record<string, any>[] } | null>
 const sqlExecuting = ref(false);
 
 const detailView = ref<DetailView>("data");
+const viewOptions = [
+    { label: "数据", value: "data" as const },
+    { label: "结构", value: "structure" as const },
+    { label: "SQL", value: "sql" as const, icon: Terminal },
+];
 
 const pageInfo = computed(() => {
     if (totalRows.value === 0) return "共 0 条";
@@ -88,7 +93,7 @@ const loadTableList = async () => {
         ZXNotification({
             title: "呜呼～",
             message: "表列表加载失败了 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     }
@@ -125,7 +130,7 @@ const loadTableData = async (page = 1) => {
         ZXNotification({
             title: "呜呼～",
             message: "数据加载失败了 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -173,7 +178,7 @@ const executeSql = async () => {
             ZXNotification({
                 title: "执行失败",
                 message: res?.message || "SQL 执行失败了 (´；ω；`)",
-                type: "😭",
+                type: "error",
                 position: "top-right",
             });
             return;
@@ -188,8 +193,8 @@ const executeSql = async () => {
             };
             ZXNotification({
                 title: "执行成功～",
-                message: `返回 ${rows.length} 条记录 ✨`,
-                type: "🎉",
+                message: `返回 ${rows.length} 条记录`,
+                type: "success",
                 position: "top-right",
                 confetti: true,
             });
@@ -198,7 +203,7 @@ const executeSql = async () => {
             ZXNotification({
                 title: "执行成功～",
                 message: payload?.message || "SQL 执行成功！",
-                type: "🎉",
+                type: "success",
                 position: "top-right",
                 confetti: true,
             });
@@ -215,7 +220,7 @@ const executeSql = async () => {
                 error?.response?.data?.message ||
                 error?.message ||
                 "SQL 执行失败了 (´；ω；`)",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -259,47 +264,11 @@ onMounted(() => {
                         </div>
                     </div>
 
-                    <div
-                        class="grid grid-cols-3 gap-1 rounded-2xl bg-gray-100 p-1 sm:flex sm:flex-shrink-0"
-                    >
-                        <button
-                            type="button"
-                            @click="detailView = 'data'"
-                            :class="
-                                detailView === 'data'
-                                    ? 'bg-white text-zx-primary shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-800'
-                            "
-                            class="cursor-pointer rounded-xl px-3 py-1.5 text-xs font-medium transition-colors"
-                        >
-                            数据
-                        </button>
-                        <button
-                            type="button"
-                            @click="detailView = 'structure'"
-                            :class="
-                                detailView === 'structure'
-                                    ? 'bg-white text-zx-primary shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-800'
-                            "
-                            class="cursor-pointer rounded-xl px-3 py-1.5 text-xs font-medium transition-colors"
-                        >
-                            结构
-                        </button>
-                        <button
-                            type="button"
-                            @click="detailView = 'sql'"
-                            :class="
-                                detailView === 'sql'
-                                    ? 'bg-white text-zx-primary shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-800'
-                            "
-                            class="flex cursor-pointer items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-xs font-medium transition-colors"
-                        >
-                            <Terminal class="h-3.5 w-3.5" />
-                            <span>SQL</span>
-                        </button>
-                    </div>
+                    <ZxSegmented
+                        v-model="detailView"
+                        :options="viewOptions"
+                        size="sm"
+                    />
                 </div>
 
                 <div class="min-h-0 flex-1 overflow-hidden">
@@ -315,31 +284,21 @@ onMounted(() => {
                             @open-log="openSqlLog"
                         />
                         <div class="min-h-0 flex-1 overflow-hidden">
-                            <div
+                            <ZxEmptyState
                                 v-if="!sqlResult"
-                                class="flex h-full items-center justify-center"
-                            >
-                                <div class="text-center text-gray-400">
-                                    <FileText
-                                        class="mx-auto mb-4 h-16 w-16 opacity-50"
-                                    />
-                                    <p>暂无结果</p>
-                                    <p class="mt-2 text-sm">
-                                        执行查询后在此查看
-                                    </p>
-                                </div>
-                            </div>
-                            <div
+                                :icon="FileText"
+                                text="暂无结果"
+                                sub-text="执行查询后在此查看"
+                                size="md"
+                                class="h-full justify-center"
+                            />
+                            <ZxEmptyState
                                 v-else-if="sqlResult.rows.length === 0"
-                                class="flex h-full items-center justify-center"
-                            >
-                                <div class="text-center text-gray-400">
-                                    <CheckCircle
-                                        class="mx-auto mb-4 h-16 w-16 opacity-50"
-                                    />
-                                    <p>执行成功，无返回数据</p>
-                                </div>
-                            </div>
+                                :icon="CheckCircle"
+                                text="执行成功，无返回数据"
+                                size="md"
+                                class="h-full justify-center"
+                            />
                             <QueryResultTable
                                 v-else
                                 :columns="sqlResult.columns"

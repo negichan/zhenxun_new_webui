@@ -108,9 +108,15 @@ const rangeLabel = computed(() => {
     return `${start} ~ ${end}`;
 });
 
-const handleQuickRange = (range: (typeof quickTimeRanges)[number]) => {
-    selectedQuickRange.value = range.value;
-    if (range.value === "custom") {
+const handleQuickRange = (
+    rangeOrVal:
+        | (typeof quickTimeRanges)[number]
+        | (typeof quickTimeRanges)[number]["value"],
+) => {
+    const val = typeof rangeOrVal === "string" ? rangeOrVal : rangeOrVal.value;
+    const range = quickTimeRanges.find((r) => r.value === val);
+    selectedQuickRange.value = val;
+    if (!range || range.value === "custom") {
         if (!startTime.value || !endTime.value) {
             analyticsStore.setDefaultTimeRange(30 * 24);
         }
@@ -130,7 +136,7 @@ const applyCustomRange = () => {
         ZXNotification({
             title: "呜呼～",
             message: "请先选择起止时间 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
         return;
@@ -139,7 +145,7 @@ const applyCustomRange = () => {
         ZXNotification({
             title: "呜呼～",
             message: "起始时间要早于结束时间 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
         return;
@@ -466,7 +472,7 @@ const loadTrendData = async () => {
         ZXNotification({
             title: "呜呼～",
             message: "趋势数据加载失败了 (っ °Д °;) っ",
-            type: "😭",
+            type: "error",
             position: "top-right",
         });
     } finally {
@@ -599,38 +605,18 @@ onActivated(() => {
                     v-if="!globalStore.isDesktopMode"
                     class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3"
                 >
-                    <div class="flex items-center gap-1 rounded-2xl border bg-gray-100 p-1">
-                        <button
-                            v-for="range in quickTimeRanges"
-                            :key="range.value"
-                            type="button"
-                            class="btn-touch rounded-xl px-3 py-1.5 text-xs font-medium transition-all"
-                            :class="
-                                selectedQuickRange === range.value
-                                    ? 'bg-white text-zx-primary shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                            "
-                            @click="handleQuickRange(range)"
-                        >
-                            {{ range.label }}
-                        </button>
-                    </div>
-                    <div class="flex items-center gap-1 rounded-2xl border bg-gray-100 p-1">
-                        <button
-                            v-for="opt in granularityOptions"
-                            :key="opt.value"
-                            type="button"
-                            class="btn-touch rounded-xl px-3 py-1.5 text-xs font-medium transition-all"
-                            :class="
-                                granularity === opt.value
-                                    ? 'bg-white text-zx-primary shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                            "
-                            @click="handleGranularity(opt.value)"
-                        >
-                            {{ opt.label }}
-                        </button>
-                    </div>
+                    <ZxSegmented
+                        :model-value="selectedQuickRange"
+                        :options="quickTimeRanges"
+                        size="sm"
+                        @update:model-value="handleQuickRange"
+                    />
+                    <ZxSegmented
+                        v-model="granularity"
+                        :options="granularityOptions"
+                        size="sm"
+                        @change="handleGranularity"
+                    />
                 </div>
 
                 <div
