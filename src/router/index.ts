@@ -99,12 +99,16 @@ const routes = [
                 redirect: "/chat",
                 meta: { menuKey: "manage" },
             },
-            {
-                // UI 风格参考页：不进菜单，直接访问 URL
-                path: "/ui-style",
-                name: "UI 风格参考",
-                component: () => import("@/views/ui-style/UIStyle.vue"),
-            },
+            // UI 风格参考页只服务开发期：用 DEV 分支注册，生产构建整段被剔除，产物里不留路由与分块
+            ...(import.meta.env.DEV
+                ? [
+                      {
+                          path: "/ui-style",
+                          name: "UI 风格参考",
+                          component: () => import("@/views/ui-style/UIStyle.vue"),
+                      },
+                  ]
+                : []),
         ],
     },
     {
