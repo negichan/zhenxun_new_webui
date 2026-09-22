@@ -48,6 +48,24 @@ export const useGlobalStore = defineStore("global", () => {
         localStorage.setItem(EXP_KEY, enabled ? "1" : "0");
     }
 
+    // 实验性：长列表激进预加载模式
+    const turboScrollEnabled = ref(
+        localStorage.getItem("experimentalTurboScroll") === "1",
+    );
+    function setTurboScrollEnabled(enabled: boolean): void {
+        turboScrollEnabled.value = enabled;
+        localStorage.setItem("experimentalTurboScroll", enabled ? "1" : "0");
+    }
+
+    // 实验性：协议遥测详细报文抓包记录
+    const telemetryCaptureEnabled = ref(
+        localStorage.getItem("experimentalTelemetryCapture") !== "0",
+    );
+    function setTelemetryCaptureEnabled(enabled: boolean): void {
+        telemetryCaptureEnabled.value = enabled;
+        localStorage.setItem("experimentalTelemetryCapture", enabled ? "1" : "0");
+    }
+
     watch(
         animationsEnabled,
         (enabled) => {
@@ -79,5 +97,9 @@ export const useGlobalStore = defineStore("global", () => {
         setAnimationsEnabled,
         experimentalFeaturesEnabled,
         setExperimentalFeaturesEnabled,
+        turboScrollEnabled,
+        setTurboScrollEnabled,
+        telemetryCaptureEnabled,
+        setTelemetryCaptureEnabled,
     };
 });

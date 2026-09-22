@@ -194,18 +194,6 @@ export const mainMenus = reactive<MenuItem[]>([
             },
         ],
     },
-    // {
-    //     name: '设置',
-    //     key: 'settings',
-    //     icon: Settings,
-    //     path: '/settings'
-    // },
-    // {
-    //     name: '关于',
-    //     key: 'about',
-    //     icon: Info,
-    //     path: '/about'
-    // }
 ]);
 
 /**

@@ -93,18 +93,6 @@ const routes = [
                 component: () => import("@/views/config/Config.vue"),
                 meta: { menuKey: "config" },
             },
-            // {
-            //     path: '/settings',
-            //     name: '设置',
-            //     component: () => import('@/views/settings/Settings.vue'),
-            //     meta: { menuKey: 'settings' }
-            // },
-            // {
-            //     path: '/about',
-            //     name: '关于我们',
-            //     component: () => import('@/views/about/About.vue'),
-            //     meta: { menuKey: 'about' }
-            // },
             {
                 path: "/manage",
                 name: "管理",
@@ -211,7 +199,7 @@ router.beforeEach(
                 ZXNotification({
                     title: "哼唧",
                     message: "哥哥这就嫌弃人家了吗？(ノへ￣、))",
-                    type: "😭",
+                    type: "error",
                     confetti: true,
                 });
 
@@ -249,7 +237,7 @@ router.beforeEach(
                 ZXNotification({
                     title: "欢迎光临~",
                     message: "请先登录哦 (｡･ω･｡)",
-                    type: "🥳",
+                    type: "success",
                     confetti: true,
                 });
             } else {
